@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Paragraph Adapter</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -513,6 +514,37 @@ textarea:focus { border-color: var(--accent); }
   border-color: var(--accent);
   color: var(--text);
 }
+
+/* ═══════════════════════════════
+   MOBILE / TOUCH
+═══════════════════════════════ */
+@media (max-width: 700px) {
+  .row { padding: 12px 14px; }
+  .mixer-section { padding: 12px 14px; }
+  .current-wrap { padding: 12px 14px; }
+
+  /* Taller mixer so chips have room */
+  .mixer-wrap { height: 360px; }
+
+  /* Stack sensibility boxes vertically on narrow screens */
+  .sensibility-row { flex-direction: column; gap: 8px; }
+  .sensibility-box { width: 100%; }
+  .sensibility-box.right { text-align: left; }
+  .sensibility-box.right .sensibility-label { text-align: left; }
+
+  /* Bigger chips for fat fingers */
+  .chip-pill { padding: 6px 14px !important; }
+
+  /* Stack the output header on small screens */
+  .row-label { flex-wrap: wrap; gap: 6px; }
+
+  /* Ensure output box doesn't get too tall and eat screen */
+  .output-current { max-height: 260px; }
+
+  /* Load button full width on mobile */
+  .sentence-row { flex-direction: column; }
+  .load-btn { width: 100%; text-align: center; }
+}
 </style>
 </head>
 <body>
@@ -808,6 +840,7 @@ function renderChips() {
       '</div>';
 
     chip.addEventListener('mousedown', function(e) { onChipMouseDown(e, word.key); });
+    chip.addEventListener('touchstart', function(e) { onChipTouchStart(e, word.key); }, { passive: false });
     mixer.appendChild(chip);
   });
 }
@@ -852,6 +885,52 @@ document.addEventListener('mouseup', function() {
   if (draggingKey) {
     draggingKey             = null;
     document.body.style.cursor = '';
+    renderChips();
+    scheduleUpdate(0);
+  }
+});
+
+/* ═══════════════════════════════
+   TOUCH DRAG
+═══════════════════════════════ */
+function onChipTouchStart(e, key) {
+  e.preventDefault();
+  e.stopPropagation();
+  var touch       = e.touches[0];
+  selectedKey     = key;
+  draggingKey     = key;
+  dragStartMouseX = touch.clientX;
+  dragStartMouseY = touch.clientY;
+  var word        = words.find(function(w) { return w.key === key; });
+  dragStartXFrac  = word.xFrac;
+  dragStartYFrac  = word.yFrac;
+  renderChips();
+}
+
+document.addEventListener('touchmove', function(e) {
+  if (!draggingKey) return;
+  e.preventDefault(); // prevent page scroll while dragging a chip
+  var touch   = e.touches[0];
+  var mixer   = document.getElementById('mixer');
+  var W       = mixer.clientWidth  || 600;
+  var H       = mixer.clientHeight || 360;
+  var PADH    = 30;
+  var PADV    = 26;
+  var usableX = W - PADH * 2;
+  var usableY = H - PADV * 2;
+  var deltaX  = touch.clientX - dragStartMouseX;
+  var deltaY  = touch.clientY - dragStartMouseY;
+  var word    = words.find(function(w) { return w.key === draggingKey; });
+  if (!word) return;
+  word.xFrac = Math.max(0, Math.min(1, dragStartXFrac + deltaX / usableX));
+  word.yFrac = Math.max(0, Math.min(1, dragStartYFrac + deltaY / usableY));
+  renderChips();
+  scheduleUpdate(150);
+}, { passive: false });
+
+document.addEventListener('touchend', function() {
+  if (draggingKey) {
+    draggingKey = null;
     renderChips();
     scheduleUpdate(0);
   }
