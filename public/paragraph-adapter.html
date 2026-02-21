@@ -523,6 +523,15 @@ textarea:focus { border-color: var(--accent); }
   .mixer-section { padding: 12px 14px; }
   .current-wrap { padding: 12px 14px; }
 
+  /* Reorder: source → output → mixer → concepts → rest */
+  .row-source       { order: 1; }
+  .current-wrap     { order: 2; }
+  .mixer-section    { order: 3; }
+  .row-concepts     { order: 4; }
+  .row-prompt       { order: 5; }
+  .row-base-prompt  { order: 6; }
+  .row-history      { order: 7; }
+
   /* Taller mixer so chips have room */
   .mixer-wrap { height: 360px; }
 
@@ -551,7 +560,7 @@ textarea:focus { border-color: var(--accent); }
 <div class="page">
 
   <!-- 1. SOURCE PARAGRAPH -->
-  <div class="row">
+  <div class="row row-source">
     <div class="row-label">Source paragraph</div>
     <textarea id="mission" rows="4" oninput="scheduleUpdate(800)">The restaurant on the corner has been serving the same dishes for twenty years. Regulars come every Friday, sitting at the same tables, ordering the same meals. The owner knows every name. Nothing ever changes, and nobody wants it to.</textarea>
   </div>
@@ -602,7 +611,7 @@ textarea:focus { border-color: var(--accent); }
   </div>
 
   <!-- 3. TRANSFORMATION CONCEPTS -->
-  <div class="row">
+  <div class="row row-concepts">
     <div class="row-label">Transformation concepts</div>
     <div class="sentence-row">
       <textarea id="sentence-input" rows="2">formal academic tone, add dry humour, shorter punchier sentences, melancholy nostalgia</textarea>
@@ -639,13 +648,13 @@ textarea:focus { border-color: var(--accent); }
   </div>
 
   <!-- 5. GENERATED PROMPT (preview) -->
-  <div class="row">
+  <div class="row row-prompt">
     <div class="row-label">Generated prompt</div>
     <div class="prompt-block" id="generated-prompt">—</div>
   </div>
 
   <!-- 6. BASE PROMPT TEMPLATE -->
-  <div class="row">
+  <div class="row row-base-prompt">
     <div class="row-label">Base prompt template</div>
     <div class="base-prompt-editor" id="base-editor">
       <div>
@@ -665,7 +674,7 @@ Preserve the core meaning of the original paragraph.</textarea>
   </div>
 
   <!-- 7. PREVIOUS OUTPUTS -->
-  <div class="row">
+  <div class="row row-history">
     <div class="row-label" style="margin-bottom:6px">Previous outputs</div>
     <div class="history-empty" id="history-empty">
       Previous outputs will appear here as you adjust the mixer.
@@ -840,7 +849,10 @@ function renderChips() {
       '</div>';
 
     chip.addEventListener('mousedown', function(e) { onChipMouseDown(e, word.key); });
-    chip.addEventListener('touchstart', function(e) { onChipTouchStart(e, word.key); }, { passive: false });
+    chip.addEventListener('touchstart',  function(e) { onChipTouchStart(e, word.key); }, { passive: false });
+    chip.addEventListener('touchmove',   onChipTouchMove, { passive: false });
+    chip.addEventListener('touchend',    onChipTouchEnd,  { passive: false });
+    chip.addEventListener('touchcancel', onChipTouchEnd,  { passive: false });
     mixer.appendChild(chip);
   });
 }
@@ -907,13 +919,14 @@ function onChipTouchStart(e, key) {
   renderChips();
 }
 
-document.addEventListener('touchmove', function(e) {
+function onChipTouchMove(e) {
   if (!draggingKey) return;
-  e.preventDefault(); // prevent page scroll while dragging a chip
+  e.preventDefault();
+  e.stopPropagation();
   var touch   = e.touches[0];
   var mixer   = document.getElementById('mixer');
   var W       = mixer.clientWidth  || 600;
-  var H       = mixer.clientHeight || 360;
+  var H       = mixer.clientHeight || 300;
   var PADH    = 30;
   var PADV    = 26;
   var usableX = W - PADH * 2;
@@ -926,15 +939,16 @@ document.addEventListener('touchmove', function(e) {
   word.yFrac = Math.max(0, Math.min(1, dragStartYFrac + deltaY / usableY));
   renderChips();
   scheduleUpdate(150);
-}, { passive: false });
+}
 
-document.addEventListener('touchend', function() {
-  if (draggingKey) {
-    draggingKey = null;
-    renderChips();
-    scheduleUpdate(0);
-  }
-});
+function onChipTouchEnd(e) {
+  if (!draggingKey) return;
+  e.preventDefault();
+  e.stopPropagation();
+  draggingKey = null;
+  renderChips();
+  scheduleUpdate(0);
+}
 
 /* ═══════════════════════════════
    PROMPT BUILDER
