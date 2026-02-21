@@ -621,61 +621,6 @@ textarea:focus { border-color: var(--accent); }
     <div class="row-label">Original thought</div>
     <textarea id="mission" rows="4" oninput="scheduleUpdate(800)">The restaurant on the corner has been serving the same dishes for twenty years. Regulars come every Friday, sitting at the same tables, ordering the same meals. The owner knows every name. Nothing ever changes, and nobody wants it to.</textarea>
   </div>
-
-  <!-- 2. CONCEPT MIXER with sensibility boxes below -->
-  <div class="mixer-section">
-    <div class="row-label">
-      Concept mixer
-      <span style="font-size:9px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400;">
-        — drag ↑↓ weight &nbsp; ←→ lean towards one of two sensibilities
-      </span>
-    </div>
-    <!-- Mixer canvas (full width) -->
-    <div class="mixer-wrap" id="mixer">
-      <div class="guide" style="top:25%"></div>
-      <div class="guide" style="top:50%"></div>
-      <div class="guide" style="top:75%"></div>
-      <div class="deadzone-band" id="deadzone-band">
-        <div class="deadzone-label">no lean</div>
-      </div>
-      <div class="scale-rail">
-        <span class="scale-val">1.00</span>
-        <span class="scale-val">0.75</span>
-        <span class="scale-val">0.50</span>
-        <span class="scale-val">0.25</span>
-        <span class="scale-val">0.00</span>
-      </div>
-      <div class="axis-top">↑ High influence</div>
-      <div class="axis-bot">Low influence ↓</div>
-      <div class="axis-left" id="axis-left">← Sensibility 1</div>
-      <div class="axis-right" id="axis-right">Sensibility 2 →</div>
-      <div class="mixer-empty" id="mixer-empty">
-        <div class="mixer-empty-icon">⟳</div>
-        Type transformation concepts below and click Load
-      </div>
-    </div>
-    <!-- Sensibility boxes below, left and right -->
-    <div class="sensibility-row">
-      <div class="sensibility-box left">
-        <div class="sensibility-label">← Sensibility 1</div>
-        <textarea id="direction-1" rows="2" oninput="scheduleUpdate(800)" placeholder="e.g. poetic and lyrical">poetic and lyrical</textarea>
-      </div>
-      <div class="sensibility-box right">
-        <div class="sensibility-label">Sensibility 2 →</div>
-        <textarea id="direction-2" rows="2" oninput="scheduleUpdate(800)" placeholder="e.g. clinical and precise">clinical and precise</textarea>
-      </div>
-    </div>
-  </div>
-
-  <!-- 3. TRANSFORMATION CONCEPTS -->
-  <div class="row row-concepts">
-    <div class="row-label">Transformation concepts</div>
-    <div class="sentence-row">
-      <textarea id="sentence-input" rows="2">formal academic tone, add dry humour, shorter punchier sentences, melancholy nostalgia</textarea>
-      <button class="load-btn" onclick="loadSentence()">Load concepts →</button>
-    </div>
-  </div>
-
   <!-- 4. CURRENT OUTPUT + MODEL CHOOSER -->
   <div class="current-wrap">
     <div class="row-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
@@ -703,6 +648,61 @@ textarea:focus { border-color: var(--accent); }
       Press 'Load concepts' to start live output
     </div>
   </div>
+
+  <!-- 2. CONCEPT MIXER with sensibility boxes below -->
+  <div class="mixer-section">
+    <div class="row-label">
+      Concept mixer
+      <span style="font-size:9px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400;">
+        — drag ↑↓ weight &nbsp; ←→ lean towards one of two sensibilities
+      </span>
+    </div>
+    <!-- Mixer canvas (full width) -->
+    <div class="mixer-wrap" id="mixer">
+      <div class="guide" style="top:25%"></div>
+      <div class="guide" style="top:50%"></div>
+      <div class="guide" style="top:75%"></div>
+      <div class="deadzone-band" id="deadzone-band">
+        <div class="deadzone-label">no lean</div>
+      </div>
+      <div class="scale-rail">
+        <span class="scale-val">1.00</span>
+        <span class="scale-val">0.75</span>
+        <span class="scale-val">0.50</span>
+        <span class="scale-val">0.25</span>
+        <span class="scale-val">0.00</span>
+      </div>
+      <div class="axis-top">↑</div>
+      <div class="axis-bot">↓</div>
+      <div class="axis-left" id="axis-left">← Sensibility 1</div>
+      <div class="axis-right" id="axis-right">Sensibility 2 →</div>
+      <div class="mixer-empty" id="mixer-empty">
+        <div class="mixer-empty-icon">⟳</div>
+        Type transformation concepts below and click Load
+      </div>
+    </div>
+    <!-- Sensibility boxes below, left and right -->
+    <div class="sensibility-row">
+      <div class="sensibility-box left">
+        <div class="sensibility-label">← Sensibility 1</div>
+        <textarea id="direction-1" rows="2" oninput="scheduleUpdate(800)" placeholder="e.g. poetic and lyrical">expressed as sound</textarea>
+      </div>
+      <div class="sensibility-box right">
+        <div class="sensibility-label">Sensibility 2 →</div>
+        <textarea id="direction-2" rows="2" oninput="scheduleUpdate(800)" placeholder="e.g. clinical and precise">expressed as code</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. TRANSFORMATION CONCEPTS -->
+  <div class="row row-concepts">
+    <div class="row-label">Transformation concepts</div>
+    <div class="sentence-row">
+      <textarea id="sentence-input" rows="2">cat perspective, dog perspective, bowl of petunias perspective, whale perspective, paranoid android perspective</textarea>
+      <button class="load-btn" onclick="loadSentence()">Load concepts →</button>
+    </div>
+  </div>
+
 
   <!-- 5. GENERATED PROMPT (preview) -->
   <div class="row row-prompt">
