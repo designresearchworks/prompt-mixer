@@ -79,31 +79,83 @@ textarea {
 }
 textarea:focus { border-color: var(--accent); }
 
-#mission       { font-size: 14px; }
-#sentence-input { font-size: 13px; }
+#mission { font-size: 14px; }
 
 .sentence-row {
   display: flex;
   gap: 10px;
-  align-items: flex-start;
+  align-items: stretch;
 }
-.sentence-row textarea { flex: 1; }
 
 .load-btn {
   background: var(--accent);
   color: white;
   border: none;
   border-radius: 8px;
-  padding: 10px 18px;
+  padding: 0 18px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  align-self: center;
+  flex-shrink: 0;
   transition: opacity 0.15s, transform 0.1s;
 }
 .load-btn:hover  { opacity: 0.85; }
 .load-btn:active { transform: scale(0.97); }
+
+/* ── Tag input (concepts) ─────────────────────── */
+.tag-input-wrap {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 5px 10px;
+  min-height: 34px;
+  cursor: text;
+  transition: border-color 0.15s;
+}
+.tag-input-wrap:focus-within { border-color: var(--accent); }
+.tag-token {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(124,92,252,0.18);
+  border: 1px solid rgba(124,92,252,0.35);
+  border-radius: 5px;
+  padding: 1px 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c4b5fd;
+  white-space: nowrap;
+  user-select: none;
+  gap: 5px;
+}
+.tag-token-del {
+  font-size: 10px;
+  opacity: 0.5;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 1px;
+  transition: opacity 0.1s;
+}
+.tag-token-del:hover { opacity: 1; }
+.tag-input-field {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  flex: 1;
+  min-width: 80px;
+  height: 22px;
+  padding: 0;
+}
+/* Hidden real textarea keeps the actual value for form/JS reads */
+#sentence-input { display: none; }
 
 /* ═══════════════════════════════
    MIXER + SENSIBILITY BOXES BELOW
@@ -176,18 +228,20 @@ textarea:focus { border-color: var(--accent); }
   font-weight: 600;
 }
 .sensibility-box.left .sensibility-label {
-  color: rgba(236,72,153,0.6);
+  color: rgba(236,72,153,0.7); /* updated dynamically by renderChips */
 }
 .sensibility-box.right .sensibility-label {
-  color: rgba(52,211,153,0.6);
+  color: rgba(52,211,153,0.7); /* updated dynamically by renderChips */
 }
 .sensibility-box textarea {
   font-size: 12px;
   background: var(--surface2);
   border: 1px solid var(--border2);
   border-radius: 6px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   resize: none;
+  height: 32px;
+  line-height: 1.4;
 }
 .guide {
   position: absolute;
@@ -196,22 +250,7 @@ textarea:focus { border-color: var(--accent); }
   background: var(--border);
   pointer-events: none;
 }
-.scale-rail {
-  position: absolute;
-  right: 12px;
-  top: 0; bottom: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 12px 0;
-  pointer-events: none;
-}
-.scale-val {
-  font-size: 9px;
-  letter-spacing: 1px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
+
 .axis-top {
   position: absolute;
   left: 12px; top: 10px;
@@ -231,24 +270,46 @@ textarea:focus { border-color: var(--accent); }
   left: 12px; top: 10px;
   font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
   color: rgba(236,72,153,0.40);
-  pointer-events: none;
+  pointer-events: all;
+  cursor: pointer;
   max-width: 35%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  z-index: 5;
+  transition: color 0.15s, opacity 0.15s;
 }
+.axis-left:hover { opacity: 0.85; filter: brightness(1.4); }
 .axis-right {
   position: absolute;
   right: 12px; top: 10px;
   font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
   color: rgba(52,211,153,0.40);
-  pointer-events: none;
+  pointer-events: all;
+  cursor: pointer;
   max-width: 35%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: right;
+  z-index: 5;
+  transition: color 0.15s, opacity 0.15s;
 }
+.axis-right:hover { opacity: 0.85; filter: brightness(1.4); }
+/* Hidden colour pickers anchored in the mixer corners */
+.axis-color-pick {
+  position: absolute;
+  top: 10px;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: none;
+}
+#axis-pick-1 { left: 12px; }
+#axis-pick-2 { right: 12px; }
 .mixer-empty {
   position: absolute;
   inset: 0;
@@ -269,11 +330,12 @@ textarea:focus { border-color: var(--accent); }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   cursor: grab;
   user-select: none;
   transform: translate(-50%, -50%);
   z-index: 10;
+  width: 72px;
 }
 .word-chip:hover .chip-pill { filter: brightness(1.15); }
 .word-chip.is-dragging { cursor: grabbing; z-index: 20; }
@@ -283,16 +345,22 @@ textarea:focus { border-color: var(--accent); }
   outline-offset: 2px;
 }
 .chip-pill {
-  border-radius: 999px;
-  padding: 4px 10px;
+  border-radius: 8px;
+  padding: 3px 6px;
   font-weight: 700;
+  font-size: 9px;
   border: 1.5px solid;
-  white-space: nowrap;
-  transition: background 0.15s, color 0.15s, border-color 0.15s, font-size 0.15s;
+  white-space: normal;
+  word-break: break-word;
+  text-align: center;
+  width: 100%;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.08s;
   box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+  line-height: 1.3;
+  transform-origin: center center;
 }
 .chip-weight {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
   font-family: 'Courier New', monospace;
   letter-spacing: 0.5px;
@@ -598,8 +666,9 @@ textarea:focus { border-color: var(--accent); }
   .sensibility-box.right { text-align: left; }
   .sensibility-box.right .sensibility-label { text-align: left; }
 
-  /* Bigger chips for fat fingers */
-  .chip-pill { padding: 6px 14px !important; }
+  /* Slightly more padding for fat fingers, but keep compact */
+  .chip-pill { padding: 4px 7px !important; }
+  .word-chip { width: 80px; }
 
   /* Stack the output header on small screens */
   .row-label { flex-wrap: wrap; gap: 6px; }
@@ -665,17 +734,12 @@ textarea:focus { border-color: var(--accent); }
       <div class="deadzone-band" id="deadzone-band">
         <div class="deadzone-label">no lean</div>
       </div>
-      <div class="scale-rail">
-        <span class="scale-val">1.00</span>
-        <span class="scale-val">0.75</span>
-        <span class="scale-val">0.50</span>
-        <span class="scale-val">0.25</span>
-        <span class="scale-val">0.00</span>
-      </div>
       <div class="axis-top">↑</div>
       <div class="axis-bot">↓</div>
-      <div class="axis-left" id="axis-left">← Sensibility 1</div>
-      <div class="axis-right" id="axis-right">Sensibility 2 →</div>
+      <div class="axis-left" id="axis-left" onclick="document.getElementById('axis-pick-1').click()" title="Click to change colour">← Sensibility 1</div>
+      <div class="axis-right" id="axis-right" onclick="document.getElementById('axis-pick-2').click()" title="Click to change colour">Sensibility 2 →</div>
+      <input type="color" id="axis-pick-1" class="axis-color-pick" value="#ec4899" oninput="renderChips()">
+      <input type="color" id="axis-pick-2" class="axis-color-pick" value="#34d399" oninput="renderChips()">
       <div class="mixer-empty" id="mixer-empty">
         <div class="mixer-empty-icon">⟳</div>
         Type transformation concepts below and click Load
@@ -685,11 +749,11 @@ textarea:focus { border-color: var(--accent); }
     <div class="sensibility-row">
       <div class="sensibility-box left">
         <div class="sensibility-label">← Sensibility 1</div>
-        <textarea id="direction-1" rows="2" oninput="scheduleUpdate(800)" placeholder="e.g. poetic and lyrical">expressed as sound</textarea>
+        <textarea id="direction-1" rows="1" oninput="scheduleUpdate(800)" placeholder="e.g. poetic and lyrical">dour and serious</textarea>
       </div>
       <div class="sensibility-box right">
         <div class="sensibility-label">Sensibility 2 →</div>
-        <textarea id="direction-2" rows="2" oninput="scheduleUpdate(800)" placeholder="e.g. clinical and precise">expressed as code</textarea>
+        <textarea id="direction-2" rows="1" oninput="scheduleUpdate(800)" placeholder="e.g. clinical and precise">lighthearted and silly</textarea>
       </div>
     </div>
   </div>
@@ -698,8 +762,13 @@ textarea:focus { border-color: var(--accent); }
   <div class="row row-concepts">
     <div class="row-label">Transformation concepts</div>
     <div class="sentence-row">
-      <textarea id="sentence-input" rows="2">cat perspective, dog perspective, bowl of petunias perspective, whale perspective, paranoid android perspective</textarea>
-      <button class="load-btn" onclick="loadSentence()">Load concepts →</button>
+      <!-- Hidden real textarea keeps value in sync for buildPrompt / loadSentence -->
+      <textarea id="sentence-input">cat perspective, dog perspective, bowl of petunias perspective, whale perspective, paranoid android perspective</textarea>
+      <!-- Visible tag input -->
+      <div class="tag-input-wrap" id="tag-input-wrap">
+        <input class="tag-input-field" id="tag-input-field" type="text" placeholder="type a concept, press comma…" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="load-btn" onclick="loadSentence()">Load →</button>
     </div>
   </div>
 
@@ -801,13 +870,66 @@ function simpleMarkdown(text) {
 /* ═══════════════════════════════
    COLOUR MAPPING
 ═══════════════════════════════ */
-function chipStyle(w) {
-  if (w >= 0.85) return { bg: 'rgba(217,119,6,0.32)',   color: '#fcd34d', border: '#d97706' };
-  if (w >= 0.68) return { bg: 'rgba(194,65,12,0.28)',   color: '#fb923c', border: '#c2410c' };
-  if (w >= 0.50) return { bg: 'rgba(124,92,252,0.28)',  color: '#c4b5fd', border: '#7c5cfc' };
-  if (w >= 0.32) return { bg: 'rgba(29,78,216,0.24)',   color: '#60a5fa', border: '#2563eb' };
-  if (w >= 0.15) return { bg: 'rgba(30,58,138,0.20)',   color: '#4a7fc1', border: '#1d4ed8' };
-  return           { bg: 'rgba(30,30,60,0.20)',         color: '#3a3a58', border: '#252540' };
+// Parse a #rrggbb hex string to {r,g,b}
+function hexToRgb(hex) {
+  var h = hex.replace('#', '');
+  return {
+    r: parseInt(h.slice(0,2), 16),
+    g: parseInt(h.slice(2,4), 16),
+    b: parseInt(h.slice(4,6), 16)
+  };
+}
+// Return rgba() string from hex + alpha
+function hexToRgbA(hex, alpha) {
+  var c = hexToRgb(hex);
+  return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + alpha + ')';
+}
+function lerp(a, b, f) { return Math.round(a + (b - a) * f); }
+
+// Weight → text colour: bright warm at top, dim/dark at bottom
+function weightTextColor(w) {
+  // Interpolate through: dim grey (0) → blue (0.3) → purple (0.55) → orange (0.8) → gold (1.0)
+  var stops = [
+    { at: 0.00, r: 58,  g: 58,  b: 88  },
+    { at: 0.30, r: 96,  g: 165, b: 250 },
+    { at: 0.55, r: 196, g: 181, b: 253 },
+    { at: 0.80, r: 251, g: 146, b: 60  },
+    { at: 1.00, r: 252, g: 211, b: 77  }
+  ];
+  var lo = stops[0], hi = stops[stops.length - 1];
+  for (var i = 0; i < stops.length - 1; i++) {
+    if (w >= stops[i].at && w <= stops[i+1].at) { lo = stops[i]; hi = stops[i+1]; break; }
+  }
+  var f = lo.at === hi.at ? 0 : (w - lo.at) / (hi.at - lo.at);
+  return 'rgb(' + lerp(lo.r,hi.r,f) + ',' + lerp(lo.g,hi.g,f) + ',' + lerp(lo.b,hi.b,f) + ')';
+}
+
+// Lean → background colour: lean colour tinted by intensity, dark base when neutral
+function chipStyle(weight, xFrac) {
+  var textColor = weightTextColor(weight);
+
+  var leanInDead = inDeadzone(xFrac);
+  var amount     = leanInDead ? 0 : leanIntensity(xFrac);
+  var leanLeft   = xFrac < 0.5;
+
+  var pickEl = document.getElementById(leanLeft ? 'axis-pick-1' : 'axis-pick-2');
+  var lc     = hexToRgb(pickEl ? pickEl.value : (leanLeft ? '#ec4899' : '#34d399'));
+
+  // Background: dark base when neutral, fades to lean colour as intensity rises
+  var bgAlpha    = leanInDead ? 0.12 : (0.10 + amount * 0.30);
+  var borderAlpha= leanInDead ? 0.18 : (0.25 + amount * 0.60);
+
+  // In deadzone use a neutral dark bg; outside use the lean colour
+  var bgColor, borderColor;
+  if (leanInDead) {
+    bgColor     = 'rgba(40,40,70,' + bgAlpha.toFixed(2) + ')';
+    borderColor = 'rgba(80,80,120,' + borderAlpha.toFixed(2) + ')';
+  } else {
+    bgColor     = 'rgba(' + lc.r + ',' + lc.g + ',' + lc.b + ',' + bgAlpha.toFixed(2) + ')';
+    borderColor = 'rgba(' + lc.r + ',' + lc.g + ',' + lc.b + ',' + borderAlpha.toFixed(2) + ')';
+  }
+
+  return { bg: bgColor, color: textColor, border: borderColor };
 }
 
 /* ═══════════════════════════════
@@ -828,17 +950,38 @@ function loadSentence() {
   });
 
   var n = unique.length;
+  // Pick one random concept to be "active" (high weight, centred)
+  var activeIndex = Math.floor(Math.random() * n);
+
   words = unique.map(function(token, i) {
     var label = token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
-    // Distribute evenly through vertical space (top=high influence, bottom=low)
-    // Use 15%–85% of the range to avoid edge clipping
-    var yFrac = n > 1 ? 0.15 + (i / (n - 1)) * 0.70 : 0.5;
-    return {
-      key:   token.toLowerCase(),
-      label: label,
-      xFrac: 0.5,   // centre = deadzone = no lean
-      yFrac: yFrac
-    };
+    if (i === activeIndex) {
+      // Active concept: mid-high weight (yFrac ~0.2), centred in deadzone
+      return {
+        key:   token.toLowerCase(),
+        label: label,
+        xFrac: 0.5,   // deadzone, no lean
+        yFrac: 0.20   // weight = 0.80
+      };
+    } else {
+      // Inactive: zero weight (bottom), evenly distributed across X
+      // Spread across full width in bands, skipping the one used for active
+      var inactiveCount  = n - 1;
+      var inactiveIndex  = i < activeIndex ? i : i - 1;
+      var xFrac;
+      if (inactiveCount === 1) {
+        xFrac = 0.5;
+      } else {
+        // Spread from 0.05 to 0.95, evenly spaced
+        xFrac = 0.05 + (inactiveIndex / (inactiveCount - 1)) * 0.90;
+      }
+      return {
+        key:   token.toLowerCase(),
+        label: label,
+        xFrac: xFrac,
+        yFrac: 1.0    // weight = 0.0
+      };
+    }
   });
 
   document.getElementById('mixer-empty').style.display = words.length ? 'none' : '';
@@ -898,6 +1041,19 @@ function renderChips() {
   document.getElementById('axis-left').textContent  = '← ' + (d1 || 'Sensibility 1');
   document.getElementById('axis-right').textContent = (d2 || 'Sensibility 2') + ' →';
 
+  // Sync axis label + sensibility box label colours from colour pickers
+  var c1El = document.getElementById('axis-pick-1');
+  var c2El = document.getElementById('axis-pick-2');
+  var c1 = c1El ? c1El.value : '#ec4899';
+  var c2 = c2El ? c2El.value : '#34d399';
+  document.getElementById('axis-left').style.color  = hexToRgbA(c1, 0.5);
+  document.getElementById('axis-right').style.color = hexToRgbA(c2, 0.5);
+  // Update sensibility label colours
+  var sLabels = document.querySelectorAll('.sensibility-box.left .sensibility-label');
+  sLabels.forEach(function(el) { el.style.color = hexToRgbA(c1, 0.7); });
+  var sLabels2 = document.querySelectorAll('.sensibility-box.right .sensibility-label');
+  sLabels2.forEach(function(el) { el.style.color = hexToRgbA(c2, 0.7); });
+
   // Position and size the deadzone band
   var dzLeft  = (0.5 - DEADZONE_HALF) * W;
   var dzWidth = DEADZONE_HALF * 2 * W;
@@ -907,10 +1063,11 @@ function renderChips() {
 
   words.forEach(function(word) {
     var weight = 1.0 - word.yFrac;
-    var style  = chipStyle(weight);
+    var style  = chipStyle(weight, word.xFrac);
     var px     = PADH + word.xFrac * (W - PADH * 2);
     var py     = PADV + word.yFrac * (H - PADV * 2);
-    var fs     = Math.round(9 + weight * 4);
+    // Scale smoothly: 0.65 at zero weight → 1.10 at full weight
+    var scale  = (0.65 + weight * 0.45).toFixed(3);
 
     var lean = word.xFrac;
     var leanText;
@@ -935,7 +1092,7 @@ function renderChips() {
         'background:' + style.bg + ';' +
         'color:' + style.color + ';' +
         'border-color:' + style.border + ';' +
-        'font-size:' + fs + 'px' +
+        'transform:scale(' + scale + ')' +
       '">' + word.label + '</div>' +
       '<div class="chip-weight" style="color:' + style.color + '">' +
         weight.toFixed(2) +
@@ -1324,6 +1481,120 @@ function scheduleUpdate(delay) {
     generateOutput();
   }, delay);
 }
+
+/* ═══════════════════════════════
+   RESIZE
+═══════════════════════════════ */
+var resizeTimer = null;
+window.addEventListener('resize', function() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderChips, 60);
+});
+
+/* ═══════════════════════════════
+   TAG INPUT
+═══════════════════════════════ */
+var tagTokens = []; // array of strings
+
+function tagSyncTextarea() {
+  document.getElementById('sentence-input').value = tagTokens.join(', ');
+}
+
+function tagRender() {
+  var wrap  = document.getElementById('tag-input-wrap');
+  var field = document.getElementById('tag-input-field');
+  // Remove existing token els (leave the field)
+  wrap.querySelectorAll('.tag-token').forEach(function(el) { el.remove(); });
+  // Insert tokens before the field
+  tagTokens.forEach(function(tok, idx) {
+    var span = document.createElement('span');
+    span.className = 'tag-token';
+    span.innerHTML = escHtml(tok) +
+      '<span class="tag-token-del" data-idx="' + idx + '" title="Remove">×</span>';
+    span.querySelector('.tag-token-del').addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      tagTokens.splice(idx, 1);
+      tagRender();
+      tagSyncTextarea();
+    });
+    wrap.insertBefore(span, field);
+  });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function tagCommit(raw) {
+  var val = raw.trim().replace(/,+$/, '').trim();
+  if (val.length === 0) return;
+  // avoid duplicates (case-insensitive)
+  if (!tagTokens.some(function(t) { return t.toLowerCase() === val.toLowerCase(); })) {
+    tagTokens.push(val);
+  }
+}
+
+// Initialise from the hidden textarea's default value
+(function initTagInput() {
+  var hidden = document.getElementById('sentence-input');
+  tagTokens = hidden.value.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  tagRender();
+
+  var field = document.getElementById('tag-input-field');
+  var wrap  = document.getElementById('tag-input-wrap');
+
+  // Click anywhere in wrap focuses the field
+  wrap.addEventListener('click', function() { field.focus(); });
+
+  field.addEventListener('keydown', function(e) {
+    if (e.key === 'Backspace' && field.value === '' && tagTokens.length) {
+      // Delete last token on backspace when field empty
+      tagTokens.pop();
+      tagRender();
+      tagSyncTextarea();
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      tagCommit(field.value);
+      field.value = '';
+      tagRender();
+      tagSyncTextarea();
+    }
+  });
+
+  field.addEventListener('input', function() {
+    var val = field.value;
+    // Commit on comma
+    if (val.indexOf(',') !== -1) {
+      var parts = val.split(',');
+      // Last part stays in field
+      var last = parts.pop();
+      parts.forEach(function(p) { tagCommit(p); });
+      field.value = last;
+      tagRender();
+      tagSyncTextarea();
+    }
+  });
+
+  // Commit dangling text on blur
+  field.addEventListener('blur', function() {
+    if (field.value.trim()) {
+      tagCommit(field.value);
+      field.value = '';
+      tagRender();
+      tagSyncTextarea();
+    }
+  });
+})();
+
+// Override restoreHistory to also refresh tag UI
+var _origRestoreHistory = restoreHistory;
+restoreHistory = function(index) {
+  _origRestoreHistory(index);
+  var hidden = document.getElementById('sentence-input');
+  tagTokens = hidden.value.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  tagRender();
+};
 
 /* ═══════════════════════════════
    INIT
