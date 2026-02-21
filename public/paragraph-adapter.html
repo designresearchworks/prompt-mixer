@@ -516,6 +516,63 @@ textarea:focus { border-color: var(--accent); }
 }
 
 /* ═══════════════════════════════
+   COLLAPSIBLE SECTIONS
+═══════════════════════════════ */
+.collapse-btn {
+  background: none;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.6;
+}
+.collapse-btn:hover { color: var(--text); border-color: var(--accent); }
+.collapsible-body {
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+  max-height: 600px;
+  opacity: 1;
+}
+.collapsible-body.collapsed {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* ═══════════════════════════════
+   HISTORY TOOLTIP
+═══════════════════════════════ */
+.history-item {
+  position: relative;
+}
+.history-tooltip {
+  display: none;
+  position: fixed;
+  z-index: 999;
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #d0d0e8;
+  max-width: 420px;
+  max-height: 320px;
+  overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+.history-tooltip::-webkit-scrollbar { width: 3px; }
+.history-tooltip::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.history-tooltip.visible { display: block; }
+
+/* ═══════════════════════════════
    MOBILE / TOUCH
 ═══════════════════════════════ */
 @media (max-width: 700px) {
@@ -561,7 +618,7 @@ textarea:focus { border-color: var(--accent); }
 
   <!-- 1. SOURCE PARAGRAPH -->
   <div class="row row-source">
-    <div class="row-label">Source paragraph</div>
+    <div class="row-label">Original thought</div>
     <textarea id="mission" rows="4" oninput="scheduleUpdate(800)">The restaurant on the corner has been serving the same dishes for twenty years. Regulars come every Friday, sitting at the same tables, ordering the same meals. The owner knows every name. Nothing ever changes, and nobody wants it to.</textarea>
   </div>
 
@@ -643,32 +700,42 @@ textarea:focus { border-color: var(--accent); }
       </div>
     </div>
     <div class="output-current" id="output-current">
-      Load transformation concepts into the mixer to see output…
+      Press 'Load concepts' to start live output
     </div>
   </div>
 
   <!-- 5. GENERATED PROMPT (preview) -->
   <div class="row row-prompt">
-    <div class="row-label">Generated prompt</div>
-    <div class="prompt-block" id="generated-prompt">—</div>
+    <div class="row-label">
+      Generated prompt
+      <button class="collapse-btn" onclick="toggleCollapse('generated-prompt-body', this)">show</button>
+    </div>
+    <div class="collapsible-body collapsed" id="generated-prompt-body">
+      <div class="prompt-block" id="generated-prompt">—</div>
+    </div>
   </div>
 
   <!-- 6. BASE PROMPT TEMPLATE -->
   <div class="row row-base-prompt">
-    <div class="row-label">Base prompt template</div>
-    <div class="base-prompt-editor" id="base-editor">
-      <div>
-        <label>Preamble</label>
-        <textarea id="base-preamble" rows="3" oninput="scheduleUpdate(800)">You have several transformation concepts to apply. Each has two properties:
+    <div class="row-label">
+      Base prompt template
+      <button class="collapse-btn" onclick="toggleCollapse('base-prompt-body', this)">show</button>
+    </div>
+    <div class="collapsible-body collapsed" id="base-prompt-body">
+      <div class="base-prompt-editor" id="base-editor">
+        <div>
+          <label>Preamble</label>
+          <textarea id="base-preamble" rows="3" oninput="scheduleUpdate(800)">You have several transformation concepts to apply to the thought. Each has two properties:
 - Weight (0.00 = ignore, 1.00 = apply strongly)
-- Lean toward one of two sensibilities (or neutral if in the middle)</textarea>
-      </div>
-      <div>
-        <label>Closing instruction</label>
-        <textarea id="base-closing" rows="4" oninput="scheduleUpdate(800)">Rewrite the paragraph applying these transformations proportionally.
+- Optionally, lean toward a sensibility</textarea>
+        </div>
+        <div>
+          <label>Closing instruction</label>
+          <textarea id="base-closing" rows="4" oninput="scheduleUpdate(800)">Reimagine the original thought applying these transformations proportionally.
 Higher-weighted concepts should have a more visible effect on the output.
 Concepts that lean toward a sensibility should pull the style in that direction.
-Preserve the core meaning of the original paragraph.</textarea>
+Preserve the core meaning of the original thought.</textarea>
+        </div>
       </div>
     </div>
   </div>
@@ -683,6 +750,9 @@ Preserve the core meaning of the original paragraph.</textarea>
   </div>
 
 </div><!-- /page -->
+
+<!-- Floating history tooltip -->
+<div class="history-tooltip" id="history-tooltip"></div>
 
 <script>
 /* ═══════════════════════════════
@@ -760,13 +830,14 @@ function loadSentence() {
   var n = unique.length;
   words = unique.map(function(token, i) {
     var label = token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
-    var spread = n > 1 ? 0.3 : 0;
-    var xOff   = n > 1 ? (i / (n - 1) - 0.5) * spread : 0;
+    // Distribute evenly through vertical space (top=high influence, bottom=low)
+    // Use 15%–85% of the range to avoid edge clipping
+    var yFrac = n > 1 ? 0.15 + (i / (n - 1)) * 0.70 : 0.5;
     return {
       key:   token.toLowerCase(),
       label: label,
-      xFrac: 0.5 + xOff,
-      yFrac: 0.5
+      xFrac: 0.5,   // centre = deadzone = no lean
+      yFrac: yFrac
     };
   });
 
@@ -776,12 +847,37 @@ function loadSentence() {
 }
 
 /* ═══════════════════════════════
-   DEADZONE CONFIG
+   DEADZONE CONFIG + LEAN CURVE
 ═══════════════════════════════ */
 var DEADZONE_HALF = 0.10; // 10% either side of centre = 20% total band
 
 function inDeadzone(xFrac) {
   return xFrac >= (0.5 - DEADZONE_HALF) && xFrac <= (0.5 + DEADZONE_HALF);
+}
+
+// Returns a 0–1 lean intensity for a given xFrac, with non-linear curve.
+// 0 = fully toward sensibility 1, 1 = fully toward sensibility 2.
+// Inside the deadzone returns 0.
+// Outside the deadzone: normalise distance from deadzone edge to canvas edge,
+// then apply a power curve (ease-in) so small movements near the deadzone
+// produce small lean values, and sensitivity ramps up toward the extremes.
+function leanIntensity(xFrac) {
+  var CURVE   = 2.5; // exponent — higher = more pronounced ease-in
+  var MIN_PCT = 0.01; // ensure entering the active zone reads 1%, not 0%
+  if (xFrac <= 0.5) {
+    // Left side — toward sensibility 1
+    var dzEdge     = 0.5 - DEADZONE_HALF; // e.g. 0.40
+    if (xFrac >= dzEdge) return 0;        // inside deadzone
+    var normalised = (dzEdge - xFrac) / dzEdge; // 0 at dz edge, 1 at far left
+    // Remap [0,1] → [MIN_PCT,1] so just-outside-deadzone reads ~1%
+    return MIN_PCT + (1 - MIN_PCT) * Math.pow(normalised, CURVE);
+  } else {
+    // Right side — toward sensibility 2
+    var dzEdge     = 0.5 + DEADZONE_HALF; // e.g. 0.60
+    if (xFrac <= dzEdge) return 0;         // inside deadzone
+    var normalised = (xFrac - dzEdge) / (1 - dzEdge); // 0 at dz edge, 1 at far right
+    return MIN_PCT + (1 - MIN_PCT) * Math.pow(normalised, CURVE);
+  }
 }
 
 /* ═══════════════════════════════
@@ -821,9 +917,9 @@ function renderChips() {
     if (inDeadzone(lean)) {
       leanText = '· neutral';
     } else if (lean < 0.5) {
-      leanText = '← ' + (1.0 - lean).toFixed(2);
+      leanText = '← ' + Math.round(leanIntensity(lean) * 100) + '%';
     } else {
-      leanText = lean.toFixed(2) + ' →';
+      leanText = Math.round(leanIntensity(lean) * 100) + '% →';
     }
 
     var chip = document.createElement('div');
@@ -963,27 +1059,26 @@ function buildPrompt() {
   // Filter out zero-weight concepts entirely
   var activeWords = words.filter(function(w) { return (1.0 - w.yFrac) > 0.01; });
 
-  if (!activeWords.length) return 'Here is the original paragraph:\n\n"""\n' + source + '\n"""\n\nNo active transformation concepts (all at zero weight).';
+  if (!activeWords.length) return 'Here is the original thought:\n\n"""\n' + source + '\n"""\n\nNo active transformation concepts (all at zero weight).';
 
   var lines = activeWords.map(function(w) {
     var weight = (1.0 - w.yFrac).toFixed(2);
     var lean   = w.xFrac;
     var leanDesc;
     if (inDeadzone(lean)) {
-      // In the deadzone — no sensibility lean mentioned
-      leanDesc = 'no directional lean';
+      leanDesc = null;
     } else if (lean < 0.5) {
-      leanDesc = 'leans ' + Math.round((1.0 - lean) * 100) + '% toward "' + dir1 + '"';
+      leanDesc = 'leans ' + Math.round(leanIntensity(lean) * 100) + '% toward "' + dir1 + '"';
     } else {
-      leanDesc = 'leans ' + Math.round(lean * 100) + '% toward "' + dir2 + '"';
+      leanDesc = 'leans ' + Math.round(leanIntensity(lean) * 100) + '% toward "' + dir2 + '"';
     }
-    return w.label + ': weight ' + weight + ', ' + leanDesc;
+    return w.label + ': weight ' + weight + (leanDesc ? ', ' + leanDesc : '');
   }).join('\n');
 
   var brief   = document.getElementById('keep-brief').checked
                   ? '\nKeep your answer extremely brief (e.g., less than 20 words).'
                   : '';
-  var prompt = 'Here is the original paragraph:\n\n"""\n' + source + '\n"""\n\n' +
+  var prompt = 'Here is the original thought:\n\n"""\n' + source + '\n"""\n\n' +
     preamble + '\n\n' +
     lines + '\n\n' +
     closing + brief;
@@ -1134,7 +1229,9 @@ function renderHistory() {
       '<span class="history-preview">' + preview + '</span>' +
       '<div class="history-tags">' + tags + '</div>';
 
-    div.addEventListener('click', function() { restoreHistory(i); });
+div.addEventListener('click', function() { restoreHistory(i); });
+//div.addEventListener('mouseenter', function(e) { showHistoryTooltip(e, item.output); }); // ← pass e instead of div
+//div.addEventListener('mouseleave', hideHistoryTooltip);
     list.appendChild(div);
   });
 }
@@ -1164,6 +1261,53 @@ function restoreHistory(index) {
   document.querySelectorAll('.history-item').forEach(function(el) { el.classList.remove('active'); });
   var items = document.querySelectorAll('.history-item');
   if (items[index]) items[index].classList.add('active');
+}
+
+/* ═══════════════════════════════
+   COLLAPSIBLE TOGGLE
+═══════════════════════════════ */
+function toggleCollapse(id, btn) {
+  var body = document.getElementById(id);
+  var isCollapsed = body.classList.contains('collapsed');
+  body.classList.toggle('collapsed');
+  btn.textContent = isCollapsed ? 'hide' : 'show';
+}
+
+/* ═══════════════════════════════
+   HISTORY TOOLTIP
+═══════════════════════════════ */
+var tooltip = document.getElementById('history-tooltip');
+
+function showHistoryTooltip(e, outputText) {
+  tooltip.innerHTML = simpleMarkdown(outputText || '(empty)');
+  tooltip.classList.add('visible');
+  positionTooltipNearMouse(e.clientX, e.clientY);
+}
+
+function positionTooltipNearMouse(mx, my) {
+  var tipW    = Math.min(420, window.innerWidth - 16);
+  var tipH    = 320;
+  var padding = 8;
+  var offset  = 14;
+
+  // Prefer left of cursor, fall back to right
+  var x = mx - tipW - offset;
+  if (x < padding) x = mx + offset;
+  if (x + tipW > window.innerWidth - padding) x = window.innerWidth - tipW - padding;
+  if (x < padding) x = padding;
+
+  // Vertically centred on cursor
+  var y = my - tipH / 2;
+  if (y + tipH > window.innerHeight - padding) y = window.innerHeight - tipH - padding;
+  if (y < padding) y = padding;
+
+  tooltip.style.left  = Math.round(x) + 'px';
+  tooltip.style.top   = Math.round(y) + 'px';
+  tooltip.style.width = tipW + 'px';
+}
+
+function hideHistoryTooltip() {
+  tooltip.classList.remove('visible');
 }
 
 /* ═══════════════════════════════
