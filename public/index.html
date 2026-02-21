@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Prompt Weight Mixer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0b0b13;
+  --surface:  #11111c;
+  --surface2: #181828;
+  --border:   #1e1e32;
+  --border2:  #2a2a45;
+  --muted:    #484868;
+  --text:     #c4c4de;
+  --accent:   #7c5cfc;
+  --green:    #22c55e;
+  --gold:     #d97706;
+}
+
+html, body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.menu-wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 80px 24px;
+}
+
+.menu-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: #e4e4f8;
+  margin-bottom: 6px;
+}
+
+.menu-sub {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-bottom: 48px;
+}
+
+.cards {
+  display: flex;
+  gap: 20px;
+}
+
+.card {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  padding: 32px 28px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card:hover {
+  border-color: var(--accent);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 32px rgba(124,92,252,0.12);
+}
+
+.card-icon {
+  font-size: 32px;
+  opacity: 0.7;
+}
+
+.card-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: #e4e4f8;
+}
+
+.card-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.card-arrow {
+  margin-top: auto;
+  padding-top: 8px;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+</style>
+</head>
+<body>
+<div class="menu-wrap">
+  <div class="menu-title">Prompt Weight Mixer</div>
+  <div class="menu-sub">
+    Explore how weighting individual words and concepts influences LLM output in real time.
+    Choose a mode below.
+  </div>
+
+  <div class="cards">
+
+    <a class="card" href="sentence-mixer.html">
+      <div class="card-icon">&#9783;</div>
+      <div class="card-name">Sentence Mixer</div>
+      <div class="card-desc">
+        Set a mission, load an influence sentence, and drag words
+        up or down to control how strongly each shapes the generated output.
+      </div>
+      <div class="card-arrow">Open &rarr;</div>
+    </a>
+
+    <a class="card" href="paragraph-adapter.html">
+      <div class="card-icon">&#10227;</div>
+      <div class="card-name">Paragraph Adapter</div>
+      <div class="card-desc">
+        Paste a source paragraph, define transformation concepts,
+        and mix their weights to see the paragraph rewritten in real time.
+      </div>
+      <div class="card-arrow">Open &rarr;</div>
+    </a>
+
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Prompt Weight Mixer</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0b0b13;
+  --surface:  #11111c;
+  --surface2: #181828;
+  --border:   #1e1e32;
+  --border2:  #2a2a45;
+  --muted:    #484868;
+  --text:     #c4c4de;
+  --accent:   #7c5cfc;
+  --green:    #22c55e;
+  --gold:     #d97706;
+}
+
+html, body {
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* ═══════════════════════════════
+   SPLIT LAYOUT
+═══════════════════════════════ */
+.split {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── LEFT PANEL ── */
+.left {
+  width: 54%;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.left::-webkit-scrollbar { width: 4px; }
+.left::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── RIGHT PANEL ── */
+.right {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.right::-webkit-scrollbar { width: 4px; }
+.right::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ═══════════════════════════════
+   SHARED ROW STYLE
+═══════════════════════════════ */
+.row {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.row:last-child { border-bottom: none; }
+
+.row-label {
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ═══════════════════════════════
+   LEFT — INPUTS
+═══════════════════════════════ */
+textarea {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  line-height: 1.6;
+}
+textarea:focus { border-color: var(--accent); }
+
+#mission       { font-size: 15px; }
+#sentence-input { font-size: 13px; }
+
+.sentence-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.sentence-row textarea { flex: 1; }
+
+.load-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: center;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.load-btn:hover  { opacity: 0.85; }
+.load-btn:active { transform: scale(0.97); }
+
+/* ═══════════════════════════════
+   LEFT — MIXER
+═══════════════════════════════ */
+.mixer-wrap {
+  position: relative;
+  height: 280px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border2);
+  background:
+    linear-gradient(to bottom,
+      rgba(217,119,6,0.07)   0%,
+      rgba(109,40,217,0.04) 45%,
+      rgba(29,78,216,0.07)  100%),
+    var(--surface);
+}
+.guide {
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+.scale-rail {
+  position: absolute;
+  right: 12px;
+  top: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 12px 0;
+  pointer-events: none;
+}
+.scale-val {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.axis-top {
+  position: absolute;
+  left: 12px; top: 10px;
+  font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: rgba(251,191,36,0.45);
+  pointer-events: none;
+}
+.axis-bot {
+  position: absolute;
+  left: 12px; bottom: 10px;
+  font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: rgba(96,165,250,0.35);
+  pointer-events: none;
+}
+.mixer-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+.mixer-empty-icon { font-size: 24px; opacity: 0.35; }
+
+/* Word chips */
+.word-chip {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: grab;
+  user-select: none;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+}
+.word-chip:hover .chip-pill { filter: brightness(1.15); }
+.word-chip.is-dragging { cursor: grabbing; z-index: 20; }
+.word-chip.is-dragging .chip-pill { filter: brightness(1.3); box-shadow: 0 4px 24px rgba(0,0,0,0.6); }
+.word-chip.selected .chip-pill {
+  outline: 2px solid rgba(255,255,255,0.65);
+  outline-offset: 2px;
+}
+.chip-pill {
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 700;
+  border: 1.5px solid;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, font-size 0.15s;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+}
+.chip-weight {
+  font-size: 9px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+  transition: color 0.15s;
+}
+
+/* ═══════════════════════════════
+   LEFT — PROMPT BLOCK
+═══════════════════════════════ */
+.prompt-block {
+  background: #060d14;
+  border: 1px solid #0e2030;
+  border-radius: 8px;
+  padding: 14px 18px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #3d8f5c;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ═══════════════════════════════
+   RIGHT — CURRENT OUTPUT (sticky)
+═══════════════════════════════ */
+.current-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border2);
+  flex-shrink: 0;
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--green);
+  font-weight: 600;
+}
+.live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: blink 1.6s ease-in-out infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+
+.output-current {
+  margin-top: 10px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 18px 22px;
+  font-size: 14px;
+  line-height: 1.9;
+  color: #d0d0e8;
+  transition: opacity 0.2s;
+  box-shadow: 0 0 0 1px rgba(124,92,252,0.15), 0 4px 24px rgba(0,0,0,0.4);
+}
+.output-current.fading { opacity: 0.3; }
+
+/* ═══════════════════════════════
+   RIGHT — HISTORY
+═══════════════════════════════ */
+.history-wrap {
+  padding: 0 24px 40px;
+  flex: 1;
+}
+
+.history-empty {
+  padding-top: 28px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.7;
+}
+
+.history-item {
+  margin-top: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: opacity 0.4s;
+}
+.history-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.history-ago {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.snap-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+.snap-tag {
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.history-text {
+  padding: 14px 18px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--text);
+}
+
+/* divider between sticky and history */
+.history-label-row {
+  padding: 16px 24px 0;
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+<div class="split">
+
+  <!-- ════════════ LEFT ════════════ -->
+  <div class="left">
+
+    <!-- Mission -->
+    <div class="row">
+      <div class="row-label">Mission</div>
+      <textarea id="mission" rows="2" oninput="scheduleUpdate()">Describe a dinner for Friday night</textarea>
+    </div>
+
+    <!-- Sentence -->
+    <div class="row">
+      <div class="row-label">Influence sentence</div>
+      <div class="sentence-row">
+        <textarea id="sentence-input" rows="2">Fresh fish and haddock with crispy chips and white wine</textarea>
+        <button class="load-btn" onclick="loadSentence()">Load into mixer →</button>
+      </div>
+    </div>
+
+    <!-- Mixer -->
+    <div class="row">
+      <div class="row-label">
+        Influence mixer
+        <span style="font-size:9px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400;">
+          — drag up ↑ more / down ↓ less
+        </span>
+      </div>
+      <div class="mixer-wrap" id="mixer">
+        <div class="guide" style="top:25%"></div>
+        <div class="guide" style="top:50%"></div>
+        <div class="guide" style="top:75%"></div>
+        <div class="scale-rail">
+          <span class="scale-val">1.00</span>
+          <span class="scale-val">0.75</span>
+          <span class="scale-val">0.50</span>
+          <span class="scale-val">0.25</span>
+          <span class="scale-val">0.00</span>
+        </div>
+        <div class="axis-top">High influence</div>
+        <div class="axis-bot">Low influence</div>
+        <div class="mixer-empty" id="mixer-empty">
+          <div class="mixer-empty-icon">⟳</div>
+          Type a sentence above and click Load
+        </div>
+      </div>
+    </div>
+
+    <!-- Generated prompt -->
+    <div class="row">
+      <div class="row-label">Generated prompt</div>
+      <div class="prompt-block" id="generated-prompt">—</div>
+    </div>
+
+  </div><!-- /left -->
+
+  <!-- ════════════ RIGHT ════════════ -->
+  <div class="right">
+
+    <!-- Current output — sticky -->
+    <div class="current-wrap">
+      <div class="row-label">
+        <div class="live-badge"><div class="live-dot"></div>Current output</div>
+      </div>
+      <div class="output-current" id="output-current">
+        Load an influence sentence into the mixer to see output…
+      </div>
+    </div>
+
+    <!-- History label -->
+    <div class="history-label-row">
+      <div class="row-label" style="margin-bottom:0">Previous outputs</div>
+    </div>
+
+    <!-- History list -->
+    <div class="history-wrap">
+      <div class="history-empty" id="history-empty">
+        Previous outputs will appear here as you adjust the mixer.
+      </div>
+      <div id="history-list"></div>
+    </div>
+
+  </div><!-- /right -->
+
+</div><!-- /split -->
+
+<script>
+/* ═══════════════════════════════
+   DATA
+═══════════════════════════════ */
+let words = [];
+let outputHistory  = [];  // [{ html, snapshot }]  newest first
+let currentHTML    = '';
+
+/* ═══════════════════════════════
+   DRAG STATE
+═══════════════════════════════ */
+let draggingKey     = null;
+let dragStartMouseY = 0;
+let dragStartYFrac  = 0;
+let selectedKey     = null;
+
+/* ═══════════════════════════════
+   COLOUR MAPPING
+═══════════════════════════════ */
+function chipStyle(w) {
+  if (w >= 0.85) return { bg: 'rgba(217,119,6,0.32)',   color: '#fcd34d', border: '#d97706' };
+  if (w >= 0.68) return { bg: 'rgba(194,65,12,0.28)',   color: '#fb923c', border: '#c2410c' };
+  if (w >= 0.50) return { bg: 'rgba(124,92,252,0.28)',  color: '#c4b5fd', border: '#7c5cfc' };
+  if (w >= 0.32) return { bg: 'rgba(29,78,216,0.24)',   color: '#60a5fa', border: '#2563eb' };
+  if (w >= 0.15) return { bg: 'rgba(30,58,138,0.20)',   color: '#4a7fc1', border: '#1d4ed8' };
+  return           { bg: 'rgba(30,30,60,0.20)',         color: '#3a3a58', border: '#252540' };
+}
+
+/* ═══════════════════════════════
+   LOAD SENTENCE
+═══════════════════════════════ */
+function loadSentence() {
+  const raw    = document.getElementById('sentence-input').value.trim();
+  const tokens = raw
+    .split(/\s+/)
+    .map(function(w) { return w.replace(/[^a-zA-Z0-9]/g, ''); })
+    .filter(function(w) { return w.length > 0; });
+
+  var seen   = new Set();
+  var unique = [];
+  tokens.forEach(function(t) {
+    var k = t.toLowerCase();
+    if (!seen.has(k)) { seen.add(k); unique.push(t); }
+  });
+
+  var n = unique.length;
+  words = unique.map(function(token, i) {
+    return {
+      key:   token.toLowerCase(),
+      label: token.charAt(0).toUpperCase() + token.slice(1).toLowerCase(),
+      xFrac: (i + 1) / (n + 1),
+      yFrac: 0.5
+    };
+  });
+
+  document.getElementById('mixer-empty').style.display = words.length ? 'none' : '';
+  renderChips();
+  scheduleUpdate(0);
+}
+
+/* ═══════════════════════════════
+   RENDER CHIPS
+═══════════════════════════════ */
+function renderChips() {
+  var mixer = document.getElementById('mixer');
+  mixer.querySelectorAll('.word-chip').forEach(function(el) { el.remove(); });
+
+  var W    = mixer.clientWidth  || 600;
+  var H    = mixer.clientHeight || 280;
+  var PADV = 26;
+
+  words.forEach(function(word) {
+    var weight = 1.0 - word.yFrac;
+    var style  = chipStyle(weight);
+    var px     = word.xFrac * W;
+    var py     = PADV + word.yFrac * (H - PADV * 2);
+    var fs     = Math.round(11 + weight * 7);
+
+    var chip = document.createElement('div');
+    chip.className = 'word-chip' +
+      (draggingKey === word.key ? ' is-dragging' : '') +
+      (selectedKey === word.key ? ' selected'    : '');
+    chip.dataset.key = word.key;
+    chip.style.left  = px + 'px';
+    chip.style.top   = py + 'px';
+
+    chip.innerHTML =
+      '<div class="chip-pill" style="' +
+        'background:' + style.bg + ';' +
+        'color:' + style.color + ';' +
+        'border-color:' + style.border + ';' +
+        'font-size:' + fs + 'px' +
+      '">' + word.label + '</div>' +
+      '<div class="chip-weight" style="color:' + style.color + '">' +
+        weight.toFixed(2) +
+      '</div>';
+
+    chip.addEventListener('mousedown', function(e) { onChipMouseDown(e, word.key); });
+    mixer.appendChild(chip);
+  });
+}
+
+/* ═══════════════════════════════
+   DRAG
+═══════════════════════════════ */
+function onChipMouseDown(e, key) {
+  e.preventDefault();
+  e.stopPropagation();
+  selectedKey     = key;
+  draggingKey     = key;
+  dragStartMouseY = e.clientY;
+  var word        = words.find(function(w) { return w.key === key; });
+  dragStartYFrac  = word.yFrac;
+  document.body.style.cursor = 'grabbing';
+  renderChips();
+}
+
+document.addEventListener('mousemove', function(e) {
+  if (!draggingKey) return;
+  var mixer  = document.getElementById('mixer');
+  var H      = mixer.clientHeight || 280;
+  var PADV   = 26;
+  var usable = H - PADV * 2;
+  var deltaY = e.clientY - dragStartMouseY;
+  var word   = words.find(function(w) { return w.key === draggingKey; });
+  if (!word) return;
+  word.yFrac = Math.max(0, Math.min(1, dragStartYFrac + deltaY / usable));
+  renderChips();
+  scheduleUpdate(150);
+});
+
+document.addEventListener('mouseup', function() {
+  if (draggingKey) {
+    draggingKey             = null;
+    document.body.style.cursor = '';
+    renderChips();
+    scheduleUpdate(0);
+  }
+});
+
+/* ═══════════════════════════════
+   PROMPT BUILDER
+═══════════════════════════════ */
+function buildPrompt() {
+  var mission = (document.getElementById('mission').value || '').trim();
+  if (!words.length) return 'Your mission is: "' + mission + '"\n\nNo influences loaded.';
+  var lines = words.map(function(w) {
+    return w.label + ': ' + (1.0 - w.yFrac).toFixed(2);
+  }).join('\n');
+  return 'Your mission is: "' + mission + '"\n\n' +
+    'You have several influences on this.\n' +
+    'Each is weighted from 0.00 (no influence) to 1.00 (dominant):\n\n' +
+    lines + '\n\n' +
+    'Shape your response so higher-weighted influences appear more prominently.';
+}
+
+/* ═══════════════════════════════
+   OUTPUT GENERATOR (mock)
+═══════════════════════════════ */
+function generateOutput() {
+  var mission = (document.getElementById('mission').value || '').trim();
+  if (!words.length) {
+    return '<em style="color:var(--muted)">Load a sentence into the mixer to begin.</em>';
+  }
+
+  var ranked = words
+    .map(function(w) { return { label: w.label, w: 1.0 - w.yFrac }; })
+    .filter(function(x) { return x.w > 0.05; })
+    .sort(function(a, b) { return b.w - a.w; });
+
+  if (!ranked.length) {
+    return '<em style="color:var(--muted)">All influences at zero. Drag words upward to shape the output.</em>';
+  }
+
+  var top    = ranked[0];
+  var second = ranked[1];
+  var isDinner = /dinner|meal|food|eat|supper/i.test(mission);
+
+  if (isDinner) {
+    var t = top.label.toLowerCase();
+
+    if (t === 'haddock' && top.w > 0.55) {
+      var secondPart = '';
+      if (second && second.w > 0.25) {
+        var detail = /chip/i.test(second.label)
+          ? 'hand-cut chips, triple-cooked — the Friday indulgence that earns its place beside the fish.'
+          : /wine/i.test(second.label)
+            ? 'a cold, crisp white — Chablis, probably — chosen specifically for the fish.'
+            : 'adding depth and balance to the plate.';
+        secondPart = '<br><br>' + second.label + ' (' + second.w.toFixed(2) + ') plays a meaningful supporting role — ' + detail;
+      }
+      return '<strong>Friday dinner: a haddock evening.</strong><br><br>' +
+        'The centrepiece is a pan-seared haddock fillet — skin crisped to amber, flesh flaking at the gentlest pressure. ' +
+        'At a weight of <strong>' + top.w.toFixed(2) + '</strong>, haddock sets the entire tone.' +
+        secondPart +
+        '<br><br>The kind of dinner that makes the end of the week feel like a small ceremony.';
+    }
+
+    if (/^fish$/i.test(t) && top.w > 0.45) {
+      var secondPart = '';
+      if (second && second.w > 0.30) {
+        var detail = /chip/i.test(second.label)
+          ? 'earns its place alongside — golden and hand-cut, the earthiness that completes the plate.'
+          : 'makes its presence felt without crowding the fish.';
+        secondPart = ' ' + second.label + ' (' + second.w.toFixed(2) + ') ' + detail;
+      }
+      return '<strong>Friday dinner: a fish supper.</strong><br><br>' +
+        'Fish (' + top.w.toFixed(2) + ') is the unambiguous heart of this meal. ' +
+        'The variety is yours — sole for delicacy, sea bass for richness, cod for comfort.' +
+        (secondPart ? '<br><br>' + secondPart : '') +
+        '<br><br>It is the sea on a plate.';
+    }
+
+    if (/chip/i.test(t) && top.w > 0.50) {
+      var secondPart = '';
+      if (second && second.w > 0.25) {
+        var detail = /fish|haddock/i.test(second.label)
+          ? 'the fish that turns chips into a proper meal.'
+          : 'a companion that earns its place without upstaging the star.';
+        secondPart = '<br><br>' + second.label + ' (' + second.w.toFixed(2) + ') provides the supporting logic — ' + detail;
+      }
+      return '<strong>Friday dinner: chips are the main event.</strong><br><br>' +
+        'At ' + top.w.toFixed(2) + ', chips dominate without apology. ' +
+        'Triple-cooked, golden — impossibly crisp outside, cloud-soft within.' +
+        secondPart +
+        '<br><br>It is Friday, and Friday has different rules.';
+    }
+
+    if (/wine/i.test(t) && top.w > 0.50) {
+      var secondPart = second && second.w > 0.20
+        ? ' ' + second.label + ' (' + second.w.toFixed(2) + ') makes a quiet appearance — understated, not competing with the glass.'
+        : '';
+      return '<strong>Friday dinner: a wine dinner.</strong><br><br>' +
+        'The wine leads at ' + top.w.toFixed(2) + ' — a crisp Muscadet or light Burgundy, ' +
+        'chosen first, around which everything else is arranged. ' +
+        'The food is deliberately lean.' +
+        (secondPart ? '<br><br>' + secondPart : '') +
+        '<br><br>Less about eating, more about the Friday ritual of decompression.';
+    }
+  }
+
+  /* Generic */
+  var verb = top.w > 0.80 ? 'dominates' : top.w > 0.60 ? 'leads' : top.w > 0.40 ? 'guides' : 'gently nudges';
+  var low  = ranked.filter(function(x) { return x.w < 0.25; }).map(function(x) { return x.label; });
+  var out  = '<strong>' + (mission || 'The output') + ' — shaped by your influences.</strong><br><br>' +
+    top.label + ' (' + top.w.toFixed(2) + ') ' + verb + ' the result.';
+  if (second && second.w > 0.15) {
+    var role = second.w > 0.65 ? 'major' : second.w > 0.40 ? 'notable' : 'supporting';
+    out += ' ' + second.label + ' (' + second.w.toFixed(2) + ') plays a ' + role + ' role.';
+  }
+  if (ranked[2] && ranked[2].w > 0.12) {
+    out += ' ' + ranked[2].label + ' (' + ranked[2].w.toFixed(2) + ') adds a finishing note.';
+  }
+  if (low.length) {
+    out += '<br><br>The lower-weighted influences — ' + low.join(', ') + ' — are present but restrained.';
+  }
+  return out;
+}
+
+/* ═══════════════════════════════
+   HISTORY
+═══════════════════════════════ */
+function pushHistory(html) {
+  if (!html || html === currentHTML) return;
+  // Capture current word weights as a snapshot
+  var snapshot = words
+    .map(function(w) { return { label: w.label, weight: 1.0 - w.yFrac }; })
+    .sort(function(a, b) { return b.weight - a.weight; })
+    .slice(0, 4);
+  outputHistory.unshift({ html: currentHTML, snapshot: snapshot });
+  if (outputHistory.length > 8) outputHistory.pop();
+  currentHTML = html;
+  renderHistory();
+}
+
+function renderHistory() {
+  var list  = document.getElementById('history-list');
+  var empty = document.getElementById('history-empty');
+  list.innerHTML = '';
+
+  if (!outputHistory.length) {
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  outputHistory.forEach(function(item, i) {
+    // Opacity fades with age: 0.55 → 0.12
+    var opacity = Math.max(0.13, 0.58 - i * 0.11);
+
+    var ago = i === 0 ? '1 change ago' : (i + 1) + ' changes ago';
+
+    var tags = item.snapshot
+      .filter(function(s) { return s.weight > 0.05; })
+      .map(function(s) {
+        return '<span class="snap-tag">' + s.label + ' ' + s.weight.toFixed(2) + '</span>';
+      }).join('');
+
+    var div = document.createElement('div');
+    div.className = 'history-item';
+    div.style.opacity = opacity;
+    div.innerHTML =
+      '<div class="history-meta">' +
+        '<span class="history-ago">' + ago + '</span>' +
+        '<div class="snap-tags">' + tags + '</div>' +
+      '</div>' +
+      '<div class="history-text">' + item.html + '</div>';
+
+    list.appendChild(div);
+  });
+}
+
+/* ═══════════════════════════════
+   UPDATE SCHEDULER
+═══════════════════════════════ */
+var updateTimer = null;
+
+function scheduleUpdate(delay) {
+  if (delay === undefined) delay = 300;
+  clearTimeout(updateTimer);
+  if (delay > 0) document.getElementById('output-current').classList.add('fading');
+  updateTimer = setTimeout(function() {
+    var newHTML = generateOutput();
+    pushHistory(newHTML);
+    document.getElementById('generated-prompt').textContent = buildPrompt();
+    document.getElementById('output-current').innerHTML = newHTML;
+    document.getElementById('output-current').classList.remove('fading');
+  }, delay);
+}
+
+/* ═══════════════════════════════
+   INIT
+═══════════════════════════════ */
+scheduleUpdate(0);
+</script>
+</body>
+</html>

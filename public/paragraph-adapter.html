@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Paragraph Adapter</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0b0b13;
+  --surface:  #11111c;
+  --surface2: #181828;
+  --border:   #1e1e32;
+  --border2:  #2a2a45;
+  --muted:    #484868;
+  --text:     #c4c4de;
+  --accent:   #7c5cfc;
+  --green:    #22c55e;
+  --gold:     #d97706;
+}
+
+html, body {
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* ═══════════════════════════════
+   PAGE LAYOUT — single column, full-width stacked
+═══════════════════════════════ */
+.page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.page::-webkit-scrollbar { width: 5px; }
+.page::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ═══════════════════════════════
+   SHARED ROW STYLE
+═══════════════════════════════ */
+.row {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.row-label {
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ═══════════════════════════════
+   INPUTS
+═══════════════════════════════ */
+textarea {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  line-height: 1.6;
+}
+textarea:focus { border-color: var(--accent); }
+
+#mission       { font-size: 14px; }
+#sentence-input { font-size: 13px; }
+
+.sentence-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.sentence-row textarea { flex: 1; }
+
+.load-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: center;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.load-btn:hover  { opacity: 0.85; }
+.load-btn:active { transform: scale(0.97); }
+
+/* ═══════════════════════════════
+   MIXER + SENSIBILITY BOXES BELOW
+═══════════════════════════════ */
+.mixer-section {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.mixer-wrap {
+  position: relative;
+  height: 300px;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid var(--border2);
+  background:
+    linear-gradient(to bottom,
+      rgba(217,119,6,0.07)   0%,
+      rgba(109,40,217,0.04) 45%,
+      rgba(29,78,216,0.07)  100%),
+    var(--surface);
+}
+
+/* Deadzone overlay band in the center of the mixer */
+.deadzone-band {
+  position: absolute;
+  top: 0; bottom: 0;
+  /* width + left set via JS */
+  background: rgba(255,255,255,0.025);
+  border-left: 1px dashed rgba(255,255,255,0.08);
+  border-right: 1px dashed rgba(255,255,255,0.08);
+  pointer-events: none;
+  z-index: 1;
+}
+.deadzone-label {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.18);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Sensibility boxes sit below the mixer, left and right */
+.sensibility-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+.sensibility-box {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sensibility-box.right {
+  text-align: right;
+}
+.sensibility-label {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.sensibility-box.left .sensibility-label {
+  color: rgba(236,72,153,0.6);
+}
+.sensibility-box.right .sensibility-label {
+  color: rgba(52,211,153,0.6);
+}
+.sensibility-box textarea {
+  font-size: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 8px 10px;
+  resize: none;
+}
+.guide {
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+.scale-rail {
+  position: absolute;
+  right: 12px;
+  top: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 12px 0;
+  pointer-events: none;
+}
+.scale-val {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.axis-top {
+  position: absolute;
+  left: 12px; top: 10px;
+  font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: rgba(251,191,36,0.45);
+  pointer-events: none;
+}
+.axis-bot {
+  position: absolute;
+  left: 12px; bottom: 10px;
+  font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: rgba(96,165,250,0.35);
+  pointer-events: none;
+}
+.axis-left {
+  position: absolute;
+  left: 12px; top: 10px;
+  font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+  color: rgba(236,72,153,0.40);
+  pointer-events: none;
+  max-width: 35%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axis-right {
+  position: absolute;
+  right: 12px; top: 10px;
+  font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+  color: rgba(52,211,153,0.40);
+  pointer-events: none;
+  max-width: 35%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+.mixer-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+.mixer-empty-icon { font-size: 24px; opacity: 0.35; }
+
+/* Word chips */
+.word-chip {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: grab;
+  user-select: none;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+}
+.word-chip:hover .chip-pill { filter: brightness(1.15); }
+.word-chip.is-dragging { cursor: grabbing; z-index: 20; }
+.word-chip.is-dragging .chip-pill { filter: brightness(1.3); box-shadow: 0 4px 24px rgba(0,0,0,0.6); }
+.word-chip.selected .chip-pill {
+  outline: 2px solid rgba(255,255,255,0.65);
+  outline-offset: 2px;
+}
+.chip-pill {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 700;
+  border: 1.5px solid;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, font-size 0.15s;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+}
+.chip-weight {
+  font-size: 9px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+  transition: color 0.15s;
+}
+
+/* ═══════════════════════════════
+   PROMPT BLOCK
+═══════════════════════════════ */
+.prompt-block {
+  background: #060d14;
+  border: 1px solid #0e2030;
+  border-radius: 8px;
+  padding: 14px 18px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #3d8f5c;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.prompt-block::-webkit-scrollbar { width: 3px; }
+.prompt-block::-webkit-scrollbar-thumb { background: #0e2030; border-radius: 2px; }
+
+/* ═══════════════════════════════
+   CURRENT OUTPUT
+═══════════════════════════════ */
+.current-wrap {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #60a5fa;
+}
+.live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #3b82f6;
+  flex-shrink: 0;
+}
+/* Streaming state: flashing amber-red */
+.live-dot.streaming {
+  background: #f59e0b;
+  animation: pulse-stream 0.8s ease-in-out infinite;
+}
+@keyframes pulse-stream {
+  0%, 100% { opacity: 1; background: #f59e0b; }
+  50%      { opacity: 0.3; background: #ef4444; }
+}
+
+.spinner {
+  width: 12px; height: 12px;
+  border: 2px solid rgba(124,92,252,0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: none;
+  flex-shrink: 0;
+}
+.spinner.active { display: block; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.output-current {
+  margin-top: 10px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 18px 22px;
+  font-size: 14px;
+  line-height: 1.9;
+  color: #d0d0e8;
+  transition: opacity 0.2s;
+  box-shadow: 0 0 0 1px rgba(124,92,252,0.15), 0 4px 24px rgba(0,0,0,0.4);
+  max-height: 400px;
+  overflow-y: auto;
+}
+.output-current::-webkit-scrollbar { width: 3px; }
+.output-current::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.output-current.fading { opacity: 0.3; }
+
+/* Markdown styling inside output */
+.output-current h1,
+.output-current h2,
+.output-current h3 {
+  color: #e0e0f0;
+  margin: 0.6em 0 0.3em;
+  line-height: 1.4;
+}
+.output-current h1 { font-size: 1.3em; }
+.output-current h2 { font-size: 1.15em; }
+.output-current h3 { font-size: 1.05em; }
+.output-current strong { color: #e8e8f8; }
+.output-current em { color: #b8b8d8; }
+.output-current ul, .output-current ol {
+  margin: 0.4em 0;
+  padding-left: 1.5em;
+}
+.output-current li { margin: 0.2em 0; }
+.output-current p { margin: 0.4em 0; }
+
+/* ═══════════════════════════════
+   HISTORY (compact list)
+═══════════════════════════════ */
+.history-empty {
+  padding: 20px 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.7;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: 4px;
+}
+.history-item:hover {
+  background: var(--surface2);
+}
+.history-item.active {
+  background: rgba(124,92,252,0.08);
+}
+.history-num {
+  font-size: 9px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  width: 16px;
+  text-align: right;
+}
+.history-preview {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.history-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+.snap-tag {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════
+   BASE PROMPT EDITOR
+═══════════════════════════════ */
+.base-prompt-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.base-prompt-editor label {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+  display: block;
+}
+.base-prompt-editor textarea {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #3d8f5c;
+  background: #060d14;
+  border-color: #0e2030;
+  line-height: 1.7;
+}
+.base-prompt-editor textarea:focus { border-color: #1a5040; }
+
+/* ═══════════════════════════════
+   MODEL SELECTOR
+═══════════════════════════════ */
+.model-select {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+.model-select:hover, .model-select:focus {
+  border-color: var(--accent);
+  color: var(--text);
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- 1. SOURCE PARAGRAPH -->
+  <div class="row">
+    <div class="row-label">Source paragraph</div>
+    <textarea id="mission" rows="4" oninput="scheduleUpdate(800)">The restaurant on the corner has been serving the same dishes for twenty years. Regulars come every Friday, sitting at the same tables, ordering the same meals. The owner knows every name. Nothing ever changes, and nobody wants it to.</textarea>
+  </div>
+
+  <!-- 2. CONCEPT MIXER with sensibility boxes below -->
+  <div class="mixer-section">
+    <div class="row-label">
+      Concept mixer
+      <span style="font-size:9px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400;">
+        — drag ↑↓ weight &nbsp; ←→ lean towards one of two sensibilities
+      </span>
+    </div>
+    <!-- Mixer canvas (full width) -->
+    <div class="mixer-wrap" id="mixer">
+      <div class="guide" style="top:25%"></div>
+      <div class="guide" style="top:50%"></div>
+      <div class="guide" style="top:75%"></div>
+      <div class="deadzone-band" id="deadzone-band">
+        <div class="deadzone-label">no lean</div>
+      </div>
+      <div class="scale-rail">
+        <span class="scale-val">1.00</span>
+        <span class="scale-val">0.75</span>
+        <span class="scale-val">0.50</span>
+        <span class="scale-val">0.25</span>
+        <span class="scale-val">0.00</span>
+      </div>
+      <div class="axis-top">↑ High influence</div>
+      <div class="axis-bot">Low influence ↓</div>
+      <div class="axis-left" id="axis-left">← Sensibility 1</div>
+      <div class="axis-right" id="axis-right">Sensibility 2 →</div>
+      <div class="mixer-empty" id="mixer-empty">
+        <div class="mixer-empty-icon">⟳</div>
+        Type transformation concepts below and click Load
+      </div>
+    </div>
+    <!-- Sensibility boxes below, left and right -->
+    <div class="sensibility-row">
+      <div class="sensibility-box left">
+        <div class="sensibility-label">← Sensibility 1</div>
+        <textarea id="direction-1" rows="2" oninput="scheduleUpdate(800)" placeholder="e.g. poetic and lyrical">poetic and lyrical</textarea>
+      </div>
+      <div class="sensibility-box right">
+        <div class="sensibility-label">Sensibility 2 →</div>
+        <textarea id="direction-2" rows="2" oninput="scheduleUpdate(800)" placeholder="e.g. clinical and precise">clinical and precise</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. TRANSFORMATION CONCEPTS -->
+  <div class="row">
+    <div class="row-label">Transformation concepts</div>
+    <div class="sentence-row">
+      <textarea id="sentence-input" rows="2">formal academic tone, add dry humour, shorter punchier sentences, melancholy nostalgia</textarea>
+      <button class="load-btn" onclick="loadSentence()">Load concepts →</button>
+    </div>
+  </div>
+
+  <!-- 4. CURRENT OUTPUT + MODEL CHOOSER -->
+  <div class="current-wrap">
+    <div class="row-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="live-badge"><div class="live-dot" id="live-dot"></div>Current output</div>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:600;user-select:none;">
+          <input type="checkbox" id="keep-brief" checked onchange="scheduleUpdate(0)" style="accent-color:var(--accent);width:12px;height:12px;cursor:pointer;">
+          Force short output
+        </label>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <select class="model-select" id="model-select">
+          <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+          <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6</option>
+          <option value="qwen/qwen3.5-plus-02-15">Qwen 3.5 Plus</option>
+          <option value="x-ai/grok-4.1-fast">Grok 4.1 Fast</option>
+          <option value="minimax/minimax-m2.5">MiniMax M2.5</option>
+          <option value="google/gemini-3-flash-preview" selected>Gemini 3 Flash</option>
+          <option value="google/gemini-2.5-flash-lite-preview-09-2025">Gemini 2.5 Flash Lite</option>
+        </select>
+        <div class="spinner" id="spinner"></div>
+      </div>
+    </div>
+    <div class="output-current" id="output-current">
+      Load transformation concepts into the mixer to see output…
+    </div>
+  </div>
+
+  <!-- 5. GENERATED PROMPT (preview) -->
+  <div class="row">
+    <div class="row-label">Generated prompt</div>
+    <div class="prompt-block" id="generated-prompt">—</div>
+  </div>
+
+  <!-- 6. BASE PROMPT TEMPLATE -->
+  <div class="row">
+    <div class="row-label">Base prompt template</div>
+    <div class="base-prompt-editor" id="base-editor">
+      <div>
+        <label>Preamble</label>
+        <textarea id="base-preamble" rows="3" oninput="scheduleUpdate(800)">You have several transformation concepts to apply. Each has two properties:
+- Weight (0.00 = ignore, 1.00 = apply strongly)
+- Lean toward one of two sensibilities (or neutral if in the middle)</textarea>
+      </div>
+      <div>
+        <label>Closing instruction</label>
+        <textarea id="base-closing" rows="4" oninput="scheduleUpdate(800)">Rewrite the paragraph applying these transformations proportionally.
+Higher-weighted concepts should have a more visible effect on the output.
+Concepts that lean toward a sensibility should pull the style in that direction.
+Preserve the core meaning of the original paragraph.</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. PREVIOUS OUTPUTS -->
+  <div class="row">
+    <div class="row-label" style="margin-bottom:6px">Previous outputs</div>
+    <div class="history-empty" id="history-empty">
+      Previous outputs will appear here as you adjust the mixer.
+    </div>
+    <div id="history-list"></div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+/* ═══════════════════════════════
+   DATA
+═══════════════════════════════ */
+var words = [];
+var outputHistory  = [];
+var currentOutput  = '';
+var isStreaming    = false;
+var pendingPrompt  = null;
+
+/* ═══════════════════════════════
+   DRAG STATE
+═══════════════════════════════ */
+var draggingKey     = null;
+var dragStartMouseX = 0;
+var dragStartMouseY = 0;
+var dragStartXFrac  = 0;
+var dragStartYFrac  = 0;
+var selectedKey     = null;
+
+/* ═══════════════════════════════
+   SIMPLE MARKDOWN RENDERER
+═══════════════════════════════ */
+function simpleMarkdown(text) {
+  if (!text) return '';
+  var s = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  s = s.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  s = s.replace(/^## (.+)$/gm,  '<h2>$1</h2>');
+  s = s.replace(/^# (.+)$/gm,   '<h1>$1</h1>');
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/__(.+?)__/g,     '<strong>$1</strong>');
+  s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  s = s.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+  s = s.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+  s = s.replace(/\n\n+/g, '</p><p>');
+  s = s.replace(/\n/g, '<br>');
+  s = '<p>' + s + '</p>';
+  s = s.replace(/<p><\/p>/g, '');
+  return s;
+}
+
+/* ═══════════════════════════════
+   COLOUR MAPPING
+═══════════════════════════════ */
+function chipStyle(w) {
+  if (w >= 0.85) return { bg: 'rgba(217,119,6,0.32)',   color: '#fcd34d', border: '#d97706' };
+  if (w >= 0.68) return { bg: 'rgba(194,65,12,0.28)',   color: '#fb923c', border: '#c2410c' };
+  if (w >= 0.50) return { bg: 'rgba(124,92,252,0.28)',  color: '#c4b5fd', border: '#7c5cfc' };
+  if (w >= 0.32) return { bg: 'rgba(29,78,216,0.24)',   color: '#60a5fa', border: '#2563eb' };
+  if (w >= 0.15) return { bg: 'rgba(30,58,138,0.20)',   color: '#4a7fc1', border: '#1d4ed8' };
+  return           { bg: 'rgba(30,30,60,0.20)',         color: '#3a3a58', border: '#252540' };
+}
+
+/* ═══════════════════════════════
+   LOAD SENTENCE
+═══════════════════════════════ */
+function loadSentence() {
+  var raw    = document.getElementById('sentence-input').value.trim();
+  var tokens = raw
+    .split(/,/)
+    .map(function(w) { return w.trim(); })
+    .filter(function(w) { return w.length > 0; });
+
+  var seen   = new Set();
+  var unique = [];
+  tokens.forEach(function(t) {
+    var k = t.toLowerCase();
+    if (!seen.has(k)) { seen.add(k); unique.push(t); }
+  });
+
+  var n = unique.length;
+  words = unique.map(function(token, i) {
+    var label = token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+    var spread = n > 1 ? 0.3 : 0;
+    var xOff   = n > 1 ? (i / (n - 1) - 0.5) * spread : 0;
+    return {
+      key:   token.toLowerCase(),
+      label: label,
+      xFrac: 0.5 + xOff,
+      yFrac: 0.5
+    };
+  });
+
+  document.getElementById('mixer-empty').style.display = words.length ? 'none' : '';
+  renderChips();
+  scheduleUpdate(0);
+}
+
+/* ═══════════════════════════════
+   DEADZONE CONFIG
+═══════════════════════════════ */
+var DEADZONE_HALF = 0.10; // 10% either side of centre = 20% total band
+
+function inDeadzone(xFrac) {
+  return xFrac >= (0.5 - DEADZONE_HALF) && xFrac <= (0.5 + DEADZONE_HALF);
+}
+
+/* ═══════════════════════════════
+   RENDER CHIPS
+═══════════════════════════════ */
+function renderChips() {
+  var mixer = document.getElementById('mixer');
+  mixer.querySelectorAll('.word-chip').forEach(function(el) { el.remove(); });
+
+  var W    = mixer.clientWidth  || 600;
+  var H    = mixer.clientHeight || 300;
+  var PADH = 30;
+  var PADV = 26;
+
+  // Update axis labels from sensibility inputs
+  var d1 = (document.getElementById('direction-1').value || '').trim();
+  var d2 = (document.getElementById('direction-2').value || '').trim();
+  document.getElementById('axis-left').textContent  = '← ' + (d1 || 'Sensibility 1');
+  document.getElementById('axis-right').textContent = (d2 || 'Sensibility 2') + ' →';
+
+  // Position and size the deadzone band
+  var dzLeft  = (0.5 - DEADZONE_HALF) * W;
+  var dzWidth = DEADZONE_HALF * 2 * W;
+  var band = document.getElementById('deadzone-band');
+  band.style.left  = dzLeft + 'px';
+  band.style.width = dzWidth + 'px';
+
+  words.forEach(function(word) {
+    var weight = 1.0 - word.yFrac;
+    var style  = chipStyle(weight);
+    var px     = PADH + word.xFrac * (W - PADH * 2);
+    var py     = PADV + word.yFrac * (H - PADV * 2);
+    var fs     = Math.round(9 + weight * 4);
+
+    var lean = word.xFrac;
+    var leanText;
+    if (inDeadzone(lean)) {
+      leanText = '· neutral';
+    } else if (lean < 0.5) {
+      leanText = '← ' + (1.0 - lean).toFixed(2);
+    } else {
+      leanText = lean.toFixed(2) + ' →';
+    }
+
+    var chip = document.createElement('div');
+    chip.className = 'word-chip' +
+      (draggingKey === word.key ? ' is-dragging' : '') +
+      (selectedKey === word.key ? ' selected'    : '');
+    chip.dataset.key = word.key;
+    chip.style.left  = px + 'px';
+    chip.style.top   = py + 'px';
+
+    chip.innerHTML =
+      '<div class="chip-pill" style="' +
+        'background:' + style.bg + ';' +
+        'color:' + style.color + ';' +
+        'border-color:' + style.border + ';' +
+        'font-size:' + fs + 'px' +
+      '">' + word.label + '</div>' +
+      '<div class="chip-weight" style="color:' + style.color + '">' +
+        weight.toFixed(2) +
+      '</div>' +
+      '<div class="chip-weight" style="color:' + style.color + ';opacity:0.6;font-size:8px">' +
+        leanText +
+      '</div>';
+
+    chip.addEventListener('mousedown', function(e) { onChipMouseDown(e, word.key); });
+    mixer.appendChild(chip);
+  });
+}
+
+/* ═══════════════════════════════
+   DRAG
+═══════════════════════════════ */
+function onChipMouseDown(e, key) {
+  e.preventDefault();
+  e.stopPropagation();
+  selectedKey     = key;
+  draggingKey     = key;
+  dragStartMouseX = e.clientX;
+  dragStartMouseY = e.clientY;
+  var word        = words.find(function(w) { return w.key === key; });
+  dragStartXFrac  = word.xFrac;
+  dragStartYFrac  = word.yFrac;
+  document.body.style.cursor = 'grabbing';
+  renderChips();
+}
+
+document.addEventListener('mousemove', function(e) {
+  if (!draggingKey) return;
+  var mixer   = document.getElementById('mixer');
+  var W       = mixer.clientWidth  || 600;
+  var H       = mixer.clientHeight || 300;
+  var PADH    = 30;
+  var PADV    = 26;
+  var usableX = W - PADH * 2;
+  var usableY = H - PADV * 2;
+  var deltaX  = e.clientX - dragStartMouseX;
+  var deltaY  = e.clientY - dragStartMouseY;
+  var word    = words.find(function(w) { return w.key === draggingKey; });
+  if (!word) return;
+  word.xFrac = Math.max(0, Math.min(1, dragStartXFrac + deltaX / usableX));
+  word.yFrac = Math.max(0, Math.min(1, dragStartYFrac + deltaY / usableY));
+  renderChips();
+  scheduleUpdate(150);
+});
+
+document.addEventListener('mouseup', function() {
+  if (draggingKey) {
+    draggingKey             = null;
+    document.body.style.cursor = '';
+    renderChips();
+    scheduleUpdate(0);
+  }
+});
+
+/* ═══════════════════════════════
+   PROMPT BUILDER
+═══════════════════════════════ */
+function buildPrompt() {
+  var source   = (document.getElementById('mission').value || '').trim();
+  var dir1     = (document.getElementById('direction-1').value || '').trim() || 'Sensibility 1';
+  var dir2     = (document.getElementById('direction-2').value || '').trim() || 'Sensibility 2';
+  var preamble = (document.getElementById('base-preamble').value || '').trim();
+  var closing  = (document.getElementById('base-closing').value || '').trim();
+
+  // Filter out zero-weight concepts entirely
+  var activeWords = words.filter(function(w) { return (1.0 - w.yFrac) > 0.01; });
+
+  if (!activeWords.length) return 'Here is the original paragraph:\n\n"""\n' + source + '\n"""\n\nNo active transformation concepts (all at zero weight).';
+
+  var lines = activeWords.map(function(w) {
+    var weight = (1.0 - w.yFrac).toFixed(2);
+    var lean   = w.xFrac;
+    var leanDesc;
+    if (inDeadzone(lean)) {
+      // In the deadzone — no sensibility lean mentioned
+      leanDesc = 'no directional lean';
+    } else if (lean < 0.5) {
+      leanDesc = 'leans ' + Math.round((1.0 - lean) * 100) + '% toward "' + dir1 + '"';
+    } else {
+      leanDesc = 'leans ' + Math.round(lean * 100) + '% toward "' + dir2 + '"';
+    }
+    return w.label + ': weight ' + weight + ', ' + leanDesc;
+  }).join('\n');
+
+  var brief   = document.getElementById('keep-brief').checked
+                  ? '\nKeep your answer extremely brief (e.g., less than 20 words).'
+                  : '';
+  var prompt = 'Here is the original paragraph:\n\n"""\n' + source + '\n"""\n\n' +
+    preamble + '\n\n' +
+    lines + '\n\n' +
+    closing + brief;
+  return prompt;
+}
+
+/* ═══════════════════════════════
+   STREAMING STATUS HELPERS
+═══════════════════════════════ */
+function setStreamingState(active) {
+  var dot     = document.getElementById('live-dot');
+  var spinner = document.getElementById('spinner');
+  if (active) {
+    dot.classList.add('streaming');
+    spinner.classList.add('active');
+  } else {
+    dot.classList.remove('streaming');
+    spinner.classList.remove('active');
+  }
+}
+
+/* ═══════════════════════════════
+   OUTPUT GENERATOR (streaming)
+═══════════════════════════════ */
+async function generateOutput() {
+  if (!words.length) return;
+
+  var prompt = buildPrompt();
+
+  if (isStreaming) {
+    pendingPrompt = prompt;
+    return;
+  }
+
+  isStreaming   = true;
+  pendingPrompt = null;
+
+  var outputEl = document.getElementById('output-current');
+  outputEl.classList.add('fading');
+  setStreamingState(true);
+
+  var assembled = '';
+
+  try {
+    var response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt, model: document.getElementById('model-select').value }),
+    });
+
+    var reader = response.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+
+    outputEl.classList.remove('fading');
+    outputEl.innerHTML = '';
+
+    outer: while (true) {
+      var result = await reader.read();
+      if (result.done) break;
+
+      buffer += decoder.decode(result.value, { stream: true });
+      var lines = buffer.split('\n\n');
+      buffer = lines.pop();
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (!line.startsWith('data: ')) continue;
+        var payload = line.slice(6);
+        if (payload === '[DONE]') {
+          pushHistory(assembled);
+          break outer;
+        }
+        if (payload === '[ERROR]') {
+          outputEl.textContent = 'Error generating response. Check your API key and server.';
+          break outer;
+        }
+        var token = payload.replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+        assembled += token;
+        outputEl.innerHTML = simpleMarkdown(assembled);
+      }
+    }
+  } catch (err) {
+    outputEl.classList.remove('fading');
+    outputEl.textContent = 'Request failed. Is the server running?';
+  } finally {
+    isStreaming = false;
+    setStreamingState(false);
+    if (pendingPrompt && pendingPrompt !== prompt) {
+      generateOutput();
+    }
+  }
+}
+
+/* ═══════════════════════════════
+   HISTORY
+═══════════════════════════════ */
+function pushHistory(outputText) {
+  if (!outputText || outputText === currentOutput) return;
+  var snapshot = words
+    .map(function(w) { return { label: w.label, weight: 1.0 - w.yFrac }; })
+    .sort(function(a, b) { return b.weight - a.weight; })
+    .slice(0, 4);
+  var wordsCopy = words.map(function(w) {
+    return { key: w.key, label: w.label, xFrac: w.xFrac, yFrac: w.yFrac };
+  });
+  outputHistory.unshift({
+    output: currentOutput,
+    words: wordsCopy,
+    source: document.getElementById('mission').value,
+    direction1: document.getElementById('direction-1').value,
+    direction2: document.getElementById('direction-2').value,
+    concepts: document.getElementById('sentence-input').value,
+    snapshot: snapshot
+  });
+  if (outputHistory.length > 20) outputHistory.pop();
+  currentOutput = outputText;
+  renderHistory();
+}
+
+function renderHistory() {
+  var list  = document.getElementById('history-list');
+  var empty = document.getElementById('history-empty');
+  list.innerHTML = '';
+
+  if (!outputHistory.length) {
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  outputHistory.forEach(function(item, i) {
+    var preview = (item.output || '').replace(/\n/g, ' ').substring(0, 80);
+    if ((item.output || '').length > 80) preview += '…';
+    if (!preview) preview = '(empty)';
+
+    var tags = item.snapshot
+      .filter(function(s) { return s.weight > 0.05; })
+      .map(function(s) {
+        return '<span class="snap-tag">' + s.label + ' ' + s.weight.toFixed(2) + '</span>';
+      }).join('');
+
+    var div = document.createElement('div');
+    div.className = 'history-item';
+    div.dataset.index = i;
+    div.innerHTML =
+      '<span class="history-num">' + (i + 1) + '</span>' +
+      '<span class="history-preview">' + preview + '</span>' +
+      '<div class="history-tags">' + tags + '</div>';
+
+    div.addEventListener('click', function() { restoreHistory(i); });
+    list.appendChild(div);
+  });
+}
+
+function restoreHistory(index) {
+  var item = outputHistory[index];
+  if (!item) return;
+
+  document.getElementById('mission').value = item.source || '';
+  document.getElementById('direction-1').value = item.direction1 || '';
+  document.getElementById('direction-2').value = item.direction2 || '';
+  document.getElementById('sentence-input').value = item.concepts || '';
+
+  words = item.words.map(function(w) {
+    return { key: w.key, label: w.label, xFrac: w.xFrac, yFrac: w.yFrac };
+  });
+
+  document.getElementById('mixer-empty').style.display = words.length ? 'none' : '';
+  renderChips();
+
+  var outputEl = document.getElementById('output-current');
+  outputEl.innerHTML = simpleMarkdown(item.output || '');
+  currentOutput = item.output || '';
+
+  document.getElementById('generated-prompt').textContent = buildPrompt();
+
+  document.querySelectorAll('.history-item').forEach(function(el) { el.classList.remove('active'); });
+  var items = document.querySelectorAll('.history-item');
+  if (items[index]) items[index].classList.add('active');
+}
+
+/* ═══════════════════════════════
+   UPDATE SCHEDULER
+═══════════════════════════════ */
+var updateTimer = null;
+
+function scheduleUpdate(delay) {
+  if (delay === undefined) delay = 800;
+  clearTimeout(updateTimer);
+  if (delay > 0) document.getElementById('output-current').classList.add('fading');
+  updateTimer = setTimeout(function() {
+    document.getElementById('generated-prompt').textContent = buildPrompt();
+    generateOutput();
+  }, delay);
+}
+
+/* ═══════════════════════════════
+   INIT
+═══════════════════════════════ */
+scheduleUpdate(0);
+</script>
+</body>
+</html>
