@@ -936,7 +936,7 @@ textarea:focus { border-color: var(--accent); }
         <textarea id="direction-1" rows="1" oninput="scheduleUpdate(800)" placeholder="e.g. poetic and lyrical">dour and serious</textarea>
       </div>
       <div class="sensibility-box sensibility-controls">
-        <button class="feedback-btn" id="chip-physics-btn" onclick="toggleChipPhysics()">chip physics</button>
+        <button class="feedback-btn" id="chip-physics-btn" onclick="toggleChipPhysics()">fish physics</button>
         <button class="feedback-btn" onclick="launchRandomTrajectories()" title="Random speeds and directions">rnd</button>
       </div>
       <div class="sensibility-box right">
@@ -2178,7 +2178,7 @@ function updateChipPhysicsButtonState() {
   var btn = document.getElementById('chip-physics-btn');
   if (!btn) return;
   btn.classList.toggle('active', chipPhysicsEnabled);
-  btn.textContent = 'chip physics';
+  btn.textContent = 'fish physics';
 }
 
 function hasActiveChipMotion() {
