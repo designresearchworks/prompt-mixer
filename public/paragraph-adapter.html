@@ -452,7 +452,7 @@ textarea:focus { border-color: var(--accent); }
 }
 .output-current::-webkit-scrollbar { width: 3px; }
 .output-current::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-.output-current.fading { opacity: 0.3; }
+/*.output-current.fading { opacity: 0.3; }*/
 
 /* Markdown styling inside output */
 .output-current h1,
@@ -699,6 +699,8 @@ textarea:focus { border-color: var(--accent); }
           <input type="checkbox" id="keep-brief" checked onchange="scheduleUpdate(0)" style="accent-color:var(--accent);width:12px;height:12px;cursor:pointer;">
           Force short output
         </label>
+                <div class="spinner" id="spinner"></div>
+
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         <select class="model-select" id="model-select">
@@ -709,8 +711,11 @@ textarea:focus { border-color: var(--accent); }
           <option value="minimax/minimax-m2.5">MiniMax M2.5</option>
           <option value="google/gemini-3-flash-preview" selected>Gemini 3 Flash</option>
           <option value="google/gemini-2.5-flash-lite-preview-09-2025">Gemini 2.5 Flash Lite</option>
+          <option value="groq:openai/gpt-oss-20b">Groq GPT-OSS 20B</option>
+          <option value="groq:groq/compound-mini">Groq Compound Mini</option>
+<option value="groq:openai/gpt-oss-120b">Groq GPT-OSS 120B</option>
+<option value="groq:llama-3.1-8b-instant">Groq LLaMA 3.1 8B Instant</option>
         </select>
-        <div class="spinner" id="spinner"></div>
       </div>
     </div>
     <div class="output-current" id="output-current">
@@ -842,6 +847,7 @@ var dragStartMouseY = 0;
 var dragStartXFrac  = 0;
 var dragStartYFrac  = 0;
 var selectedKey     = null;
+var stateDirtyWhileStreaming = false;
 
 /* ═══════════════════════════════
    SIMPLE MARKDOWN RENDERER
@@ -1265,10 +1271,12 @@ async function generateOutput() {
 
   var prompt = buildPrompt();
 
+/*
   if (isStreaming) {
     pendingPrompt = prompt;
     return;
   }
+  */
 
   isStreaming   = true;
   pendingPrompt = null;
@@ -1322,11 +1330,13 @@ async function generateOutput() {
     outputEl.classList.remove('fading');
     outputEl.textContent = 'Request failed. Is the server running?';
   } finally {
-    isStreaming = false;
-    setStreamingState(false);
-    if (pendingPrompt && pendingPrompt !== prompt) {
-      generateOutput();
-    }
+  isStreaming = false;
+  setStreamingState(false);
+
+  if (stateDirtyWhileStreaming) {
+    stateDirtyWhileStreaming = false;
+    generateOutput();
+  }
   }
 }
 
@@ -1475,13 +1485,19 @@ var updateTimer = null;
 function scheduleUpdate(delay) {
   if (delay === undefined) delay = 800;
   clearTimeout(updateTimer);
-  if (delay > 0) document.getElementById('output-current').classList.add('fading');
+
   updateTimer = setTimeout(function() {
     document.getElementById('generated-prompt').textContent = buildPrompt();
-    generateOutput();
+
+    if (isStreaming) {
+      // Don't queue — just mark dirty
+      stateDirtyWhileStreaming = true;
+    } else {
+      generateOutput();
+    }
+
   }, delay);
 }
-
 /* ═══════════════════════════════
    RESIZE
 ═══════════════════════════════ */
