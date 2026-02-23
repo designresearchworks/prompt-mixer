@@ -834,7 +834,7 @@ textarea:focus { border-color: var(--accent); }
   <!-- 1. SOURCE PARAGRAPH -->
   <div class="row row-source" id="row-source">
     <div class="row-label">Thought</div>
-    <textarea id="mission" rows="3" oninput="scheduleUpdate(800)">The restaurant on the corner has been serving the same dishes for twenty years. Regulars come every Friday, sitting at the same tables, ordering the same meals. The owner knows every name. Nothing ever changes, and nobody wants it to.</textarea>
+    <textarea id="mission" rows="3" oninput="scheduleUpdate(800)">how many roads must a man walk down</textarea>
   </div>
 
   <div class="row row-food" id="row-food" style="display:none;">
@@ -867,7 +867,7 @@ textarea:focus { border-color: var(--accent); }
         </select>
         <div class="cadence-wrap" id="cadence-wrap">
           <span class="cadence-label">Fast</span>
-          <input class="cadence-slider" id="infinite-cadence" type="range" min="0" max="5000" step="50" value="150" oninput="updateCadenceLabel()">
+          <input class="cadence-slider" id="infinite-cadence" type="range" min="0" max="5000" step="50" value="2500" oninput="updateCadenceLabel()">
           <span class="cadence-label">Slow</span>
         </div>
         <button class="feedback-btn" id="feedback-btn" onclick="applyFeedback()">fdbk</button>
@@ -927,10 +927,10 @@ textarea:focus { border-color: var(--accent); }
 
   <!-- 3. TRANSFORMATION CONCEPTS -->
   <div class="row row-concepts">
-    <div class="row-label">Transformation concepts</div>
+    <div class="row-label">fish</div>
     <div class="sentence-row">
       <!-- Hidden real textarea keeps value in sync for buildPrompt -->
-      <textarea id="sentence-input">Bowl of Petunias</textarea>
+      <textarea id="sentence-input">Bowl of Petunias, Paranoid Android, Whale, Mice, Heart of Gold, babelfish</textarea>
       <!-- Visible tag input -->
       <div class="tag-input-wrap" id="tag-input-wrap">
         <input class="tag-input-field" id="tag-input-field" type="text" placeholder="type a concept, press comma…" autocomplete="off" spellcheck="false">
@@ -998,7 +998,7 @@ var outputHistory  = [];
 var currentOutput  = '';
 var feedbackModeEnabled = false;
 var infiniteFeedbackEnabled = false;
-var infiniteCadenceValue = 150;
+var infiniteCadenceValue = 2500;
 var isStreaming    = false;
 var pendingPrompt  = null;
 var inFlightPrompt = null;
@@ -2066,8 +2066,8 @@ function updateCadenceEnabledState() {
 function updateCadenceLabel() {
   var slider = document.getElementById('infinite-cadence');
   if (!slider) return;
-  infiniteCadenceValue = parseInt(slider.value || '150', 10);
-  if (isNaN(infiniteCadenceValue)) infiniteCadenceValue = 150;
+  infiniteCadenceValue = parseInt(slider.value || '2500', 10);
+  if (isNaN(infiniteCadenceValue)) infiniteCadenceValue = 2500;
 }
 
 function getInfiniteCadenceDelayMs() {
@@ -2259,7 +2259,8 @@ function prepareTrajectoryLaunch() {
 function launchRandomTrajectories() {
   if (!prepareTrajectoryLaunch()) return;
   words.forEach(function(w) {
-    var speed = chipPhysicsMaxSpeed * (0.35 + Math.random() * 0.65);
+    var baseSpeed = chipPhysicsMaxSpeed * (0.35 + Math.random() * 0.65);
+    var speed = baseSpeed * (0.10 + Math.random() * 0.40);
     var angle = Math.random() * Math.PI * 2;
     w.vx = Math.cos(angle) * speed;
     w.vy = Math.sin(angle) * speed;
