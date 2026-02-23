@@ -50,10 +50,11 @@ html, body {
 .cards {
   display: flex;
   gap: 20px;
+  flex-wrap: wrap;
 }
 
 .card {
-  flex: 1;
+  flex: 1 1 200px;
   background: var(--surface);
   border: 1px solid var(--border2);
   border-radius: 14px;
@@ -96,6 +97,10 @@ html, body {
   font-weight: 600;
   letter-spacing: 1px;
 }
+
+@media (max-width: 720px) {
+  .cards { flex-direction: column; }
+}
 </style>
 </head>
 <body>
@@ -124,6 +129,16 @@ html, body {
       <div class="card-desc">
         Paste a source paragraph, define transformation concepts,
         and mix their weights to see the paragraph rewritten in real time.
+      </div>
+      <div class="card-arrow">Open &rarr;</div>
+    </a>
+
+    <a class="card" href="paragraph-adapter-feedback.html">
+      <div class="card-icon">&#9851;</div>
+      <div class="card-name">Paragraph Adapter + Feedback</div>
+      <div class="card-desc">
+        Run paragraph adaptation, then use Feedback to overwrite
+        the original thought with the latest output.
       </div>
       <div class="card-arrow">Open &rarr;</div>
     </a>

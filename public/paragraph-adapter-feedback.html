@@ -1,0 +1,2566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Paragraph Adapter (Feedback)</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0b0b13;
+  --surface:  #11111c;
+  --surface2: #181828;
+  --border:   #1e1e32;
+  --border2:  #2a2a45;
+  --muted:    #484868;
+  --text:     #c4c4de;
+  --accent:   #7c5cfc;
+  --green:    #22c55e;
+  --gold:     #d97706;
+  --core-ui-text-size: 13.7px;
+}
+
+html, body {
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* ═══════════════════════════════
+   PAGE LAYOUT — single column, full-width stacked
+═══════════════════════════════ */
+.page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.page::-webkit-scrollbar { width: 5px; }
+.page::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ═══════════════════════════════
+   SHARED ROW STYLE
+═══════════════════════════════ */
+.row {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.row-label {
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ═══════════════════════════════
+   INPUTS
+═══════════════════════════════ */
+textarea {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  line-height: 1.6;
+}
+textarea:focus { border-color: var(--accent); }
+
+#mission,
+#food-for-thought,
+#direction-1,
+#direction-2,
+.output-current {
+  font-size: var(--core-ui-text-size);
+}
+
+#direction-1,
+#direction-2 {
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* IE/Edge legacy */
+}
+#direction-1::-webkit-scrollbar,
+#direction-2::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+#row-source,
+#row-food {
+  min-height: 136px;
+}
+
+#mission,
+#food-for-thought {
+  height: 84px;
+  min-height: 84px;
+  max-height: 84px;
+  overflow-y: auto;
+}
+
+.sentence-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+
+/* ── Tag input (concepts) ─────────────────────── */
+.tag-input-wrap {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 5px 10px;
+  min-height: 34px;
+  cursor: text;
+  transition: border-color 0.15s;
+}
+.tag-input-wrap:focus-within { border-color: var(--accent); }
+.tag-token {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(124,92,252,0.18);
+  border: 1px solid rgba(124,92,252,0.35);
+  border-radius: 5px;
+  padding: 1px 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c4b5fd;
+  white-space: nowrap;
+  user-select: none;
+  gap: 5px;
+}
+.tag-token-del {
+  font-size: 10px;
+  opacity: 0.5;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 1px;
+  transition: opacity 0.1s;
+}
+.tag-token-del:hover { opacity: 1; }
+.tag-input-field {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  flex: 1;
+  min-width: 80px;
+  height: 22px;
+  padding: 0;
+}
+/* Hidden real textarea keeps the actual value for form/JS reads */
+#sentence-input { display: none; }
+
+/* ═══════════════════════════════
+   MIXER + SENSIBILITY BOXES BELOW
+═══════════════════════════════ */
+.mixer-section {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.mixer-wrap {
+  position: relative;
+  height: 300px;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid var(--border2);
+  background:
+    linear-gradient(to bottom,
+      rgba(244,114,182,0.08) 0%,
+      rgba(190,24,93,0.04)  45%,
+      rgba(109,40,217,0.03) 100%),
+    var(--surface);
+}
+.pong-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  z-index: 30;
+}
+.mixer-wrap.pong-mode .pong-canvas {
+  display: block;
+}
+.mixer-wrap.pong-mode .guide,
+.mixer-wrap.pong-mode .deadzone-band,
+.mixer-wrap.pong-mode .axis-left,
+.mixer-wrap.pong-mode .axis-right,
+.mixer-wrap.pong-mode .axis-color-pick,
+.mixer-wrap.pong-mode .mixer-empty,
+.mixer-wrap.pong-mode .word-chip {
+  display: none !important;
+}
+
+/* Deadzone overlay band in the center of the mixer */
+.deadzone-band {
+  position: absolute;
+  top: 0; bottom: 0;
+  /* width + left set via JS */
+  background: rgba(255,255,255,0.025);
+  border-left: 1px dashed rgba(255,255,255,0.08);
+  border-right: 1px dashed rgba(255,255,255,0.08);
+  pointer-events: none;
+  z-index: 1;
+}
+.deadzone-label {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.18);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Sensibility boxes sit below the mixer, left and right */
+.sensibility-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+.sensibility-box {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sensibility-controls {
+  width: auto;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0;
+  background: none;
+  border: none;
+  white-space: nowrap;
+}
+.sensibility-box.right {
+  text-align: right;
+}
+.sensibility-label {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.sensibility-box.left .sensibility-label {
+  color: rgba(236,72,153,0.7); /* updated dynamically by renderChips */
+}
+.sensibility-box.right .sensibility-label {
+  color: rgba(52,211,153,0.7); /* updated dynamically by renderChips */
+}
+.sensibility-box textarea {
+  font-size: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 6px 10px;
+  resize: none;
+  height: 32px;
+  line-height: 1.4;
+}
+.guide {
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+
+.axis-left {
+  position: absolute;
+  left: 12px; top: 10px;
+  font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+  color: rgba(236,72,153,0.40);
+  pointer-events: all;
+  cursor: pointer;
+  max-width: 35%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 5;
+  transition: color 0.15s, opacity 0.15s;
+}
+.axis-left:hover { opacity: 0.85; filter: brightness(1.4); }
+.axis-right {
+  position: absolute;
+  right: 12px; top: 10px;
+  font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+  color: rgba(52,211,153,0.40);
+  pointer-events: all;
+  cursor: pointer;
+  max-width: 35%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  z-index: 5;
+  transition: color 0.15s, opacity 0.15s;
+}
+.axis-right:hover { opacity: 0.85; filter: brightness(1.4); }
+/* Hidden colour pickers anchored in the mixer corners */
+.axis-color-pick {
+  position: absolute;
+  top: 10px;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  pointer-events: none;
+}
+#axis-pick-1 { left: 12px; }
+#axis-pick-2 { right: 12px; }
+.mixer-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+.mixer-empty-icon { font-size: 24px; opacity: 0.35; }
+
+/* Word chips */
+.word-chip {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: grab;
+  user-select: none;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  width: 72px;
+}
+.word-chip:hover .chip-pill { filter: brightness(1.15); }
+.word-chip.is-dragging { cursor: grabbing; z-index: 20; }
+.word-chip.is-dragging .chip-pill { filter: brightness(1.3); box-shadow: 0 4px 24px rgba(0,0,0,0.6); }
+.word-chip.selected .chip-pill {
+  outline: 2px solid rgba(255,255,255,0.65);
+  outline-offset: 2px;
+}
+.chip-pill {
+  border-radius: 8px;
+  padding: 3px 6px;
+  font-weight: 700;
+  font-size: 9px;
+  border: 1.5px solid;
+  white-space: normal;
+  word-break: break-word;
+  text-align: center;
+  width: 100%;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.08s;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+  line-height: 1.3;
+  transform-origin: center center;
+}
+.chip-weight {
+  font-size: 8px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
+  transition: color 0.15s;
+}
+
+/* ═══════════════════════════════
+   PROMPT BLOCK
+═══════════════════════════════ */
+.prompt-block {
+  background: #060d14;
+  border: 1px solid #0e2030;
+  border-radius: 8px;
+  padding: 14px 18px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #3d8f5c;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.prompt-block::-webkit-scrollbar { width: 3px; }
+.prompt-block::-webkit-scrollbar-thumb { background: #0e2030; border-radius: 2px; }
+
+/* ═══════════════════════════════
+   CURRENT OUTPUT
+═══════════════════════════════ */
+.current-wrap {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #60a5fa;
+}
+.live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #3b82f6;
+  flex-shrink: 0;
+}
+/* Streaming state: flashing amber-red */
+.live-dot.streaming {
+  background: #f59e0b;
+  animation: pulse-stream 0.8s ease-in-out infinite;
+}
+@keyframes pulse-stream {
+  0%, 100% { opacity: 1; background: #f59e0b; }
+  50%      { opacity: 0.3; background: #ef4444; }
+}
+
+.output-current {
+  margin-top: 10px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 10px 14px;
+  line-height: 1.6;
+  color: #d0d0e8;
+  transition: opacity 0.2s;
+  box-shadow: 0 0 0 1px rgba(124,92,252,0.15), 0 4px 24px rgba(0,0,0,0.4);
+  height: 64px;
+  max-height: 64px;
+  overflow-y: auto;
+}
+.output-size-controls {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.output-size-btn {
+  width: 24px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+.output-size-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.output-current::-webkit-scrollbar { width: 3px; }
+.output-current::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+/*.output-current.fading { opacity: 0.3; }*/
+
+/* Markdown styling inside output */
+.output-current h1,
+.output-current h2,
+.output-current h3 {
+  color: #e0e0f0;
+  margin: 0.6em 0 0.3em;
+  line-height: 1.4;
+}
+.output-current h1 { font-size: 1.3em; }
+.output-current h2 { font-size: 1.15em; }
+.output-current h3 { font-size: 1.05em; }
+.output-current strong { color: #e8e8f8; }
+.output-current em { color: #b8b8d8; }
+.output-current ul, .output-current ol {
+  margin: 0.4em 0;
+  padding-left: 1.5em;
+}
+.output-current li { margin: 0.2em 0; }
+.output-current p { margin: 0 0 0.4em 0; }
+.output-current > :first-child { margin-top: 0; }
+.output-current > :last-child { margin-bottom: 0; }
+
+/* ═══════════════════════════════
+   HISTORY (compact list)
+═══════════════════════════════ */
+.history-empty {
+  padding: 20px 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.7;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: 4px;
+}
+.history-item:hover {
+  background: var(--surface2);
+}
+.history-item.active {
+  background: rgba(124,92,252,0.08);
+}
+.history-num {
+  font-size: 9px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  width: 16px;
+  text-align: right;
+}
+.history-preview {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.history-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+.snap-tag {
+  font-size: 8px;
+  font-family: 'Courier New', monospace;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════
+   BASE PROMPT EDITOR
+═══════════════════════════════ */
+.base-prompt-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.base-prompt-editor label {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+  display: block;
+}
+.base-prompt-editor textarea {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #3d8f5c;
+  background: #060d14;
+  border-color: #0e2030;
+  line-height: 1.7;
+}
+.base-prompt-editor textarea:focus { border-color: #1a5040; }
+
+/* ═══════════════════════════════
+   MODEL SELECTOR
+═══════════════════════════════ */
+.model-select {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+.model-select.timing {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(124, 92, 252, 0.30) 0%,
+      rgba(124, 92, 252, 0.30) var(--req-progress, 0%),
+      rgba(24, 24, 40, 0.96) var(--req-progress, 0%),
+      rgba(24, 24, 40, 0.96) 100%
+    );
+  color: #e4e4f8;
+}
+.model-select.timing.overtime {
+  animation: modelOvertimePulse 1.2s ease-in-out infinite;
+}
+.model-select:hover, .model-select:focus {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+@keyframes modelOvertimePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 92, 252, 0.16); }
+  50%      { box-shadow: 0 0 0 2px rgba(124, 92, 252, 0.32); }
+}
+
+.feedback-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  padding: 5px 10px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.feedback-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.feedback-btn.active {
+  border-color: var(--accent);
+  color: #fff;
+  background: rgba(124, 92, 252, 0.2);
+}
+.feedback-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.infinite-btn.active {
+  border-color: var(--gold);
+  color: #fff;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(217, 119, 6, 0.34) 0%,
+      rgba(217, 119, 6, 0.34) var(--loop-progress, 0%),
+      rgba(24, 24, 40, 0.96) var(--loop-progress, 0%),
+      rgba(24, 24, 40, 0.96) 100%
+    );
+}
+.cadence-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  background: var(--surface2);
+}
+.cadence-label {
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.cadence-slider {
+  width: 110px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+.cadence-wrap.disabled {
+  opacity: 0.45;
+}
+.cadence-wrap.disabled .cadence-slider {
+  cursor: not-allowed;
+}
+.infinite-feedback-msg {
+  margin-top: 8px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: #f5b763;
+  text-transform: uppercase;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity 0.45s ease, max-height 0.45s ease;
+}
+.infinite-feedback-msg.visible {
+  opacity: 1;
+  max-height: 24px;
+}
+
+/* ═══════════════════════════════
+   COLLAPSIBLE SECTIONS
+═══════════════════════════════ */
+.collapse-btn {
+  background: none;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1.6;
+}
+.collapse-btn:hover { color: var(--text); border-color: var(--accent); }
+.collapsible-body {
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+  max-height: 600px;
+  opacity: 1;
+}
+.collapsible-body.collapsed {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* ═══════════════════════════════
+   HISTORY TOOLTIP
+═══════════════════════════════ */
+.history-item {
+  position: relative;
+}
+.history-tooltip {
+  display: none;
+  position: fixed;
+  z-index: 999;
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #d0d0e8;
+  max-width: 420px;
+  max-height: 320px;
+  overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+.history-tooltip::-webkit-scrollbar { width: 3px; }
+.history-tooltip::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.history-tooltip.visible { display: block; }
+
+/* ═══════════════════════════════
+   MOBILE / TOUCH
+═══════════════════════════════ */
+@media (max-width: 700px) {
+  .row { padding: 12px 14px; }
+  .mixer-section { padding: 12px 14px; }
+  .current-wrap { padding: 12px 14px; }
+
+  /* Reorder: source → output → mixer → concepts → rest */
+  .row-source       { order: 1; }
+  .row-food         { order: 1; }
+  .current-wrap     { order: 2; }
+  .mixer-section    { order: 3; }
+  .row-concepts     { order: 4; }
+  .row-prompt       { order: 5; }
+  .row-base-prompt  { order: 6; }
+  .row-history      { order: 7; }
+
+  /* Taller mixer so chips have room */
+  .mixer-wrap { height: 360px; }
+
+  /* Stack sensibility boxes vertically on narrow screens */
+  .sensibility-row { flex-direction: column; gap: 8px; }
+  .sensibility-box { width: 100%; }
+  .sensibility-controls { width: 100%; order: 1; justify-content: flex-start; }
+  .sensibility-box.left { order: 2; }
+  .sensibility-box.right { order: 3; }
+  .sensibility-box.right { text-align: left; }
+  .sensibility-box.right .sensibility-label { text-align: left; }
+
+  /* Slightly more padding for fat fingers, but keep compact */
+  .chip-pill { padding: 4px 7px !important; }
+  .word-chip { width: 80px; }
+
+  /* Stack the output header on small screens */
+  .row-label { flex-wrap: wrap; gap: 6px; }
+
+  .output-current { max-height: none; }
+
+  .sentence-row { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- 1. SOURCE PARAGRAPH -->
+  <div class="row row-source" id="row-source">
+    <div class="row-label">Thought</div>
+    <textarea id="mission" rows="3" oninput="scheduleUpdate(800)">The restaurant on the corner has been serving the same dishes for twenty years. Regulars come every Friday, sitting at the same tables, ordering the same meals. The owner knows every name. Nothing ever changes, and nobody wants it to.</textarea>
+  </div>
+
+  <div class="row row-food" id="row-food" style="display:none;">
+    <div class="row-label">Food for thought</div>
+    <textarea id="food-for-thought" rows="3" oninput="scheduleUpdate(800)" placeholder="A sentiment appended to the end of the prompt while infinite feedback is on."></textarea>
+  </div>
+  <!-- 4. CURRENT OUTPUT + MODEL CHOOSER -->
+  <div class="current-wrap">
+    <div class="row-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="live-badge"><div class="live-dot" id="live-dot"></div><span id="current-io-label">Current output</span></div>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:600;user-select:none;">
+          <input type="checkbox" id="keep-brief" checked onchange="scheduleUpdate(0)" style="accent-color:var(--accent);width:12px;height:12px;cursor:pointer;">
+          Force short output
+        </label>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <select class="model-select" id="model-select" onchange="onModelChange()">
+          <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
+          <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6</option>
+          <option value="qwen/qwen3.5-plus-02-15">Qwen 3.5 Plus</option>
+          <option value="x-ai/grok-4.1-fast">Grok 4.1 Fast</option>
+          <option value="minimax/minimax-m2.5">MiniMax M2.5</option>
+          <option value="google/gemini-3-flash-preview">Gemini 3 Flash</option>
+          <option value="google/gemini-2.5-flash-lite-preview-09-2025">Gemini 2.5 Flash Lite</option>
+          <option value="groq:openai/gpt-oss-20b">Groq GPT-OSS 20B</option>
+          <option value="groq:groq/compound-mini" selected>Groq Compound Mini</option>
+<option value="groq:openai/gpt-oss-120b">Groq GPT-OSS 120B</option>
+<option value="groq:llama-3.1-8b-instant">Groq LLaMA 3.1 8B Instant</option>
+        </select>
+        <div class="cadence-wrap" id="cadence-wrap">
+          <span class="cadence-label">Fast</span>
+          <input class="cadence-slider" id="infinite-cadence" type="range" min="0" max="5000" step="50" value="150" oninput="updateCadenceLabel()">
+          <span class="cadence-label">Slow</span>
+        </div>
+        <button class="feedback-btn" id="feedback-btn" onclick="applyFeedback()">fdbk</button>
+        <button class="feedback-btn infinite-btn" id="infinite-feedback-btn" onclick="toggleInfiniteFeedback()">∞</button>
+      </div>
+    </div>
+    <div class="infinite-feedback-msg" id="infinite-feedback-msg"></div>
+    <div class="output-current" id="output-current">
+      Attempting first contact with an API...
+    </div>
+    <div class="output-size-controls">
+      <button class="output-size-btn" onclick="adjustOutputWindowHeight(-1)" title="Smaller output window">-</button>
+      <button class="output-size-btn" onclick="adjustOutputWindowHeight(1)" title="Larger output window">+</button>
+    </div>
+  </div>
+
+  <!-- 2. CONCEPT MIXER with sensibility boxes below -->
+  <div class="mixer-section">
+    <div class="row-label">
+      PthinkTank
+      <span style="font-size:9px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400;">
+        — drag ↑↓ weight &nbsp; ←→ lean towards one of two sensibilities
+      </span>
+    </div>
+    <!-- Mixer canvas (full width) -->
+    <div class="mixer-wrap" id="mixer">
+      <div class="guide" style="top:25%"></div>
+      <div class="guide" style="top:50%"></div>
+      <div class="guide" style="top:75%"></div>
+      <div class="deadzone-band" id="deadzone-band">
+        <div class="deadzone-label">no lean</div>
+      </div>
+      <div class="axis-left" id="axis-left" onclick="document.getElementById('axis-pick-1').click()" title="Click to change colour">← Sensibility 1</div>
+      <div class="axis-right" id="axis-right" onclick="document.getElementById('axis-pick-2').click()" title="Click to change colour">Sensibility 2 →</div>
+      <input type="color" id="axis-pick-1" class="axis-color-pick" value="#ec4899" oninput="renderChips()">
+      <input type="color" id="axis-pick-2" class="axis-color-pick" value="#34d399" oninput="renderChips()">
+      <canvas class="pong-canvas" id="pong-canvas"></canvas>
+      <div class="mixer-empty" id="mixer-empty">
+        <div class="mixer-empty-icon">⟳</div>
+        Type transformation concepts below
+      </div>
+    </div>
+    <!-- Sensibility boxes below, left and right -->
+    <div class="sensibility-row">
+      <div class="sensibility-box left">
+        <textarea id="direction-1" rows="1" oninput="scheduleUpdate(800)" placeholder="e.g. poetic and lyrical">dour and serious</textarea>
+      </div>
+      <div class="sensibility-box sensibility-controls">
+        <button class="feedback-btn" id="chip-physics-btn" onclick="toggleChipPhysics()">chip physics</button>
+        <button class="feedback-btn" onclick="launchRandomTrajectories()" title="Random speeds and directions">rnd</button>
+      </div>
+      <div class="sensibility-box right">
+        <textarea id="direction-2" rows="1" oninput="scheduleUpdate(800)" placeholder="e.g. clinical and precise">lighthearted and silly</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. TRANSFORMATION CONCEPTS -->
+  <div class="row row-concepts">
+    <div class="row-label">Transformation concepts</div>
+    <div class="sentence-row">
+      <!-- Hidden real textarea keeps value in sync for buildPrompt -->
+      <textarea id="sentence-input">Bowl of Petunias</textarea>
+      <!-- Visible tag input -->
+      <div class="tag-input-wrap" id="tag-input-wrap">
+        <input class="tag-input-field" id="tag-input-field" type="text" placeholder="type a concept, press comma…" autocomplete="off" spellcheck="false">
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 5. GENERATED PROMPT (preview) -->
+  <div class="row row-prompt">
+    <div class="row-label">
+      Generated prompt
+      <button class="collapse-btn" onclick="toggleCollapse('generated-prompt-body', this)">show</button>
+    </div>
+    <div class="collapsible-body collapsed" id="generated-prompt-body">
+      <div class="prompt-block" id="generated-prompt">—</div>
+    </div>
+  </div>
+
+  <!-- 6. BASE PROMPT TEMPLATE -->
+  <div class="row row-base-prompt">
+    <div class="row-label">
+      Base prompt template
+      <button class="collapse-btn" onclick="toggleCollapse('base-prompt-body', this)">show</button>
+    </div>
+    <div class="collapsible-body collapsed" id="base-prompt-body">
+      <div class="base-prompt-editor" id="base-editor">
+        <div>
+          <label>Preamble</label>
+          <textarea id="base-preamble" rows="3" oninput="scheduleUpdate(800)">You have several transformation concepts to apply to the thought. Each has two properties:
+- Weight (0.00 = ignore, 1.00 = apply strongly)
+- Optionally, lean toward a sensibility</textarea>
+        </div>
+        <div>
+          <label>Closing instruction</label>
+          <textarea id="base-closing" rows="4" oninput="scheduleUpdate(800)">Reimagine the original thought applying these transformations proportionally.
+Higher-weighted concepts should have a more visible effect on the output.
+Concepts that lean toward a sensibility should pull the style in that direction.
+Preserve the core meaning of the original thought.</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. PREVIOUS OUTPUTS -->
+  <div class="row row-history">
+    <div class="row-label" style="margin-bottom:6px">Previous outputs</div>
+    <div class="history-empty" id="history-empty">
+      Previous outputs will appear here as you adjust the mixer.
+    </div>
+    <div id="history-list"></div>
+  </div>
+
+</div><!-- /page -->
+
+<!-- Floating history tooltip -->
+<div class="history-tooltip" id="history-tooltip"></div>
+
+<script>
+/* ═══════════════════════════════
+   DATA
+═══════════════════════════════ */
+var words = [];
+var outputHistory  = [];
+var currentOutput  = '';
+var feedbackModeEnabled = false;
+var infiniteFeedbackEnabled = false;
+var infiniteCadenceValue = 150;
+var isStreaming    = false;
+var pendingPrompt  = null;
+var inFlightPrompt = null;
+var infiniteCountdownTimer = null;
+var infiniteCountdownRaf = null;
+var infiniteInactivityInterval = null;
+var conceptLastMoveTs = Date.now();
+var INFINITE_INACTIVITY_MS = 30000;
+var chipPhysicsEnabled = false;
+var chipPhysicsRaf = null;
+var chipPhysicsLastTs = 0;
+var chipPhysicsNextPromptTs = 0;
+var dragLastSampleTs = 0;
+var dragLastSampleXFrac = 0;
+var dragLastSampleYFrac = 0;
+var chipPhysicsMaxSpeed = 0.9; // frac units per second
+var MIXER_BOUND_PAD_X = 26;
+var MIXER_BOUND_PAD_TOP_Y = 28;
+var MIXER_BOUND_PAD_BOTTOM_Y = 3;
+var generationSafetyPaused = false;
+var pPressTimes = [];
+var pongModeActive = false;
+var pongState = null;
+var pongRaf = null;
+var outputWindowHeightPx = 0;
+var modelTiming = { modelId: null, avgMs: 0, count: 0 };
+var requestProgressRaf = null;
+var requestStartTs = 0;
+
+/* ═══════════════════════════════
+   DRAG STATE
+═══════════════════════════════ */
+var draggingKey     = null;
+var dragStartMouseX = 0;
+var dragStartMouseY = 0;
+var dragStartXFrac  = 0;
+var dragStartYFrac  = 0;
+var selectedKey     = null;
+var stateDirtyWhileStreaming = false;
+
+/* ═══════════════════════════════
+   SIMPLE MARKDOWN RENDERER
+═══════════════════════════════ */
+function simpleMarkdown(text) {
+  if (!text) return '';
+  var s = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  s = s.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  s = s.replace(/^## (.+)$/gm,  '<h2>$1</h2>');
+  s = s.replace(/^# (.+)$/gm,   '<h1>$1</h1>');
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/__(.+?)__/g,     '<strong>$1</strong>');
+  s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  s = s.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+  s = s.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+  s = s.replace(/\n\n+/g, '</p><p>');
+  s = s.replace(/\n/g, '<br>');
+  s = '<p>' + s + '</p>';
+  s = s.replace(/<p><\/p>/g, '');
+  return s;
+}
+
+function maybeTriggerPongEasterEgg(key) {
+  if (!key) return;
+  if (key.toLowerCase() !== 'p') {
+    pPressTimes = [];
+    return;
+  }
+
+  var now = performance.now();
+  pPressTimes.push(now);
+  pPressTimes = pPressTimes.filter(function(ts) { return (now - ts) <= 1600; });
+  if (pPressTimes.length >= 7) {
+    pPressTimes = [];
+    startPongMode();
+  }
+}
+
+function startPongMode() {
+  if (pongModeActive) return;
+  var mixer = document.getElementById('mixer');
+  var canvas = document.getElementById('pong-canvas');
+  if (!mixer || !canvas) return;
+
+  pongModeActive = true;
+  mixer.classList.add('pong-mode');
+
+  var w = mixer.clientWidth || 600;
+  var h = mixer.clientHeight || 300;
+  canvas.width = w;
+  canvas.height = h;
+
+  var paddleH = Math.max(44, Math.round(h * 0.23));
+  var paddleW = 8;
+  var margin = 12;
+  var ballR = 6;
+  var speed = Math.max(170, Math.min(320, Math.round((w + h) * 0.24)));
+
+  pongState = {
+    leftY: (h - paddleH) / 2,
+    rightY: (h - paddleH) / 2,
+    paddleH: paddleH,
+    paddleW: paddleW,
+    margin: margin,
+    ballR: ballR,
+    bx: w / 2,
+    by: h / 2,
+    bvx: speed,
+    bvy: speed * 0.45,
+    leftScore: 0,
+    rightScore: 0,
+    lastTs: performance.now(),
+    pauseUntil: 0
+  };
+
+  if (pongRaf) cancelAnimationFrame(pongRaf);
+  pongRaf = requestAnimationFrame(stepPongMode);
+}
+
+function stopPongMode() {
+  if (!pongModeActive) return;
+  pongModeActive = false;
+  pongState = null;
+  if (pongRaf) {
+    cancelAnimationFrame(pongRaf);
+    pongRaf = null;
+  }
+
+  var mixer = document.getElementById('mixer');
+  if (mixer) mixer.classList.remove('pong-mode');
+
+  var canvas = document.getElementById('pong-canvas');
+  if (canvas) {
+    var ctx = canvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+function resetPongBall(toRight) {
+  if (!pongState) return;
+  var mixer = document.getElementById('mixer');
+  var w = mixer ? (mixer.clientWidth || 600) : 600;
+  var h = mixer ? (mixer.clientHeight || 300) : 300;
+  var speed = Math.max(170, Math.min(320, Math.round((w + h) * 0.24)));
+  var angle = (Math.random() * 0.8 - 0.4);
+
+  pongState.bx = w / 2;
+  pongState.by = h / 2;
+  pongState.bvx = (toRight ? 1 : -1) * speed;
+  pongState.bvy = speed * angle;
+  pongState.pauseUntil = performance.now() + 520;
+}
+
+function stepPongMode(ts) {
+  if (!pongModeActive || !pongState) return;
+
+  var mixer = document.getElementById('mixer');
+  var canvas = document.getElementById('pong-canvas');
+  if (!mixer || !canvas) return;
+  var ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  var w = mixer.clientWidth || 600;
+  var h = mixer.clientHeight || 300;
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+
+  var dt = Math.min(0.04, Math.max(0.001, (ts - pongState.lastTs) / 1000));
+  pongState.lastTs = ts;
+
+  var targetLeft = pongState.by - pongState.paddleH / 2;
+  var targetRight = pongState.by - pongState.paddleH / 2;
+  pongState.leftY += (targetLeft - pongState.leftY) * Math.min(1, dt * 8.5);
+  pongState.rightY += (targetRight - pongState.rightY) * Math.min(1, dt * 8.5);
+  pongState.leftY = Math.max(0, Math.min(h - pongState.paddleH, pongState.leftY));
+  pongState.rightY = Math.max(0, Math.min(h - pongState.paddleH, pongState.rightY));
+
+  if (ts >= pongState.pauseUntil) {
+    pongState.bx += pongState.bvx * dt;
+    pongState.by += pongState.bvy * dt;
+
+    if (pongState.by - pongState.ballR <= 0) {
+      pongState.by = pongState.ballR;
+      pongState.bvy = Math.abs(pongState.bvy);
+    }
+    if (pongState.by + pongState.ballR >= h) {
+      pongState.by = h - pongState.ballR;
+      pongState.bvy = -Math.abs(pongState.bvy);
+    }
+
+    var lx = pongState.margin + pongState.paddleW;
+    if (pongState.bx - pongState.ballR <= lx &&
+        pongState.by >= pongState.leftY &&
+        pongState.by <= pongState.leftY + pongState.paddleH &&
+        pongState.bvx < 0) {
+      var relL = ((pongState.by - pongState.leftY) / pongState.paddleH - 0.5) * 1.7;
+      pongState.bx = lx + pongState.ballR;
+      pongState.bvx = Math.abs(pongState.bvx) * 1.02;
+      pongState.bvy += relL * 130;
+    }
+
+    var rx = w - pongState.margin - pongState.paddleW;
+    if (pongState.bx + pongState.ballR >= rx &&
+        pongState.by >= pongState.rightY &&
+        pongState.by <= pongState.rightY + pongState.paddleH &&
+        pongState.bvx > 0) {
+      var relR = ((pongState.by - pongState.rightY) / pongState.paddleH - 0.5) * 1.7;
+      pongState.bx = rx - pongState.ballR;
+      pongState.bvx = -Math.abs(pongState.bvx) * 1.02;
+      pongState.bvy += relR * 130;
+    }
+
+    if (pongState.bx < -20) {
+      pongState.rightScore += 1;
+      resetPongBall(true);
+    } else if (pongState.bx > w + 20) {
+      pongState.leftScore += 1;
+      resetPongBall(false);
+    }
+  }
+
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  for (var y = 8; y < h - 8; y += 16) {
+    ctx.fillRect(w / 2 - 1, y, 2, 8);
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.72)';
+  ctx.fillRect(pongState.margin, pongState.leftY, pongState.paddleW, pongState.paddleH);
+  ctx.fillRect(w - pongState.margin - pongState.paddleW, pongState.rightY, pongState.paddleW, pongState.paddleH);
+
+  ctx.beginPath();
+  ctx.arc(pongState.bx, pongState.by, pongState.ballR, 0, Math.PI * 2);
+  ctx.fillStyle = '#fca5a5';
+  ctx.fill();
+
+  ctx.font = '700 15px "Courier New", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.72)';
+  ctx.textAlign = 'center';
+  ctx.fillText(String(pongState.leftScore), w / 2 - 28, 24);
+  ctx.fillText(String(pongState.rightScore), w / 2 + 28, 24);
+
+  ctx.font = '600 9px "Segoe UI", sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.fillText('PONG EASTER EGG', w / 2, h - 10);
+
+  pongRaf = requestAnimationFrame(stepPongMode);
+}
+
+/* ═══════════════════════════════
+   COLOUR MAPPING
+═══════════════════════════════ */
+// Parse a #rrggbb hex string to {r,g,b}
+function hexToRgb(hex) {
+  var h = hex.replace('#', '');
+  return {
+    r: parseInt(h.slice(0,2), 16),
+    g: parseInt(h.slice(2,4), 16),
+    b: parseInt(h.slice(4,6), 16)
+  };
+}
+// Return rgba() string from hex + alpha
+function hexToRgbA(hex, alpha) {
+  var c = hexToRgb(hex);
+  return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + alpha + ')';
+}
+function lerp(a, b, f) { return Math.round(a + (b - a) * f); }
+
+// Weight → text colour: bright warm at top, dim/dark at bottom
+function weightTextColor(w) {
+  // Interpolate through: dim grey (0) → blue (0.3) → purple (0.55) → orange (0.8) → gold (1.0)
+  var stops = [
+    { at: 0.00, r: 58,  g: 58,  b: 88  },
+    { at: 0.30, r: 96,  g: 165, b: 250 },
+    { at: 0.55, r: 196, g: 181, b: 253 },
+    { at: 0.80, r: 251, g: 146, b: 60  },
+    { at: 1.00, r: 252, g: 211, b: 77  }
+  ];
+  var lo = stops[0], hi = stops[stops.length - 1];
+  for (var i = 0; i < stops.length - 1; i++) {
+    if (w >= stops[i].at && w <= stops[i+1].at) { lo = stops[i]; hi = stops[i+1]; break; }
+  }
+  var f = lo.at === hi.at ? 0 : (w - lo.at) / (hi.at - lo.at);
+  return 'rgb(' + lerp(lo.r,hi.r,f) + ',' + lerp(lo.g,hi.g,f) + ',' + lerp(lo.b,hi.b,f) + ')';
+}
+
+// Lean → background colour: lean colour tinted by intensity, dark base when neutral
+function chipStyle(weight, xFrac) {
+  var textColor = weightTextColor(weight);
+
+  var leanInDead = inDeadzone(xFrac);
+  var amount     = leanInDead ? 0 : leanIntensity(xFrac);
+  var leanLeft   = xFrac < 0.5;
+
+  var pickEl = document.getElementById(leanLeft ? 'axis-pick-1' : 'axis-pick-2');
+  var lc     = hexToRgb(pickEl ? pickEl.value : (leanLeft ? '#ec4899' : '#34d399'));
+
+  // Background: dark base when neutral, fades to lean colour as intensity rises
+  var bgAlpha    = leanInDead ? 0.12 : (0.10 + amount * 0.30);
+  var borderAlpha= leanInDead ? 0.18 : (0.25 + amount * 0.60);
+
+  // In deadzone use a neutral dark bg; outside use the lean colour
+  var bgColor, borderColor;
+  if (leanInDead) {
+    bgColor     = 'rgba(40,40,70,' + bgAlpha.toFixed(2) + ')';
+    borderColor = 'rgba(80,80,120,' + borderAlpha.toFixed(2) + ')';
+  } else {
+    bgColor     = 'rgba(' + lc.r + ',' + lc.g + ',' + lc.b + ',' + bgAlpha.toFixed(2) + ')';
+    borderColor = 'rgba(' + lc.r + ',' + lc.g + ',' + lc.b + ',' + borderAlpha.toFixed(2) + ')';
+  }
+
+  return { bg: bgColor, color: textColor, border: borderColor };
+}
+
+function normaliseConceptTokens(list) {
+  var seen = new Set();
+  var unique = [];
+  list.forEach(function(item) {
+    var val = (item || '').trim();
+    if (!val) return;
+    var key = val.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    unique.push(val);
+  });
+  return unique;
+}
+
+function isCrowdedAtPosition(occupied, x, y) {
+  var MIN_DX = 0.08;
+  var MIN_DY = 0.12;
+  return occupied.some(function(p) {
+    return Math.abs(p.xFrac - x) < MIN_DX && Math.abs(p.yFrac - y) < MIN_DY;
+  });
+}
+
+function findOpenMiddlePosition(occupied) {
+  var candidates = [
+    { xFrac: 0.50, yFrac: 0.50 },
+    { xFrac: 0.57, yFrac: 0.50 },
+    { xFrac: 0.43, yFrac: 0.50 },
+    { xFrac: 0.50, yFrac: 0.42 },
+    { xFrac: 0.50, yFrac: 0.58 },
+    { xFrac: 0.60, yFrac: 0.42 },
+    { xFrac: 0.40, yFrac: 0.42 },
+    { xFrac: 0.60, yFrac: 0.58 },
+    { xFrac: 0.40, yFrac: 0.58 },
+    { xFrac: 0.67, yFrac: 0.50 },
+    { xFrac: 0.33, yFrac: 0.50 },
+    { xFrac: 0.50, yFrac: 0.34 },
+    { xFrac: 0.50, yFrac: 0.66 },
+    { xFrac: 0.67, yFrac: 0.34 },
+    { xFrac: 0.33, yFrac: 0.34 },
+    { xFrac: 0.67, yFrac: 0.66 },
+    { xFrac: 0.33, yFrac: 0.66 }
+  ];
+
+  for (var i = 0; i < candidates.length; i++) {
+    var c = candidates[i];
+    if (!isCrowdedAtPosition(occupied, c.xFrac, c.yFrac)) return c;
+  }
+
+  var fallbackOffset = occupied.length % 8;
+  var step = 0.04 * (1 + Math.floor(occupied.length / 8));
+  var x = 0.5 + (fallbackOffset - 3.5) * step;
+  var y = 0.5 + ((occupied.length % 6) - 2.5) * step;
+  return {
+    xFrac: Math.max(0.05, Math.min(0.95, x)),
+    yFrac: Math.max(0.10, Math.min(0.90, y))
+  };
+}
+
+function syncWordsToTagTokens(opts) {
+  opts = opts || {};
+  var shouldSchedule = opts.schedule !== false;
+  var existingByKey = new Map(
+    words.map(function(w) {
+      return [w.key, { key: w.key, label: w.label, xFrac: w.xFrac, yFrac: w.yFrac, vx: w.vx || 0, vy: w.vy || 0 }];
+    })
+  );
+  var occupied = [];
+
+  var hadNoWords = words.length === 0;
+  words = tagTokens.map(function(token, index) {
+    var key = token.toLowerCase();
+    var existing = existingByKey.get(key);
+    if (existing) {
+      existing.label = token;
+      occupied.push({ xFrac: existing.xFrac, yFrac: existing.yFrac });
+      return existing;
+    }
+
+    if (tagTokens.length === 1 || (hadNoWords && index === 0)) {
+      var firstNode = { key: key, label: token, xFrac: 0.5, yFrac: 0.20, vx: 0, vy: 0 };
+      occupied.push({ xFrac: firstNode.xFrac, yFrac: firstNode.yFrac });
+      return firstNode;
+    }
+
+    var pos = findOpenMiddlePosition(occupied);
+    var newNode = { key: key, label: token, xFrac: pos.xFrac, yFrac: pos.yFrac, vx: 0, vy: 0 };
+    occupied.push({ xFrac: newNode.xFrac, yFrac: newNode.yFrac });
+    return newNode;
+  });
+
+  document.getElementById('mixer-empty').style.display = words.length ? 'none' : '';
+  renderChips();
+  markConceptActivity();
+  if (shouldSchedule) scheduleUpdate(0);
+}
+
+/* ═══════════════════════════════
+   DEADZONE CONFIG + LEAN CURVE
+═══════════════════════════════ */
+var DEADZONE_HALF = 0.10; // 10% either side of centre = 20% total band
+
+function inDeadzone(xFrac) {
+  return xFrac >= (0.5 - DEADZONE_HALF) && xFrac <= (0.5 + DEADZONE_HALF);
+}
+
+// Returns a 0–1 lean intensity for a given xFrac, with non-linear curve.
+// 0 = fully toward sensibility 1, 1 = fully toward sensibility 2.
+// Inside the deadzone returns 0.
+// Outside the deadzone: normalise distance from deadzone edge to canvas edge,
+// then apply a power curve (ease-in) so small movements near the deadzone
+// produce small lean values, and sensitivity ramps up toward the extremes.
+function leanIntensity(xFrac) {
+  var CURVE   = 2.5; // exponent — higher = more pronounced ease-in
+  var MIN_PCT = 0.01; // ensure entering the active zone reads 1%, not 0%
+  if (xFrac <= 0.5) {
+    // Left side — toward sensibility 1
+    var dzEdge     = 0.5 - DEADZONE_HALF; // e.g. 0.40
+    if (xFrac >= dzEdge) return 0;        // inside deadzone
+    var normalised = (dzEdge - xFrac) / dzEdge; // 0 at dz edge, 1 at far left
+    // Remap [0,1] → [MIN_PCT,1] so just-outside-deadzone reads ~1%
+    return MIN_PCT + (1 - MIN_PCT) * Math.pow(normalised, CURVE);
+  } else {
+    // Right side — toward sensibility 2
+    var dzEdge     = 0.5 + DEADZONE_HALF; // e.g. 0.60
+    if (xFrac <= dzEdge) return 0;         // inside deadzone
+    var normalised = (xFrac - dzEdge) / (1 - dzEdge); // 0 at dz edge, 1 at far right
+    return MIN_PCT + (1 - MIN_PCT) * Math.pow(normalised, CURVE);
+  }
+}
+
+/* ═══════════════════════════════
+   RENDER CHIPS
+═══════════════════════════════ */
+function renderChips() {
+  var mixer = document.getElementById('mixer');
+  mixer.querySelectorAll('.word-chip').forEach(function(el) { el.remove(); });
+
+  var W       = mixer.clientWidth  || 600;
+  var H       = mixer.clientHeight || 300;
+  var PADH    = MIXER_BOUND_PAD_X;
+  var PADVTop = MIXER_BOUND_PAD_TOP_Y;
+  var PADVBot = MIXER_BOUND_PAD_BOTTOM_Y;
+
+  // Update axis labels from sensibility inputs
+  var d1 = (document.getElementById('direction-1').value || '').trim();
+  var d2 = (document.getElementById('direction-2').value || '').trim();
+  document.getElementById('axis-left').textContent  = '← ' + (d1 || 'Sensibility 1');
+  document.getElementById('axis-right').textContent = (d2 || 'Sensibility 2') + ' →';
+
+  // Sync axis label + sensibility box label colours from colour pickers
+  var c1El = document.getElementById('axis-pick-1');
+  var c2El = document.getElementById('axis-pick-2');
+  var c1 = c1El ? c1El.value : '#ec4899';
+  var c2 = c2El ? c2El.value : '#34d399';
+  document.getElementById('axis-left').style.color  = hexToRgbA(c1, 0.5);
+  document.getElementById('axis-right').style.color = hexToRgbA(c2, 0.5);
+  // Update sensibility label colours
+  var sLabels = document.querySelectorAll('.sensibility-box.left .sensibility-label');
+  sLabels.forEach(function(el) { el.style.color = hexToRgbA(c1, 0.7); });
+  var sLabels2 = document.querySelectorAll('.sensibility-box.right .sensibility-label');
+  sLabels2.forEach(function(el) { el.style.color = hexToRgbA(c2, 0.7); });
+
+  // Position and size the deadzone band
+  var dzLeft  = (0.5 - DEADZONE_HALF) * W;
+  var dzWidth = DEADZONE_HALF * 2 * W;
+  var band = document.getElementById('deadzone-band');
+  band.style.left  = dzLeft + 'px';
+  band.style.width = dzWidth + 'px';
+
+  words.forEach(function(word) {
+    var weight = 1.0 - word.yFrac;
+    var style  = chipStyle(weight, word.xFrac);
+    var px     = PADH + word.xFrac * (W - PADH * 2);
+    var py     = PADVTop + word.yFrac * (H - PADVTop - PADVBot);
+    // Scale smoothly: 0.65 at zero weight → 1.10 at full weight
+    var scale  = (0.65 + weight * 0.45).toFixed(3);
+
+    var lean = word.xFrac;
+    var leanText;
+    if (inDeadzone(lean)) {
+      leanText = '· neutral';
+    } else if (lean < 0.5) {
+      leanText = '← ' + Math.round(leanIntensity(lean) * 100) + '%';
+    } else {
+      leanText = Math.round(leanIntensity(lean) * 100) + '% →';
+    }
+
+    var chip = document.createElement('div');
+    chip.className = 'word-chip' +
+      (draggingKey === word.key ? ' is-dragging' : '') +
+      (selectedKey === word.key ? ' selected'    : '');
+    chip.dataset.key = word.key;
+    chip.style.left  = px + 'px';
+    chip.style.top   = py + 'px';
+
+    chip.innerHTML =
+      '<div class="chip-pill" style="' +
+        'background:' + style.bg + ';' +
+        'color:' + style.color + ';' +
+        'border-color:' + style.border + ';' +
+        'transform:scale(' + scale + ')' +
+      '">' + word.label + '</div>' +
+      '<div class="chip-weight" style="color:' + style.color + '">' +
+        weight.toFixed(2) +
+      '</div>' +
+      '<div class="chip-weight" style="color:' + style.color + ';opacity:0.6;font-size:8px">' +
+        leanText +
+      '</div>';
+
+    chip.addEventListener('mousedown', function(e) { onChipMouseDown(e, word.key); });
+    chip.addEventListener('touchstart',  function(e) { onChipTouchStart(e, word.key); }, { passive: false });
+    chip.addEventListener('touchmove',   onChipTouchMove, { passive: false });
+    chip.addEventListener('touchend',    onChipTouchEnd,  { passive: false });
+    chip.addEventListener('touchcancel', onChipTouchEnd,  { passive: false });
+    mixer.appendChild(chip);
+  });
+}
+
+/* ═══════════════════════════════
+   DRAG
+═══════════════════════════════ */
+function onChipMouseDown(e, key) {
+  e.preventDefault();
+  e.stopPropagation();
+  selectedKey     = key;
+  draggingKey     = key;
+  dragStartMouseX = e.clientX;
+  dragStartMouseY = e.clientY;
+  var word        = words.find(function(w) { return w.key === key; });
+  if (chipPhysicsEnabled && word) {
+    word.vx = 0;
+    word.vy = 0;
+  }
+  dragStartXFrac  = word.xFrac;
+  dragStartYFrac  = word.yFrac;
+  dragLastSampleTs = performance.now();
+  dragLastSampleXFrac = word.xFrac;
+  dragLastSampleYFrac = word.yFrac;
+  document.body.style.cursor = 'grabbing';
+  renderChips();
+}
+
+function clampPhysicsSpeed(v) {
+  if (v > chipPhysicsMaxSpeed) return chipPhysicsMaxSpeed;
+  if (v < -chipPhysicsMaxSpeed) return -chipPhysicsMaxSpeed;
+  return v;
+}
+
+function moveDraggedWordWithPointer(clientX, clientY) {
+  if (!draggingKey) return;
+  var mixer   = document.getElementById('mixer');
+  var W       = mixer.clientWidth  || 600;
+  var H       = mixer.clientHeight || 300;
+  var PADH    = MIXER_BOUND_PAD_X;
+  var PADVTop = MIXER_BOUND_PAD_TOP_Y;
+  var PADVBot = MIXER_BOUND_PAD_BOTTOM_Y;
+  var usableX = W - PADH * 2;
+  var usableY = H - PADVTop - PADVBot;
+  var deltaX  = clientX - dragStartMouseX;
+  var deltaY  = clientY - dragStartMouseY;
+  var word    = words.find(function(w) { return w.key === draggingKey; });
+  if (!word) return;
+
+  word.xFrac = Math.max(0, Math.min(1, dragStartXFrac + deltaX / usableX));
+  word.yFrac = Math.max(0, Math.min(1, dragStartYFrac + deltaY / usableY));
+
+  if (chipPhysicsEnabled) {
+    var now = performance.now();
+    var dt = Math.max(0.001, (now - dragLastSampleTs) / 1000);
+    word.vx = clampPhysicsSpeed((word.xFrac - dragLastSampleXFrac) / dt);
+    word.vy = clampPhysicsSpeed((word.yFrac - dragLastSampleYFrac) / dt);
+    dragLastSampleTs = now;
+    dragLastSampleXFrac = word.xFrac;
+    dragLastSampleYFrac = word.yFrac;
+  }
+
+  renderChips();
+  markConceptActivity();
+  scheduleUpdate(150);
+}
+
+document.addEventListener('mousemove', function(e) {
+  if (!draggingKey) return;
+  moveDraggedWordWithPointer(e.clientX, e.clientY);
+});
+
+document.addEventListener('mouseup', function() {
+  if (draggingKey) {
+    if (!chipPhysicsEnabled) {
+      var w = words.find(function(item) { return item.key === draggingKey; });
+      if (w) { w.vx = 0; w.vy = 0; }
+    }
+    if (chipPhysicsEnabled) startChipPhysicsLoop();
+    draggingKey             = null;
+    document.body.style.cursor = '';
+    renderChips();
+    scheduleUpdate(0);
+  }
+});
+
+/* ═══════════════════════════════
+   TOUCH DRAG
+═══════════════════════════════ */
+function onChipTouchStart(e, key) {
+  e.preventDefault();
+  e.stopPropagation();
+  var touch       = e.touches[0];
+  selectedKey     = key;
+  draggingKey     = key;
+  dragStartMouseX = touch.clientX;
+  dragStartMouseY = touch.clientY;
+  var word        = words.find(function(w) { return w.key === key; });
+  if (chipPhysicsEnabled && word) {
+    word.vx = 0;
+    word.vy = 0;
+  }
+  dragStartXFrac  = word.xFrac;
+  dragStartYFrac  = word.yFrac;
+  dragLastSampleTs = performance.now();
+  dragLastSampleXFrac = word.xFrac;
+  dragLastSampleYFrac = word.yFrac;
+  renderChips();
+}
+
+function onChipTouchMove(e) {
+  if (!draggingKey) return;
+  e.preventDefault();
+  e.stopPropagation();
+  var touch = e.touches[0];
+  moveDraggedWordWithPointer(touch.clientX, touch.clientY);
+}
+
+function onChipTouchEnd(e) {
+  if (!draggingKey) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (!chipPhysicsEnabled) {
+    var w = words.find(function(item) { return item.key === draggingKey; });
+    if (w) { w.vx = 0; w.vy = 0; }
+  }
+  if (chipPhysicsEnabled) startChipPhysicsLoop();
+  draggingKey = null;
+  renderChips();
+  scheduleUpdate(0);
+}
+
+/* ═══════════════════════════════
+   PROMPT BUILDER
+═══════════════════════════════ */
+function buildPrompt() {
+  var source   = (document.getElementById('mission').value || '').trim();
+  var food     = (document.getElementById('food-for-thought').value || '').trim();
+  var dir1     = (document.getElementById('direction-1').value || '').trim() || 'Sensibility 1';
+  var dir2     = (document.getElementById('direction-2').value || '').trim() || 'Sensibility 2';
+  var preamble = (document.getElementById('base-preamble').value || '').trim();
+  var closing  = (document.getElementById('base-closing').value || '').trim();
+
+  // Filter out zero-weight concepts entirely
+  var activeWords = words.filter(function(w) { return (1.0 - w.yFrac) > 0.01; });
+
+  if (!activeWords.length) return 'Here is the original thought:\n\n"""\n' + source + '\n"""\n\nNo active transformation concepts (all at zero weight).';
+
+  var lines = activeWords.map(function(w) {
+    var weight = (1.0 - w.yFrac).toFixed(2);
+    var lean   = w.xFrac;
+    var leanDesc;
+    if (inDeadzone(lean)) {
+      leanDesc = null;
+    } else if (lean < 0.5) {
+      leanDesc = 'leans ' + Math.round(leanIntensity(lean) * 100) + '% toward "' + dir1 + '"';
+    } else {
+      leanDesc = 'leans ' + Math.round(leanIntensity(lean) * 100) + '% toward "' + dir2 + '"';
+    }
+    return w.label + ': weight ' + weight + (leanDesc ? ', ' + leanDesc : '');
+  }).join('\n');
+
+  var brief   = document.getElementById('keep-brief').checked
+                  ? '\nKeep your answer extremely brief (e.g., less than 20 words).'
+                  : '';
+  var prompt = 'Here is the original thought:\n\n"""\n' + source + '\n"""\n\n' +
+    preamble + '\n\n' +
+    lines + '\n\n' +
+    closing + brief;
+  if (feedbackModeEnabled && food) {
+    prompt += '\n\n' + food;
+  }
+  return prompt;
+}
+
+/* ═══════════════════════════════
+   STREAMING STATUS HELPERS
+═══════════════════════════════ */
+function setStreamingState(active) {
+  var dot = document.getElementById('live-dot');
+  if (active) {
+    dot.classList.add('streaming');
+    startRequestProgressDisplay();
+  } else {
+    dot.classList.remove('streaming');
+    stopRequestProgressDisplay();
+  }
+}
+
+/* ═══════════════════════════════
+   OUTPUT GENERATOR (streaming)
+═══════════════════════════════ */
+async function generateOutput() {
+  if (generationSafetyPaused) return;
+  if (!words.length) return;
+
+  var prompt = buildPrompt();
+  if (isStreaming && prompt === inFlightPrompt) return;
+  clearInfiniteCountdown();
+
+/*
+  if (isStreaming) {
+    pendingPrompt = prompt;
+    return;
+  }
+  */
+
+  isStreaming   = true;
+  pendingPrompt = null;
+  inFlightPrompt = prompt;
+
+  var outputEl = document.getElementById('output-current');
+  outputEl.classList.add('fading');
+  setStreamingState(true);
+
+  var assembled = '';
+  var completed = false;
+  var requestStartedAt = performance.now();
+
+  try {
+    var response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt, model: document.getElementById('model-select').value }),
+    });
+
+    var reader = response.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+
+    outputEl.classList.remove('fading');
+    outputEl.innerHTML = '';
+
+    outer: while (true) {
+      var result = await reader.read();
+      if (result.done) break;
+
+      buffer += decoder.decode(result.value, { stream: true });
+      var lines = buffer.split('\n\n');
+      buffer = lines.pop();
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (!line.startsWith('data: ')) continue;
+        var payload = line.slice(6);
+        if (payload === '[DONE]') {
+          completed = true;
+          pushHistory(assembled);
+          break outer;
+        }
+        if (payload === '[ERROR]') {
+          outputEl.textContent = 'Error generating response. Check your API key and server.';
+          break outer;
+        }
+        var token = payload.replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+        assembled += token;
+        outputEl.innerHTML = simpleMarkdown(assembled);
+      }
+    }
+  } catch (err) {
+    outputEl.classList.remove('fading');
+    outputEl.textContent = 'Request failed. Is the server running?';
+  } finally {
+  var requestElapsedMs = Math.max(1, performance.now() - requestStartedAt);
+  if (completed) recordModelResponseTime(requestElapsedMs);
+  isStreaming = false;
+  setStreamingState(false);
+  inFlightPrompt = null;
+
+  if (infiniteFeedbackEnabled && completed) {
+    stateDirtyWhileStreaming = false;
+    syncMissionToCurrentOutput();
+    var nextDelay = getInfiniteCadenceDelayMs();
+    startInfiniteCountdown(nextDelay);
+  } else if (stateDirtyWhileStreaming) {
+    stateDirtyWhileStreaming = false;
+    generateOutput();
+  }
+  }
+}
+
+/* ═══════════════════════════════
+   HISTORY
+═══════════════════════════════ */
+function pushHistory(outputText) {
+  if (!outputText || outputText === currentOutput) return;
+  var snapshot = words
+    .map(function(w) { return { label: w.label, weight: 1.0 - w.yFrac }; })
+    .sort(function(a, b) { return b.weight - a.weight; })
+    .slice(0, 4);
+  var wordsCopy = words.map(function(w) {
+    return { key: w.key, label: w.label, xFrac: w.xFrac, yFrac: w.yFrac };
+  });
+  outputHistory.unshift({
+    output: currentOutput,
+    words: wordsCopy,
+    source: document.getElementById('mission').value,
+    direction1: document.getElementById('direction-1').value,
+    direction2: document.getElementById('direction-2').value,
+    concepts: document.getElementById('sentence-input').value,
+    snapshot: snapshot
+  });
+  if (outputHistory.length > 20) outputHistory.pop();
+  currentOutput = outputText;
+  if (feedbackModeEnabled) syncMissionToCurrentOutput();
+  renderHistory();
+  updateFeedbackButtonState();
+}
+
+function renderHistory() {
+  var list  = document.getElementById('history-list');
+  var empty = document.getElementById('history-empty');
+  list.innerHTML = '';
+
+  if (!outputHistory.length) {
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  outputHistory.forEach(function(item, i) {
+    var preview = (item.output || '').replace(/\n/g, ' ').substring(0, 80);
+    if ((item.output || '').length > 80) preview += '…';
+    if (!preview) preview = '(empty)';
+
+    var tags = item.snapshot
+      .filter(function(s) { return s.weight > 0.05; })
+      .map(function(s) {
+        return '<span class="snap-tag">' + s.label + ' ' + s.weight.toFixed(2) + '</span>';
+      }).join('');
+
+    var div = document.createElement('div');
+    div.className = 'history-item';
+    div.dataset.index = i;
+    div.innerHTML =
+      '<span class="history-num">' + (i + 1) + '</span>' +
+      '<span class="history-preview">' + preview + '</span>' +
+      '<div class="history-tags">' + tags + '</div>';
+
+div.addEventListener('click', function() { restoreHistory(i); });
+//div.addEventListener('mouseenter', function(e) { showHistoryTooltip(e, item.output); }); // ← pass e instead of div
+//div.addEventListener('mouseleave', hideHistoryTooltip);
+    list.appendChild(div);
+  });
+}
+
+function restoreHistory(index) {
+  var item = outputHistory[index];
+  if (!item) return;
+
+  document.getElementById('mission').value = item.source || '';
+  document.getElementById('direction-1').value = item.direction1 || '';
+  document.getElementById('direction-2').value = item.direction2 || '';
+  document.getElementById('sentence-input').value = item.concepts || '';
+
+  words = item.words.map(function(w) {
+    return { key: w.key, label: w.label, xFrac: w.xFrac, yFrac: w.yFrac, vx: 0, vy: 0 };
+  });
+
+  document.getElementById('mixer-empty').style.display = words.length ? 'none' : '';
+  renderChips();
+
+  var outputEl = document.getElementById('output-current');
+  outputEl.innerHTML = simpleMarkdown(item.output || '');
+  currentOutput = item.output || '';
+  updateFeedbackButtonState();
+
+  document.getElementById('generated-prompt').textContent = buildPrompt();
+
+  document.querySelectorAll('.history-item').forEach(function(el) { el.classList.remove('active'); });
+  var items = document.querySelectorAll('.history-item');
+  if (items[index]) items[index].classList.add('active');
+}
+
+/* ═══════════════════════════════
+   COLLAPSIBLE TOGGLE
+═══════════════════════════════ */
+function toggleCollapse(id, btn) {
+  var body = document.getElementById(id);
+  var isCollapsed = body.classList.contains('collapsed');
+  body.classList.toggle('collapsed');
+  btn.textContent = isCollapsed ? 'hide' : 'show';
+}
+
+/* ═══════════════════════════════
+   HISTORY TOOLTIP
+═══════════════════════════════ */
+var tooltip = document.getElementById('history-tooltip');
+
+function showHistoryTooltip(e, outputText) {
+  tooltip.innerHTML = simpleMarkdown(outputText || '(empty)');
+  tooltip.classList.add('visible');
+  positionTooltipNearMouse(e.clientX, e.clientY);
+}
+
+function positionTooltipNearMouse(mx, my) {
+  var tipW    = Math.min(420, window.innerWidth - 16);
+  var tipH    = 320;
+  var padding = 8;
+  var offset  = 14;
+
+  // Prefer left of cursor, fall back to right
+  var x = mx - tipW - offset;
+  if (x < padding) x = mx + offset;
+  if (x + tipW > window.innerWidth - padding) x = window.innerWidth - tipW - padding;
+  if (x < padding) x = padding;
+
+  // Vertically centred on cursor
+  var y = my - tipH / 2;
+  if (y + tipH > window.innerHeight - padding) y = window.innerHeight - tipH - padding;
+  if (y < padding) y = padding;
+
+  tooltip.style.left  = Math.round(x) + 'px';
+  tooltip.style.top   = Math.round(y) + 'px';
+  tooltip.style.width = tipW + 'px';
+}
+
+function hideHistoryTooltip() {
+  tooltip.classList.remove('visible');
+}
+
+/* ═══════════════════════════════
+   UPDATE SCHEDULER
+═══════════════════════════════ */
+var updateTimer = null;
+
+function scheduleUpdate(delay) {
+  if (delay === undefined) delay = 800;
+  clearTimeout(updateTimer);
+
+  updateTimer = setTimeout(function() {
+    var nextPrompt = buildPrompt();
+    document.getElementById('generated-prompt').textContent = nextPrompt;
+    if (generationSafetyPaused) return;
+
+    if (isStreaming) {
+      // Queue one follow-up only when the prompt materially changed.
+      if (nextPrompt !== inFlightPrompt) stateDirtyWhileStreaming = true;
+    } else {
+      generateOutput();
+    }
+
+  }, delay);
+}
+
+function applyOutputWindowHeight() {
+  var outputEl = document.getElementById('output-current');
+  if (!outputEl) return;
+  if (!outputWindowHeightPx || outputWindowHeightPx < 40) outputWindowHeightPx = 64;
+  outputEl.style.height = outputWindowHeightPx + 'px';
+  outputEl.style.maxHeight = outputWindowHeightPx + 'px';
+}
+
+function syncOutputWindowHeightToThought() {
+  var mission = document.getElementById('mission');
+  var food = document.getElementById('food-for-thought');
+  var h = 64;
+  if (mission && mission.offsetHeight) h = mission.offsetHeight;
+  else if (food && food.offsetHeight) h = food.offsetHeight;
+  if (!outputWindowHeightPx) outputWindowHeightPx = h;
+  applyOutputWindowHeight();
+}
+
+function adjustOutputWindowHeight(direction) {
+  if (!outputWindowHeightPx) syncOutputWindowHeightToThought();
+  outputWindowHeightPx += direction * 24;
+  if (outputWindowHeightPx < 40) outputWindowHeightPx = 40;
+  if (outputWindowHeightPx > 520) outputWindowHeightPx = 520;
+  applyOutputWindowHeight();
+}
+
+function updateFeedbackButtonState() {
+  var btn = document.getElementById('feedback-btn');
+  if (!btn) return;
+  btn.classList.toggle('active', feedbackModeEnabled);
+  btn.textContent = 'fdbk';
+  btn.disabled = false;
+  updateSourceModeVisibility();
+}
+
+function updateInfiniteFeedbackButtonState() {
+  var btn = document.getElementById('infinite-feedback-btn');
+  if (!btn) return;
+  btn.classList.toggle('active', infiniteFeedbackEnabled);
+  btn.textContent = '∞';
+  btn.disabled = false;
+  if (!infiniteFeedbackEnabled) setInfiniteButtonProgress(0);
+  updateCurrentOutputLabel();
+  updateCadenceEnabledState();
+  updateSourceModeVisibility();
+}
+
+function applyFeedback() {
+  feedbackModeEnabled = !feedbackModeEnabled;
+  if (!feedbackModeEnabled && infiniteFeedbackEnabled) {
+    infiniteFeedbackEnabled = false;
+    clearInfiniteCountdown();
+    updateInfiniteFeedbackButtonState();
+  }
+  if (feedbackModeEnabled) syncMissionToCurrentOutput();
+  updateFeedbackButtonState();
+  refreshInactivityWatchState();
+}
+
+function toggleInfiniteFeedback() {
+  infiniteFeedbackEnabled = !infiniteFeedbackEnabled;
+  if (!infiniteFeedbackEnabled) {
+    clearInfiniteCountdown();
+  }
+  if (infiniteFeedbackEnabled) {
+    if (!feedbackModeEnabled) {
+      feedbackModeEnabled = true;
+      updateFeedbackButtonState();
+    }
+    hideInfiniteFeedbackMessage();
+    conceptLastMoveTs = Date.now();
+    syncMissionToCurrentOutput();
+    if (!isStreaming && (currentOutput || '').trim()) scheduleUpdate(0);
+  }
+  updateInfiniteFeedbackButtonState();
+  refreshInactivityWatchState();
+}
+
+function updateCadenceEnabledState() {
+  var wrap = document.getElementById('cadence-wrap');
+  var slider = document.getElementById('infinite-cadence');
+  if (!wrap || !slider) return;
+  slider.disabled = false;
+  wrap.classList.remove('disabled');
+}
+
+function updateCadenceLabel() {
+  var slider = document.getElementById('infinite-cadence');
+  if (!slider) return;
+  infiniteCadenceValue = parseInt(slider.value || '150', 10);
+  if (isNaN(infiniteCadenceValue)) infiniteCadenceValue = 150;
+}
+
+function getInfiniteCadenceDelayMs() {
+  return Math.max(0, Math.min(5000, infiniteCadenceValue));
+}
+
+function markConceptActivity() {
+  conceptLastMoveTs = Date.now();
+  hideInfiniteFeedbackMessage();
+  if (generationSafetyPaused) {
+    generationSafetyPaused = false;
+    scheduleUpdate(0);
+  }
+}
+
+function markUserActivity() {
+  conceptLastMoveTs = Date.now();
+  hideInfiniteFeedbackMessage();
+  if (generationSafetyPaused) {
+    generationSafetyPaused = false;
+    scheduleUpdate(0);
+  }
+}
+
+function isGenerationSafetyEnabled() {
+  return infiniteFeedbackEnabled || chipPhysicsEnabled;
+}
+
+function refreshInactivityWatchState() {
+  if (isGenerationSafetyEnabled()) {
+    startInfiniteInactivityWatch();
+  } else {
+    stopInfiniteInactivityWatch();
+    generationSafetyPaused = false;
+    hideInfiniteFeedbackMessage();
+  }
+}
+
+function startInfiniteInactivityWatch() {
+  stopInfiniteInactivityWatch();
+  infiniteInactivityInterval = setInterval(function() {
+    if (!isGenerationSafetyEnabled()) return;
+    if (Date.now() - conceptLastMoveTs > INFINITE_INACTIVITY_MS) {
+      pauseGenerationsDueToInactivity();
+    }
+  }, 1000);
+}
+
+function stopInfiniteInactivityWatch() {
+  if (!infiniteInactivityInterval) return;
+  clearInterval(infiniteInactivityInterval);
+  infiniteInactivityInterval = null;
+}
+
+function pauseGenerationsDueToInactivity() {
+  if (generationSafetyPaused) return;
+  generationSafetyPaused = true;
+  clearInfiniteCountdown();
+  showInfiniteFeedbackMessage('paused generations due to inactivity');
+}
+
+function showInfiniteFeedbackMessage(text) {
+  var el = document.getElementById('infinite-feedback-msg');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('visible', !!text);
+}
+
+function hideInfiniteFeedbackMessage() {
+  showInfiniteFeedbackMessage('');
+}
+
+function updateSourceModeVisibility() {
+  var sourceRow = document.getElementById('row-source');
+  var foodRow = document.getElementById('row-food');
+  if (!sourceRow || !foodRow) return;
+  sourceRow.style.display = feedbackModeEnabled ? 'none' : '';
+  foodRow.style.display = feedbackModeEnabled ? '' : 'none';
+}
+
+function updateCurrentOutputLabel() {
+  var label = document.getElementById('current-io-label');
+  if (!label) return;
+  label.textContent = feedbackModeEnabled ? 'Current I/O' : 'Current output';
+}
+
+function updateChipPhysicsButtonState() {
+  var btn = document.getElementById('chip-physics-btn');
+  if (!btn) return;
+  btn.classList.toggle('active', chipPhysicsEnabled);
+  btn.textContent = 'chip physics';
+}
+
+function hasActiveChipMotion() {
+  return words.some(function(w) {
+    return Math.abs(w.vx || 0) > 0.0001 || Math.abs(w.vy || 0) > 0.0001;
+  });
+}
+
+function stopChipPhysicsLoop() {
+  if (chipPhysicsRaf) {
+    cancelAnimationFrame(chipPhysicsRaf);
+    chipPhysicsRaf = null;
+  }
+}
+
+function startChipPhysicsLoop() {
+  if (!chipPhysicsEnabled || chipPhysicsRaf) return;
+  chipPhysicsLastTs = performance.now();
+  chipPhysicsNextPromptTs = 0;
+  chipPhysicsRaf = requestAnimationFrame(stepChipPhysics);
+}
+
+function stepChipPhysics(ts) {
+  if (!chipPhysicsEnabled) {
+    stopChipPhysicsLoop();
+    return;
+  }
+
+  var dt = Math.min(0.05, Math.max(0.001, (ts - chipPhysicsLastTs) / 1000));
+  chipPhysicsLastTs = ts;
+  var moved = false;
+
+  words.forEach(function(w) {
+    if (w.key === draggingKey) return;
+    var vx = w.vx || 0;
+    var vy = w.vy || 0;
+    if (Math.abs(vx) < 0.0001 && Math.abs(vy) < 0.0001) return;
+
+    var nx = w.xFrac + vx * dt;
+    var ny = w.yFrac + vy * dt;
+
+    if (nx < 0) { nx = -nx; vx = Math.abs(vx); }
+    if (nx > 1) { nx = 2 - nx; vx = -Math.abs(vx); }
+    if (ny < 0) { ny = -ny; vy = Math.abs(vy); }
+    if (ny > 1) { ny = 2 - ny; vy = -Math.abs(vy); }
+
+    w.xFrac = Math.max(0, Math.min(1, nx));
+    w.yFrac = Math.max(0, Math.min(1, ny));
+    w.vx = vx;
+    w.vy = vy;
+    moved = true;
+  });
+
+  if (moved) {
+    renderChips();
+    if (ts >= chipPhysicsNextPromptTs) {
+      chipPhysicsNextPromptTs = ts + 300;
+      scheduleUpdate(0);
+    }
+  }
+
+  if (!hasActiveChipMotion()) {
+    stopChipPhysicsLoop();
+    return;
+  }
+
+  chipPhysicsRaf = requestAnimationFrame(stepChipPhysics);
+}
+
+function toggleChipPhysics() {
+  chipPhysicsEnabled = !chipPhysicsEnabled;
+  if (!chipPhysicsEnabled) {
+    words.forEach(function(w) { w.vx = 0; w.vy = 0; });
+    stopChipPhysicsLoop();
+    renderChips();
+    scheduleUpdate(0);
+  } else if (hasActiveChipMotion()) {
+    startChipPhysicsLoop();
+  }
+  updateChipPhysicsButtonState();
+  conceptLastMoveTs = Date.now();
+  refreshInactivityWatchState();
+}
+
+function prepareTrajectoryLaunch() {
+  if (!words.length) return false;
+  if (!chipPhysicsEnabled) {
+    chipPhysicsEnabled = true;
+    updateChipPhysicsButtonState();
+    refreshInactivityWatchState();
+  }
+  generationSafetyPaused = false;
+  conceptLastMoveTs = Date.now();
+  hideInfiniteFeedbackMessage();
+  return true;
+}
+
+function launchRandomTrajectories() {
+  if (!prepareTrajectoryLaunch()) return;
+  words.forEach(function(w) {
+    var speed = chipPhysicsMaxSpeed * (0.35 + Math.random() * 0.65);
+    var angle = Math.random() * Math.PI * 2;
+    w.vx = Math.cos(angle) * speed;
+    w.vy = Math.sin(angle) * speed;
+  });
+  startChipPhysicsLoop();
+  scheduleUpdate(0);
+}
+
+function onModelChange(triggerUpdate) {
+  if (triggerUpdate === undefined) triggerUpdate = true;
+  var select = document.getElementById('model-select');
+  if (!select) return;
+  modelTiming.modelId = select.value;
+  modelTiming.avgMs = 0;
+  modelTiming.count = 0;
+  updateModelTimingHint();
+  stopRequestProgressDisplay();
+  if (triggerUpdate) scheduleUpdate(0);
+}
+
+function getExpectedResponseMs() {
+  if (modelTiming.count > 0 && modelTiming.avgMs > 0) return modelTiming.avgMs;
+  return 3000;
+}
+
+function recordModelResponseTime(ms) {
+  var select = document.getElementById('model-select');
+  if (!select) return;
+  var modelId = select.value;
+  if (modelTiming.modelId !== modelId) {
+    modelTiming.modelId = modelId;
+    modelTiming.avgMs = ms;
+    modelTiming.count = 1;
+    updateModelTimingHint();
+    return;
+  }
+  modelTiming.count += 1;
+  modelTiming.avgMs += (ms - modelTiming.avgMs) / modelTiming.count;
+  updateModelTimingHint();
+}
+
+function updateModelTimingHint() {
+  var select = document.getElementById('model-select');
+  if (!select) return;
+  if (!modelTiming.count) {
+    select.title = 'Expected time: collecting baseline for this model';
+    return;
+  }
+  var avgSec = (modelTiming.avgMs / 1000).toFixed(2);
+  select.title = 'Avg response: ' + avgSec + 's (' + modelTiming.count + ' samples)';
+}
+
+function setModelProgress(percent) {
+  var select = document.getElementById('model-select');
+  if (!select) return;
+  var p = Math.max(0, Math.min(100, percent || 0));
+  select.style.setProperty('--req-progress', p.toFixed(2) + '%');
+}
+
+function stopRequestProgressDisplay() {
+  if (requestProgressRaf) {
+    cancelAnimationFrame(requestProgressRaf);
+    requestProgressRaf = null;
+  }
+  var select = document.getElementById('model-select');
+  if (!select) return;
+  select.classList.remove('timing');
+  select.classList.remove('overtime');
+  setModelProgress(0);
+}
+
+function startRequestProgressDisplay() {
+  stopRequestProgressDisplay();
+
+  var select = document.getElementById('model-select');
+  if (!select) return;
+
+  requestStartTs = performance.now();
+  select.classList.add('timing');
+  setModelProgress(0);
+
+  function tick(now) {
+    if (!isStreaming) return;
+    var expectedMs = Math.max(300, getExpectedResponseMs());
+    var elapsed = now - requestStartTs;
+    var progress = Math.min(1, elapsed / expectedMs);
+    setModelProgress(progress * 100);
+    select.classList.toggle('overtime', elapsed > expectedMs);
+    requestProgressRaf = requestAnimationFrame(tick);
+  }
+
+  requestProgressRaf = requestAnimationFrame(tick);
+}
+
+function setInfiniteButtonProgress(percent) {
+  var btn = document.getElementById('infinite-feedback-btn');
+  if (!btn) return;
+  var p = Math.max(0, Math.min(100, percent || 0));
+  btn.style.setProperty('--loop-progress', p.toFixed(2) + '%');
+}
+
+function clearInfiniteCountdown() {
+  if (infiniteCountdownTimer) {
+    clearTimeout(infiniteCountdownTimer);
+    infiniteCountdownTimer = null;
+  }
+  if (infiniteCountdownRaf) {
+    cancelAnimationFrame(infiniteCountdownRaf);
+    infiniteCountdownRaf = null;
+  }
+  setInfiniteButtonProgress(0);
+}
+
+function startInfiniteCountdown(delayMs) {
+  clearInfiniteCountdown();
+
+  if (!infiniteFeedbackEnabled) return;
+  if (delayMs <= 0) {
+    setInfiniteButtonProgress(100);
+    infiniteCountdownTimer = setTimeout(function() {
+      infiniteCountdownTimer = null;
+      if (!isStreaming && infiniteFeedbackEnabled) generateOutput();
+    }, 0);
+    return;
+  }
+
+  var start = performance.now();
+  function tick(now) {
+    if (!infiniteFeedbackEnabled) return;
+    var elapsed = now - start;
+    var progress = Math.min(1, elapsed / delayMs);
+    setInfiniteButtonProgress(progress * 100);
+    if (progress < 1) {
+      infiniteCountdownRaf = requestAnimationFrame(tick);
+    } else {
+      infiniteCountdownRaf = null;
+    }
+  }
+  infiniteCountdownRaf = requestAnimationFrame(tick);
+
+  infiniteCountdownTimer = setTimeout(function() {
+    infiniteCountdownTimer = null;
+    if (infiniteCountdownRaf) {
+      cancelAnimationFrame(infiniteCountdownRaf);
+      infiniteCountdownRaf = null;
+    }
+    setInfiniteButtonProgress(100);
+    if (!isStreaming && infiniteFeedbackEnabled) generateOutput();
+  }, delayMs);
+}
+
+function syncMissionToCurrentOutput() {
+  var latestOutput = (currentOutput || '').trim();
+  if (!latestOutput) return;
+  document.getElementById('mission').value = latestOutput;
+  document.getElementById('generated-prompt').textContent = buildPrompt();
+}
+/* ═══════════════════════════════
+   RESIZE
+═══════════════════════════════ */
+var resizeTimer = null;
+window.addEventListener('resize', function() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderChips, 60);
+});
+
+/* ═══════════════════════════════
+   TAG INPUT
+═══════════════════════════════ */
+var tagTokens = []; // array of strings
+
+function tagSyncTextarea() {
+  document.getElementById('sentence-input').value = tagTokens.join(', ');
+}
+
+function tagRender() {
+  var wrap  = document.getElementById('tag-input-wrap');
+  var field = document.getElementById('tag-input-field');
+  // Remove existing token els (leave the field)
+  wrap.querySelectorAll('.tag-token').forEach(function(el) { el.remove(); });
+  // Insert tokens before the field
+  tagTokens.forEach(function(tok, idx) {
+    var span = document.createElement('span');
+    span.className = 'tag-token';
+    span.innerHTML = escHtml(tok) +
+      '<span class="tag-token-del" data-idx="' + idx + '" title="Remove">×</span>';
+    span.querySelector('.tag-token-del').addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      tagTokens.splice(idx, 1);
+      tagRender();
+      tagSyncTextarea();
+      syncWordsToTagTokens({ schedule: true });
+    });
+    wrap.insertBefore(span, field);
+  });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function tagCommit(raw) {
+  var val = raw.trim().replace(/,+$/, '').trim();
+  if (val.length === 0) return;
+  // avoid duplicates (case-insensitive)
+  if (!tagTokens.some(function(t) { return t.toLowerCase() === val.toLowerCase(); })) {
+    tagTokens.push(val);
+  }
+}
+
+// Initialise from the hidden textarea's default value
+(function initTagInput() {
+  var hidden = document.getElementById('sentence-input');
+  tagTokens = normaliseConceptTokens(hidden.value.split(','));
+  tagRender();
+  tagSyncTextarea();
+  syncWordsToTagTokens({ schedule: false });
+
+  var field = document.getElementById('tag-input-field');
+  var wrap  = document.getElementById('tag-input-wrap');
+
+  // Click anywhere in wrap focuses the field
+  wrap.addEventListener('click', function() { field.focus(); });
+
+  field.addEventListener('keydown', function(e) {
+    if (e.key === 'Backspace' && field.value === '' && tagTokens.length) {
+      // Delete last token on backspace when field empty
+      tagTokens.pop();
+      tagRender();
+      tagSyncTextarea();
+      syncWordsToTagTokens({ schedule: true });
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      tagCommit(field.value);
+      field.value = '';
+      tagRender();
+      tagSyncTextarea();
+      syncWordsToTagTokens({ schedule: true });
+    }
+  });
+
+  field.addEventListener('input', function() {
+    var val = field.value;
+    // Commit on comma
+    if (val.indexOf(',') !== -1) {
+      var parts = val.split(',');
+      // Last part stays in field
+      var last = parts.pop();
+      parts.forEach(function(p) { tagCommit(p); });
+      field.value = last;
+      tagRender();
+      tagSyncTextarea();
+      syncWordsToTagTokens({ schedule: true });
+    }
+  });
+
+  // Commit dangling text on blur
+  field.addEventListener('blur', function() {
+    if (field.value.trim()) {
+      tagCommit(field.value);
+      field.value = '';
+      tagRender();
+      tagSyncTextarea();
+      syncWordsToTagTokens({ schedule: true });
+    }
+  });
+})();
+
+// Override restoreHistory to also refresh tag UI
+var _origRestoreHistory = restoreHistory;
+restoreHistory = function(index) {
+  _origRestoreHistory(index);
+  var hidden = document.getElementById('sentence-input');
+  tagTokens = normaliseConceptTokens(hidden.value.split(','));
+  tagRender();
+};
+
+/* ═══════════════════════════════
+   INIT
+═══════════════════════════════ */
+updateFeedbackButtonState();
+updateInfiniteFeedbackButtonState();
+updateChipPhysicsButtonState();
+updateCadenceLabel();
+onModelChange(false);
+refreshInactivityWatchState();
+syncOutputWindowHeightToThought();
+
+// Keep infinite-feedback safety watchdog from triggering while user is actively using the app.
+document.addEventListener('mousemove', markUserActivity, { passive: true });
+document.addEventListener('keydown', function(e) {
+  markUserActivity();
+  maybeTriggerPongEasterEgg(e.key);
+});
+document.addEventListener('input', markUserActivity);
+document.addEventListener('mousedown', function() {
+  if (pongModeActive) stopPongMode();
+}, { passive: true });
+
+scheduleUpdate(0);
+</script>
+</body>
+</html>
