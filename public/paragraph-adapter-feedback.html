@@ -821,6 +821,26 @@ textarea:focus { border-color: var(--accent); }
 
   /* Stack the output header on small screens */
   .row-label { flex-wrap: wrap; gap: 6px; }
+  .current-head {
+    justify-content: flex-start !important;
+    align-items: flex-start !important;
+  }
+  .current-head-right {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px !important;
+  }
+  .current-head-right .model-select {
+    flex: 1 1 160px;
+    min-width: 150px;
+  }
+  .current-head-right .cadence-wrap {
+    flex: 1 1 170px;
+    min-width: 160px;
+  }
+  .current-head-right .feedback-btn {
+    flex: 0 0 auto;
+  }
 
   .output-current { max-height: none; }
 
@@ -843,7 +863,7 @@ textarea:focus { border-color: var(--accent); }
   </div>
   <!-- 4. CURRENT OUTPUT + MODEL CHOOSER -->
   <div class="current-wrap">
-    <div class="row-label" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+    <div class="row-label current-head" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
       <div style="display:flex;align-items:center;gap:12px;">
         <div class="live-badge"><div class="live-dot" id="live-dot"></div><span id="current-io-label">Current output</span></div>
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:600;user-select:none;">
@@ -851,7 +871,7 @@ textarea:focus { border-color: var(--accent); }
           Force short output
         </label>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;">
+      <div class="current-head-right" style="display:flex;align-items:center;gap:10px;">
         <select class="model-select" id="model-select" onchange="onModelChange()">
           <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
           <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6</option>
