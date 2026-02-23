@@ -51,6 +51,7 @@ html, body {
   display: flex;
   gap: 20px;
   flex-wrap: wrap;
+  margin-bottom: 26px;
 }
 
 .card {
@@ -98,6 +99,64 @@ html, body {
   letter-spacing: 1px;
 }
 
+.keys-panel {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+.keys-title {
+  font-size: 12px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.keys-grid {
+  display: grid;
+  gap: 10px;
+}
+.keys-grid input {
+  width: 100%;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  outline: none;
+}
+.keys-grid input:focus {
+  border-color: var(--accent);
+}
+.keys-actions {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.keys-save {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.keys-save:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.keys-status {
+  font-size: 12px;
+  color: var(--muted);
+}
+.keys-status.ok { color: #7dd3fc; }
+.keys-status.err { color: #fda4af; }
+
 @media (max-width: 720px) {
   .cards { flex-direction: column; }
 }
@@ -144,6 +203,64 @@ html, body {
     </a>
 
   </div>
+
+  <div class="keys-panel">
+    <div class="keys-title">Save API Keys To .env</div>
+    <div class="keys-grid">
+      <input id="openrouter-key" type="password" placeholder="OPENROUTER_API_KEY">
+      <input id="groq-key" type="password" placeholder="GROQ_API_KEY">
+    </div>
+    <div class="keys-actions">
+      <button id="save-keys-btn" class="keys-save" onclick="saveApiKeys()">Save Keys</button>
+      <div id="keys-status" class="keys-status"></div>
+    </div>
+  </div>
 </div>
+<script>
+async function saveApiKeys() {
+  const openrouter = document.getElementById('openrouter-key').value.trim();
+  const groq = document.getElementById('groq-key').value.trim();
+  const status = document.getElementById('keys-status');
+  const btn = document.getElementById('save-keys-btn');
+
+  status.className = 'keys-status';
+  status.textContent = '';
+
+  if (!openrouter && !groq) {
+    status.className = 'keys-status err';
+    status.textContent = 'Enter at least one key';
+    return;
+  }
+
+  btn.disabled = true;
+  status.textContent = 'Saving...';
+
+  try {
+    const response = await fetch('/api/save-keys', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        openrouter_api_key: openrouter || null,
+        groq_api_key: groq || null
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data && data.message ? data.message : 'Failed to save keys');
+    }
+
+    status.className = 'keys-status ok';
+    status.textContent = 'Saved to .env';
+    document.getElementById('openrouter-key').value = '';
+    document.getElementById('groq-key').value = '';
+  } catch (err) {
+    status.className = 'keys-status err';
+    status.textContent = (err && err.message) ? err.message : 'Save failed';
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
 </body>
 </html>

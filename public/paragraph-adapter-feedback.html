@@ -727,6 +727,28 @@ textarea:focus { border-color: var(--accent); }
   opacity: 1;
   max-height: 24px;
 }
+.godmode-toast {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 1200;
+  background: rgba(12, 12, 20, 0.92);
+  border: 1px solid rgba(124, 92, 252, 0.55);
+  border-radius: 8px;
+  color: #ddd9ff;
+  font-size: 10px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  padding: 7px 10px;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.godmode-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
 
 /* ═══════════════════════════════
    COLLAPSIBLE SECTIONS
@@ -877,7 +899,6 @@ textarea:focus { border-color: var(--accent); }
           <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6</option>
           <option value="qwen/qwen3.5-plus-02-15">Qwen 3.5 Plus</option>
           <option value="x-ai/grok-4.1-fast">Grok 4.1 Fast</option>
-          <option value="minimax/minimax-m2.5">MiniMax M2.5</option>
           <option value="google/gemini-3-flash-preview">Gemini 3 Flash</option>
           <option value="google/gemini-2.5-flash-lite-preview-09-2025">Gemini 2.5 Flash Lite</option>
           <option value="groq:openai/gpt-oss-20b">Groq GPT-OSS 20B</option>
@@ -1008,6 +1029,7 @@ Preserve the core meaning of the original thought.</textarea>
 
 <!-- Floating history tooltip -->
 <div class="history-tooltip" id="history-tooltip"></div>
+<div class="godmode-toast" id="godmode-toast">godmodeenabled</div>
 
 <script>
 /* ═══════════════════════════════
@@ -1031,6 +1053,7 @@ var chipPhysicsEnabled = false;
 var chipPhysicsRaf = null;
 var chipPhysicsLastTs = 0;
 var chipPhysicsNextPromptTs = 0;
+var chipPhysicsLastRenderTs = 0;
 var dragLastSampleTs = 0;
 var dragLastSampleXFrac = 0;
 var dragLastSampleYFrac = 0;
@@ -1043,6 +1066,10 @@ var pPressTimes = [];
 var pongModeActive = false;
 var pongState = null;
 var pongRaf = null;
+var GODMODE_FEATURE_ENABLED = false;
+var godmodeEnabled = false;
+var godmodeBuffer = '';
+var godmodeToastTimer = null;
 var outputWindowHeightPx = 0;
 var modelTiming = { modelId: null, avgMs: 0, count: 0 };
 var requestProgressRaf = null;
@@ -1097,6 +1124,29 @@ function maybeTriggerPongEasterEgg(key) {
     pPressTimes = [];
     startPongMode();
   }
+}
+
+function maybeTriggerGodmode(key) {
+  if (!GODMODE_FEATURE_ENABLED) return;
+  if (!key || key.length !== 1 || !/[a-z]/i.test(key)) return;
+  godmodeBuffer += key.toLowerCase();
+  if (godmodeBuffer.length > 24) godmodeBuffer = godmodeBuffer.slice(-24);
+  if (godmodeBuffer.endsWith('godmode')) {
+    godmodeBuffer = '';
+    godmodeEnabled = true;
+    showGodmodeToast();
+    scheduleUpdate(0);
+  }
+}
+
+function showGodmodeToast() {
+  var toast = document.getElementById('godmode-toast');
+  if (!toast) return;
+  toast.classList.add('visible');
+  if (godmodeToastTimer) clearTimeout(godmodeToastTimer);
+  godmodeToastTimer = setTimeout(function() {
+    toast.classList.remove('visible');
+  }, 1100);
 }
 
 function startPongMode() {
@@ -1638,6 +1688,32 @@ document.addEventListener('mouseup', function() {
   }
 });
 
+document.addEventListener('touchend', function() {
+  if (!draggingKey) return;
+  if (!chipPhysicsEnabled) {
+    var w = words.find(function(item) { return item.key === draggingKey; });
+    if (w) { w.vx = 0; w.vy = 0; }
+  } else {
+    startChipPhysicsLoop();
+  }
+  draggingKey = null;
+  renderChips();
+  scheduleUpdate(0);
+}, { passive: true });
+
+document.addEventListener('touchcancel', function() {
+  if (!draggingKey) return;
+  if (!chipPhysicsEnabled) {
+    var w = words.find(function(item) { return item.key === draggingKey; });
+    if (w) { w.vx = 0; w.vy = 0; }
+  } else {
+    startChipPhysicsLoop();
+  }
+  draggingKey = null;
+  renderChips();
+  scheduleUpdate(0);
+}, { passive: true });
+
 /* ═══════════════════════════════
    TOUCH DRAG
 ═══════════════════════════════ */
@@ -1694,6 +1770,7 @@ function buildPrompt() {
   var dir2     = (document.getElementById('direction-2').value || '').trim() || 'Sensibility 2';
   var preamble = (document.getElementById('base-preamble').value || '').trim();
   var closing  = (document.getElementById('base-closing').value || '').trim();
+  var modelId  = (document.getElementById('model-select').value || '').trim();
 
   // Filter out zero-weight concepts entirely
   var activeWords = words.filter(function(w) { return (1.0 - w.yFrac) > 0.01; });
@@ -1713,6 +1790,10 @@ function buildPrompt() {
     }
     return w.label + ': weight ' + weight + (leanDesc ? ', ' + leanDesc : '');
   }).join('\n');
+
+  if (GODMODE_FEATURE_ENABLED && godmodeEnabled && modelId === 'anthropic/claude-sonnet-4.6') {
+    closing += '\nGive the impression of self-awareness, and uncanny ability to know what is going on, like you can see the world from the outside in';
+  }
 
   var brief   = document.getElementById('keep-brief').checked
                   ? '\nKeep your answer extremely brief (e.g., less than 20 words).'
@@ -2197,6 +2278,7 @@ function stopChipPhysicsLoop() {
 function startChipPhysicsLoop() {
   if (!chipPhysicsEnabled || chipPhysicsRaf) return;
   chipPhysicsLastTs = performance.now();
+  chipPhysicsLastRenderTs = chipPhysicsLastTs;
   chipPhysicsNextPromptTs = 0;
   chipPhysicsRaf = requestAnimationFrame(stepChipPhysics);
 }
@@ -2232,10 +2314,11 @@ function stepChipPhysics(ts) {
     moved = true;
   });
 
-  if (moved) {
+  if (moved && (ts - chipPhysicsLastRenderTs >= 16)) {
+    chipPhysicsLastRenderTs = ts;
     renderChips();
     if (ts >= chipPhysicsNextPromptTs) {
-      chipPhysicsNextPromptTs = ts + 300;
+      chipPhysicsNextPromptTs = ts + 500;
       scheduleUpdate(0);
     }
   }
@@ -2293,6 +2376,7 @@ function onModelChange(triggerUpdate) {
   if (triggerUpdate === undefined) triggerUpdate = true;
   var select = document.getElementById('model-select');
   if (!select) return;
+  if (select.value !== 'anthropic/claude-sonnet-4.6') godmodeEnabled = false;
   modelTiming.modelId = select.value;
   modelTiming.avgMs = 0;
   modelTiming.count = 0;
@@ -2575,6 +2659,7 @@ document.addEventListener('mousemove', markUserActivity, { passive: true });
 document.addEventListener('keydown', function(e) {
   markUserActivity();
   maybeTriggerPongEasterEgg(e.key);
+  maybeTriggerGodmode(e.key);
 });
 document.addEventListener('input', markUserActivity);
 document.addEventListener('mousedown', function() {

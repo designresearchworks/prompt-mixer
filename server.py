@@ -1,9 +1,11 @@
 import os
+from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from openai import OpenAI
 
 load_dotenv()
@@ -21,6 +23,40 @@ app.add_middleware(
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4-6")
+ENV_PATH = os.path.join(os.getcwd(), ".env")
+
+
+class EnvKeysPayload(BaseModel):
+    openrouter_api_key: Optional[str] = None
+    groq_api_key: Optional[str] = None
+
+
+def _upsert_env_values(path: str, updates: dict[str, str]) -> None:
+    lines: list[str] = []
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+
+    remaining = dict(updates)
+    result: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in line:
+            result.append(line)
+            continue
+
+        key = line.split("=", 1)[0].strip()
+        if key in remaining:
+            result.append(f"{key}={remaining.pop(key)}")
+        else:
+            result.append(line)
+
+    for key, value in remaining.items():
+        result.append(f"{key}={value}")
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(result).rstrip() + "\n")
 
 
 @app.post("/api/generate")
@@ -67,6 +103,29 @@ async def generate(request: Request):
             yield "data: [ERROR]\n\n"
 
     return StreamingResponse(stream_tokens(), media_type="text/event-stream")
+
+
+@app.post("/api/save-keys")
+async def save_keys(payload: EnvKeysPayload):
+    global OPENROUTER_API_KEY, GROQ_API_KEY
+
+    updates: dict[str, str] = {}
+
+    if payload.openrouter_api_key is not None and payload.openrouter_api_key.strip():
+        value = payload.openrouter_api_key.strip()
+        updates["OPENROUTER_API_KEY"] = value
+        OPENROUTER_API_KEY = value
+
+    if payload.groq_api_key is not None and payload.groq_api_key.strip():
+        value = payload.groq_api_key.strip()
+        updates["GROQ_API_KEY"] = value
+        GROQ_API_KEY = value
+
+    if not updates:
+        return {"ok": False, "message": "No keys provided"}
+
+    _upsert_env_values(ENV_PATH, updates)
+    return {"ok": True, "message": "Saved keys to .env", "saved": list(updates.keys())}
 
 
 # Static files last
