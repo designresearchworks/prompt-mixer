@@ -21,6 +21,29 @@
   --header-blue: #60a5fa;
   --core-ui-text-size: 13.7px;
 }
+[data-theme="light"] {
+  --bg:       #f6f7fb;
+  --surface:  #ffffff;
+  --surface2: #eef1f8;
+  --border:   #d9dfec;
+  --border2:  #c6cee1;
+  --muted:    #6c748c;
+  --text:     #1c2233;
+  --accent:   #5a67d8;
+  --green:    #16a34a;
+  --gold:     #b45309;
+  --header-blue: #2563eb;
+}
+[data-theme="light"] .cadence-wrap {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(217, 119, 6, 0.22) 0%,
+      rgba(217, 119, 6, 0.22) var(--cad-progress, 0%),
+      rgba(255, 255, 255, 0.92) var(--cad-progress, 0%),
+      rgba(255, 255, 255, 0.92) 100%
+    );
+}
 
 html, body {
   height: 100vh;
@@ -1315,6 +1338,7 @@ textarea:focus { border-color: var(--accent); }
           <input class="cadence-slider" id="infinite-cadence" type="range" min="0" max="5000" step="50" value="2500" oninput="updateCadenceLabel()" title="Speed limit on generations">
           <span class="cadence-label">Slow</span>
         </div>
+        <button class="feedback-btn" id="theme-toggle-btn" title="Toggle light/dark mode">Light</button>
         <button class="feedback-btn" id="feedback-btn" title="Where usually the text in the Thought box is what the model is thinking about, with FDBK on it will think about the last thing it generated, last thing it generated, last thing it generated - get it?">fdbk</button>
         <button class="feedback-btn infinite-btn" id="infinite-feedback-btn" title="With this on the model won't stop after each generation, it'll just keep going (which it will do anyway if Fish Physics mode is on)">∞</button>
       </div>
@@ -1644,6 +1668,7 @@ var sharkRunTimer = null;
 var asciiBgLoaded = false;
 var asciiBgDisabled = false;
 var fishAsciiBuffer = '';
+var uiTheme = 'dark';
 
 /* ═══════════════════════════════
    SIMPLE MARKDOWN RENDERER
@@ -1667,6 +1692,29 @@ function simpleMarkdown(text) {
   s = '<p>' + s + '</p>';
   s = s.replace(/<p><\/p>/g, '');
   return s;
+}
+
+function applyUiTheme(theme) {
+  var root = document.documentElement;
+  uiTheme = (theme === 'light') ? 'light' : 'dark';
+  root.setAttribute('data-theme', uiTheme);
+  var btn = document.getElementById('theme-toggle-btn');
+  if (btn) {
+    btn.classList.toggle('active', uiTheme === 'light');
+    btn.textContent = (uiTheme === 'light') ? 'Dark' : 'Light';
+  }
+}
+
+function initUiTheme() {
+  var stored = '';
+  try { stored = localStorage.getItem('prompt_mixer_theme') || ''; } catch (e) {}
+  applyUiTheme(stored || 'dark');
+}
+
+function toggleUiTheme() {
+  var next = uiTheme === 'light' ? 'dark' : 'light';
+  applyUiTheme(next);
+  try { localStorage.setItem('prompt_mixer_theme', next); } catch (e) {}
 }
 
 function maybeTriggerPongEasterEgg(key) {
@@ -4242,6 +4290,7 @@ restoreHistory = function(index) {
 ═══════════════════════════════ */
 captureHardcodedPromptDefaults();
 loadSavedPromptTemplates();
+initUiTheme();
 updateFeedbackButtonState();
 updateInfiniteFeedbackButtonState();
 updateChipPhysicsButtonState();
@@ -4254,6 +4303,7 @@ refreshInactivityWatchState();
 syncOutputWindowHeightToThought();
 bindControlButton('feedback-btn', applyFeedback);
 bindControlButton('infinite-feedback-btn', toggleInfiniteFeedback);
+bindControlButton('theme-toggle-btn', toggleUiTheme);
 bindControlButton('chip-physics-btn', toggleChipPhysics);
 bindControlButton('rnd-btn', launchRandomTrajectories);
 bindControlButton('bmp-btn', toggleBmpMode);
