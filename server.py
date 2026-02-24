@@ -1,4 +1,6 @@
 import os
+import json
+import threading
 from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -27,6 +29,34 @@ ENV_PATH = os.path.join(os.getcwd(), ".env")
 PROMPT_STORE_DIR = os.path.join(os.getcwd(), "data")
 PROMPT_PREAMBLE_PATH = os.path.join(PROMPT_STORE_DIR, "base_preamble.txt")
 PROMPT_CLOSING_PATH = os.path.join(PROMPT_STORE_DIR, "base_closing.txt")
+APP_CONFIG_PATH = os.path.join(PROMPT_STORE_DIR, "app_config.json")
+API_COUNTER_PATH = os.path.join(PROMPT_STORE_DIR, "api_call_counter.json")
+API_COUNTER_LOCK = threading.Lock()
+DEFAULT_APP_CONFIG = {
+    "default_theme": "dark",
+    "default_model": "groq:llama-3.3-70b-versatile",
+    "default_thought": "deep thought",
+    "default_fish_concepts": "animal, vegetable, mineral",
+    "cadence_min_ms": 0,
+    "cadence_max_ms": 5000,
+    "cadence_default_ms": 2500,
+    "infinite_inactivity_ms": 30000,
+    "touch_ui_grace_ms": 320,
+    "chip_max_speed": 0.9,
+    "fish_scale_min_pct": -100,
+    "fish_scale_max_pct": 100,
+    "fish_scale_default_pct": 0,
+    "chip_scale_base": 0.902,
+    "chip_scale_weight_factor": 0.584,
+    "rnd_base_min_factor": 0.35,
+    "rnd_base_max_factor": 0.65,
+    "rnd_launch_min_factor": 0.10,
+    "rnd_launch_max_factor": 0.40,
+    "deadzone_half": 0.10,
+    "merge_hold_ms": 1000,
+    "join_glow_ms": 650,
+    "model_progress_default_ms": 3000,
+}
 
 
 class EnvKeysPayload(BaseModel):
@@ -85,8 +115,159 @@ def _write_text(path: str, value: str) -> None:
         f.write(value)
 
 
+def _read_json(path: str) -> Optional[dict]:
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _write_json(path: str, value: dict) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(value, f, indent=2, ensure_ascii=True)
+        f.write("\n")
+
+
+def _normalize_app_config(raw: Optional[dict]) -> dict:
+    if not isinstance(raw, dict):
+        return {}
+
+    out: dict = {}
+    for key, default in DEFAULT_APP_CONFIG.items():
+        if key not in raw:
+            continue
+        val = raw.get(key)
+
+        if isinstance(default, str):
+            if val is None:
+                continue
+            out[key] = str(val)
+            continue
+
+        if isinstance(default, int):
+            try:
+                out[key] = int(val)
+            except (TypeError, ValueError):
+                continue
+            continue
+
+        if isinstance(default, float):
+            try:
+                out[key] = float(val)
+            except (TypeError, ValueError):
+                continue
+            continue
+
+    # Basic bounds and consistency guards.
+    if "cadence_min_ms" in out:
+        out["cadence_min_ms"] = max(0, out["cadence_min_ms"])
+    if "cadence_max_ms" in out:
+        out["cadence_max_ms"] = max(0, out["cadence_max_ms"])
+    if "cadence_default_ms" in out:
+        out["cadence_default_ms"] = max(0, out["cadence_default_ms"])
+    if "infinite_inactivity_ms" in out:
+        out["infinite_inactivity_ms"] = max(5000, out["infinite_inactivity_ms"])
+    if "touch_ui_grace_ms" in out:
+        out["touch_ui_grace_ms"] = max(0, out["touch_ui_grace_ms"])
+    if "chip_max_speed" in out:
+        out["chip_max_speed"] = max(0.05, out["chip_max_speed"])
+    if "fish_scale_min_pct" in out:
+        out["fish_scale_min_pct"] = max(-200, min(0, out["fish_scale_min_pct"]))
+    if "fish_scale_max_pct" in out:
+        out["fish_scale_max_pct"] = max(0, min(400, out["fish_scale_max_pct"]))
+    if "fish_scale_default_pct" in out:
+        out["fish_scale_default_pct"] = max(-200, min(400, out["fish_scale_default_pct"]))
+    if "chip_scale_base" in out:
+        out["chip_scale_base"] = max(0.2, min(3.0, out["chip_scale_base"]))
+    if "chip_scale_weight_factor" in out:
+        out["chip_scale_weight_factor"] = max(0.0, min(3.0, out["chip_scale_weight_factor"]))
+    if "rnd_base_min_factor" in out:
+        out["rnd_base_min_factor"] = max(0.0, min(2.0, out["rnd_base_min_factor"]))
+    if "rnd_base_max_factor" in out:
+        out["rnd_base_max_factor"] = max(0.0, min(2.0, out["rnd_base_max_factor"]))
+    if "rnd_launch_min_factor" in out:
+        out["rnd_launch_min_factor"] = max(0.0, min(2.0, out["rnd_launch_min_factor"]))
+    if "rnd_launch_max_factor" in out:
+        out["rnd_launch_max_factor"] = max(0.0, min(2.0, out["rnd_launch_max_factor"]))
+    if "deadzone_half" in out:
+        out["deadzone_half"] = max(0.0, min(0.49, out["deadzone_half"]))
+    if "merge_hold_ms" in out:
+        out["merge_hold_ms"] = max(200, out["merge_hold_ms"])
+    if "join_glow_ms" in out:
+        out["join_glow_ms"] = max(100, out["join_glow_ms"])
+    if "model_progress_default_ms" in out:
+        out["model_progress_default_ms"] = max(300, out["model_progress_default_ms"])
+    if "default_theme" in out:
+        theme = str(out["default_theme"]).strip().lower()
+        out["default_theme"] = "light" if theme == "light" else "dark"
+
+    return out
+
+
+def _get_current_app_config() -> dict:
+    saved = _normalize_app_config(_read_json(APP_CONFIG_PATH))
+    merged = dict(DEFAULT_APP_CONFIG)
+    merged.update(saved)
+
+    # Cross-field constraints after merge.
+    if merged["cadence_max_ms"] < merged["cadence_min_ms"]:
+        merged["cadence_max_ms"] = merged["cadence_min_ms"]
+    merged["cadence_default_ms"] = max(
+        merged["cadence_min_ms"],
+        min(merged["cadence_max_ms"], merged["cadence_default_ms"]),
+    )
+
+    if merged["fish_scale_max_pct"] < merged["fish_scale_min_pct"]:
+        merged["fish_scale_max_pct"] = merged["fish_scale_min_pct"]
+    merged["fish_scale_default_pct"] = max(
+        merged["fish_scale_min_pct"],
+        min(merged["fish_scale_max_pct"], merged["fish_scale_default_pct"]),
+    )
+
+    if merged["rnd_base_max_factor"] < merged["rnd_base_min_factor"]:
+        merged["rnd_base_max_factor"] = merged["rnd_base_min_factor"]
+    if merged["rnd_launch_max_factor"] < merged["rnd_launch_min_factor"]:
+        merged["rnd_launch_max_factor"] = merged["rnd_launch_min_factor"]
+
+    return merged
+
+
+def _read_api_call_count() -> int:
+    data = _read_json(API_COUNTER_PATH)
+    if not isinstance(data, dict):
+        return 0
+    try:
+        n = int(data.get("total_api_calls", 0))
+    except (TypeError, ValueError):
+        n = 0
+    return max(0, n)
+
+
+def _increment_api_call_count() -> int:
+    with API_COUNTER_LOCK:
+        current = _read_api_call_count()
+        next_value = current + 1
+        _write_json(API_COUNTER_PATH, {"total_api_calls": next_value})
+        return next_value
+
+
+def _ensure_api_counter_file() -> None:
+    if os.path.exists(API_COUNTER_PATH):
+        return
+    _write_json(API_COUNTER_PATH, {"total_api_calls": 0})
+
+
+_ensure_api_counter_file()
+
+
 @app.post("/api/generate")
 async def generate(request: Request):
+    _increment_api_call_count()
     body = await request.json()
     prompt = body.get("prompt", "")
     model = body.get("model") or DEFAULT_MODEL
@@ -180,6 +361,46 @@ async def reset_prompt_templates(payload: PromptTemplatesResetPayload):
     _write_text(PROMPT_PREAMBLE_PATH, payload.preamble or "")
     _write_text(PROMPT_CLOSING_PATH, payload.closing or "")
     return {"ok": True, "saved": ["preamble", "closing"]}
+
+
+@app.get("/api/app-config")
+async def get_app_config():
+    return {
+        "ok": True,
+        "config": _get_current_app_config(),
+        "defaults": dict(DEFAULT_APP_CONFIG),
+    }
+
+
+@app.post("/api/app-config/save")
+async def save_app_config(request: Request):
+    body = await request.json()
+    payload = body.get("config") if isinstance(body, dict) and "config" in body else body
+    updates = _normalize_app_config(payload if isinstance(payload, dict) else {})
+
+    current = _get_current_app_config()
+    current.update(updates)
+    # Re-run constraints through the same merger path by overlaying on defaults.
+    persisted = dict(DEFAULT_APP_CONFIG)
+    persisted.update(current)
+    # Save as full expanded config for transparency.
+    _write_json(APP_CONFIG_PATH, persisted)
+
+    return {"ok": True, "config": _get_current_app_config()}
+
+
+@app.post("/api/app-config/reset")
+async def reset_app_config():
+    _write_json(APP_CONFIG_PATH, dict(DEFAULT_APP_CONFIG))
+    return {"ok": True, "config": dict(DEFAULT_APP_CONFIG)}
+
+
+@app.get("/api/stats")
+async def get_stats():
+    return {
+        "ok": True,
+        "total_api_calls": _read_api_call_count(),
+    }
 
 
 # Static files last

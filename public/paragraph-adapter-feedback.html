@@ -69,6 +69,11 @@
   border-color: #5a67d8;
   background: rgba(90, 103, 216, 0.10);
 }
+[data-theme="light"] .deadzone-band {
+  background: rgba(37, 99, 235, 0.06);
+  border-left-color: rgba(37, 99, 235, 0.26);
+  border-right-color: rgba(37, 99, 235, 0.26);
+}
 [data-theme="light"] .tag-token {
   background: rgba(90, 103, 216, 0.08);
   border-color: rgba(90, 103, 216, 0.28);
@@ -582,7 +587,7 @@ textarea:focus { border-color: var(--accent); }
 }
 .sensibility-box {
   width: 200px;
-  flex-shrink: 0;
+  flex-shrink: 1;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -880,7 +885,6 @@ textarea:focus { border-color: var(--accent); }
 }
 
 .output-current {
-  margin-top: 10px;
   background: var(--surface);
   border: 1px solid var(--accent);
   border-radius: 10px;
@@ -893,11 +897,22 @@ textarea:focus { border-color: var(--accent); }
   max-height: 64px;
   overflow-y: auto;
 }
-.output-size-controls {
-  margin-top: 8px;
+.output-with-controls {
+  margin-top: 10px;
   display: flex;
-  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 8px;
+}
+.output-with-controls .output-current {
+  flex: 1 1 auto;
+}
+.output-size-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: flex-start;
   gap: 6px;
+  flex: 0 0 auto;
 }
 .output-size-btn {
   width: 44px;
@@ -1160,9 +1175,10 @@ textarea:focus { border-color: var(--accent); }
   padding-right: 4px;
 }
 .fish-scale-wrap .cadence-slider {
-  flex: 1 1 auto;
+  flex: 0 0 60%;
   min-width: 0;
-  width: auto;
+  width: 60%;
+  max-width: 60%;
   margin: 0;
   padding: 0;
 }
@@ -1328,6 +1344,39 @@ textarea:focus { border-color: var(--accent); }
   .trawl-row { gap: 6px; }
   .trawl-input { font-size: 11px; }
 }
+
+@media (max-width: 900px) {
+  .sensibility-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .sensibility-controls {
+    width: 100%;
+    order: 1;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .sensibility-box.left {
+    order: 2;
+    width: 100%;
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+  .sensibility-box.right {
+    order: 3;
+    width: 100%;
+    flex: 0 0 auto;
+    min-width: 0;
+    text-align: left;
+  }
+  .fish-scale-wrap {
+    flex: 0 0 210px;
+    min-width: 210px;
+    max-width: 210px;
+  }
+}
 </style>
 </head>
 <body>
@@ -1385,12 +1434,14 @@ textarea:focus { border-color: var(--accent); }
       </div>
     </div>
     <div class="infinite-feedback-msg" id="infinite-feedback-msg"></div>
-    <div class="output-current" id="output-current" title="If you are in feedback mode then you can type in this box, doing so will get the model - just that one time - to think about what you type. So, when it's feeding back you can send it off in new directions">
-      Attempting first contact with an API...
-    </div>
-    <div class="output-size-controls">
-      <button class="output-size-btn" onclick="adjustOutputWindowHeight(-1)" title="Remove rows from output box">-</button>
-      <button class="output-size-btn" onclick="adjustOutputWindowHeight(1)" title="Add rows to the output box">+</button>
+    <div class="output-with-controls">
+      <div class="output-current" id="output-current" title="If you are in feedback mode then you can type in this box, doing so will get the model - just that one time - to think about what you type. So, when it's feeding back you can send it off in new directions">
+        Attempting first contact with an API...
+      </div>
+      <div class="output-size-controls">
+        <button class="output-size-btn" onclick="adjustOutputWindowHeight(1)" title="Add rows to the output box">+</button>
+        <button class="output-size-btn" onclick="adjustOutputWindowHeight(-1)" title="Remove rows from output box">-</button>
+      </div>
     </div>
   </div>
 
@@ -1651,6 +1702,13 @@ var dragLastSampleYFrac = 0;
 var chipPhysicsMaxSpeed = 0.9; // frac units per second
 var chipSpeedScalePct = 0; // -100..100
 var chipSpeedScale = 1.0; // 0.0..2.0
+var chipScaleBase = 0.902;
+var chipScaleWeightFactor = 0.584;
+var rndBaseMinFactor = 0.35;
+var rndBaseMaxFactor = 0.65;
+var rndLaunchMinFactor = 0.10;
+var rndLaunchMaxFactor = 0.40;
+var modelProgressDefaultMs = 3000;
 var MIXER_BOUND_PAD_X = 26;
 var MIXER_BOUND_PAD_TOP_Y = 28;
 var MIXER_BOUND_PAD_BOTTOM_Y = 3;
@@ -1714,6 +1772,33 @@ var asciiBgLoaded = false;
 var asciiBgDisabled = false;
 var fishAsciiBuffer = '';
 var uiTheme = 'dark';
+var uiDefaultTheme = 'dark';
+var appConfig = {};
+var DEFAULT_APP_CONFIG = {
+  default_theme: 'dark',
+  default_model: 'groq:llama-3.3-70b-versatile',
+  default_thought: 'deep thought',
+  default_fish_concepts: 'animal, vegetable, mineral',
+  cadence_min_ms: 0,
+  cadence_max_ms: 5000,
+  cadence_default_ms: 2500,
+  infinite_inactivity_ms: 30000,
+  touch_ui_grace_ms: 320,
+  chip_max_speed: 0.9,
+  fish_scale_min_pct: -100,
+  fish_scale_max_pct: 100,
+  fish_scale_default_pct: 0,
+  chip_scale_base: 0.902,
+  chip_scale_weight_factor: 0.584,
+  rnd_base_min_factor: 0.35,
+  rnd_base_max_factor: 0.65,
+  rnd_launch_min_factor: 0.10,
+  rnd_launch_max_factor: 0.40,
+  deadzone_half: 0.10,
+  merge_hold_ms: 1000,
+  join_glow_ms: 650,
+  model_progress_default_ms: 3000
+};
 
 /* ═══════════════════════════════
    SIMPLE MARKDOWN RENDERER
@@ -1753,13 +1838,127 @@ function applyUiTheme(theme) {
 function initUiTheme() {
   var stored = '';
   try { stored = localStorage.getItem('prompt_mixer_theme') || ''; } catch (e) {}
-  applyUiTheme(stored || 'dark');
+  applyUiTheme(stored || uiDefaultTheme || 'dark');
 }
 
 function toggleUiTheme() {
   var next = uiTheme === 'light' ? 'dark' : 'light';
   applyUiTheme(next);
   try { localStorage.setItem('prompt_mixer_theme', next); } catch (e) {}
+}
+
+function normalizeAppConfig(raw) {
+  var cfg = Object.assign({}, DEFAULT_APP_CONFIG, raw || {});
+  function num(key, fallback) {
+    var v = Number(cfg[key]);
+    return isFinite(v) ? v : fallback;
+  }
+  function intNum(key, fallback) {
+    return Math.round(num(key, fallback));
+  }
+  cfg.default_model = String(cfg.default_model || DEFAULT_APP_CONFIG.default_model);
+  cfg.default_theme = (String(cfg.default_theme || DEFAULT_APP_CONFIG.default_theme).toLowerCase() === 'light') ? 'light' : 'dark';
+  cfg.default_thought = String(cfg.default_thought || DEFAULT_APP_CONFIG.default_thought);
+  cfg.default_fish_concepts = String(cfg.default_fish_concepts || DEFAULT_APP_CONFIG.default_fish_concepts);
+
+  cfg.cadence_min_ms = Math.max(0, intNum('cadence_min_ms', DEFAULT_APP_CONFIG.cadence_min_ms));
+  cfg.cadence_max_ms = Math.max(cfg.cadence_min_ms, intNum('cadence_max_ms', DEFAULT_APP_CONFIG.cadence_max_ms));
+  cfg.cadence_default_ms = Math.max(cfg.cadence_min_ms, Math.min(cfg.cadence_max_ms, intNum('cadence_default_ms', DEFAULT_APP_CONFIG.cadence_default_ms)));
+  cfg.infinite_inactivity_ms = Math.max(5000, intNum('infinite_inactivity_ms', DEFAULT_APP_CONFIG.infinite_inactivity_ms));
+  cfg.touch_ui_grace_ms = Math.max(0, intNum('touch_ui_grace_ms', DEFAULT_APP_CONFIG.touch_ui_grace_ms));
+  cfg.chip_max_speed = Math.max(0.05, num('chip_max_speed', DEFAULT_APP_CONFIG.chip_max_speed));
+
+  cfg.fish_scale_min_pct = Math.max(-200, Math.min(0, intNum('fish_scale_min_pct', DEFAULT_APP_CONFIG.fish_scale_min_pct)));
+  cfg.fish_scale_max_pct = Math.max(cfg.fish_scale_min_pct, Math.min(400, intNum('fish_scale_max_pct', DEFAULT_APP_CONFIG.fish_scale_max_pct)));
+  cfg.fish_scale_default_pct = Math.max(cfg.fish_scale_min_pct, Math.min(cfg.fish_scale_max_pct, intNum('fish_scale_default_pct', DEFAULT_APP_CONFIG.fish_scale_default_pct)));
+
+  cfg.chip_scale_base = Math.max(0.2, Math.min(3.0, num('chip_scale_base', DEFAULT_APP_CONFIG.chip_scale_base)));
+  cfg.chip_scale_weight_factor = Math.max(0.0, Math.min(3.0, num('chip_scale_weight_factor', DEFAULT_APP_CONFIG.chip_scale_weight_factor)));
+
+  cfg.rnd_base_min_factor = Math.max(0.0, Math.min(2.0, num('rnd_base_min_factor', DEFAULT_APP_CONFIG.rnd_base_min_factor)));
+  cfg.rnd_base_max_factor = Math.max(cfg.rnd_base_min_factor, Math.min(2.0, num('rnd_base_max_factor', DEFAULT_APP_CONFIG.rnd_base_max_factor)));
+  cfg.rnd_launch_min_factor = Math.max(0.0, Math.min(2.0, num('rnd_launch_min_factor', DEFAULT_APP_CONFIG.rnd_launch_min_factor)));
+  cfg.rnd_launch_max_factor = Math.max(cfg.rnd_launch_min_factor, Math.min(2.0, num('rnd_launch_max_factor', DEFAULT_APP_CONFIG.rnd_launch_max_factor)));
+
+  cfg.deadzone_half = Math.max(0.0, Math.min(0.49, num('deadzone_half', DEFAULT_APP_CONFIG.deadzone_half)));
+  cfg.merge_hold_ms = Math.max(200, intNum('merge_hold_ms', DEFAULT_APP_CONFIG.merge_hold_ms));
+  cfg.join_glow_ms = Math.max(100, intNum('join_glow_ms', DEFAULT_APP_CONFIG.join_glow_ms));
+  cfg.model_progress_default_ms = Math.max(300, intNum('model_progress_default_ms', DEFAULT_APP_CONFIG.model_progress_default_ms));
+  return cfg;
+}
+
+function applyAppConfig(raw) {
+  var cfg = normalizeAppConfig(raw);
+  appConfig = cfg;
+  uiDefaultTheme = cfg.default_theme;
+
+  infiniteCadenceValue = cfg.cadence_default_ms;
+  INFINITE_INACTIVITY_MS = cfg.infinite_inactivity_ms;
+  TOUCH_UI_GRACE_MS = cfg.touch_ui_grace_ms;
+  chipPhysicsMaxSpeed = cfg.chip_max_speed;
+  DEADZONE_HALF = cfg.deadzone_half;
+  MERGE_HOLD_MS = cfg.merge_hold_ms;
+  JOIN_GLOW_MS = cfg.join_glow_ms;
+  chipScaleBase = cfg.chip_scale_base;
+  chipScaleWeightFactor = cfg.chip_scale_weight_factor;
+  rndBaseMinFactor = cfg.rnd_base_min_factor;
+  rndBaseMaxFactor = cfg.rnd_base_max_factor;
+  rndLaunchMinFactor = cfg.rnd_launch_min_factor;
+  rndLaunchMaxFactor = cfg.rnd_launch_max_factor;
+  modelProgressDefaultMs = cfg.model_progress_default_ms;
+
+  var cadence = document.getElementById('infinite-cadence');
+  if (cadence) {
+    cadence.min = String(cfg.cadence_min_ms);
+    cadence.max = String(cfg.cadence_max_ms);
+    cadence.value = String(cfg.cadence_default_ms);
+  }
+
+  var fishScale = document.getElementById('fish-speed-scale');
+  if (fishScale) {
+    fishScale.min = String(cfg.fish_scale_min_pct);
+    fishScale.max = String(cfg.fish_scale_max_pct);
+    fishScale.value = String(cfg.fish_scale_default_pct);
+  }
+
+  var mission = document.getElementById('mission');
+  if (mission) mission.value = cfg.default_thought;
+  var conceptsHidden = document.getElementById('sentence-input');
+  if (conceptsHidden) conceptsHidden.value = cfg.default_fish_concepts;
+  var modelSelect = document.getElementById('model-select');
+  if (modelSelect && Array.from(modelSelect.options).some(function(o) { return o.value === cfg.default_model; })) {
+    modelSelect.value = cfg.default_model;
+  }
+
+  // Config default_theme is authoritative for initial page theme.
+  applyUiTheme(uiDefaultTheme);
+  try { localStorage.setItem('prompt_mixer_theme', uiDefaultTheme); } catch (e) {}
+
+  if (typeof tagTokens !== 'undefined' && conceptsHidden) {
+    tagTokens = normaliseConceptTokens((conceptsHidden.value || '').split(','));
+    if (typeof tagRender === 'function') tagRender();
+    if (typeof tagSyncTextarea === 'function') tagSyncTextarea();
+    if (typeof syncWordsToTagTokens === 'function') syncWordsToTagTokens({ schedule: false });
+  }
+
+  updateCadenceLabel();
+  updateFishScaleLabel();
+  renderChips();
+  onModelChange(false);
+}
+
+async function loadAppConfig() {
+  try {
+    var res = await fetch('/api/app-config');
+    if (!res.ok) {
+      applyAppConfig(DEFAULT_APP_CONFIG);
+      return;
+    }
+    var data = await res.json();
+    applyAppConfig((data && data.config) || DEFAULT_APP_CONFIG);
+  } catch (err) {
+    applyAppConfig(DEFAULT_APP_CONFIG);
+  }
 }
 
 function maybeTriggerPongEasterEgg(key) {
@@ -2254,8 +2453,7 @@ function renderChips() {
     var style  = chipStyle(weight, word.xFrac, d1Active, d2Active);
     var px     = PADH + word.xFrac * (W - PADH * 2);
     var py     = PADVTop + word.yFrac * (H - PADVTop - PADVBot);
-    // Larger overall (+30%), with the same vertical size behavior.
-    var scale  = (0.902 + weight * 0.584).toFixed(3);
+    var scale  = (chipScaleBase + weight * chipScaleWeightFactor).toFixed(3);
     var squishH = word.squishH || 0;
     var squishV = word.squishV || 0;
     var stretchX = ((1 - squishH * 0.55) * (1 + squishV * 0.22)).toFixed(3);
@@ -3741,8 +3939,8 @@ function prepareTrajectoryLaunch() {
 function launchRandomTrajectories() {
   if (!prepareTrajectoryLaunch()) return;
   words.forEach(function(w) {
-    var baseSpeed = chipPhysicsMaxSpeed * (0.35 + Math.random() * 0.65);
-    var speed = baseSpeed * (0.10 + Math.random() * 0.40);
+    var baseSpeed = chipPhysicsMaxSpeed * (rndBaseMinFactor + Math.random() * (rndBaseMaxFactor - rndBaseMinFactor));
+    var speed = baseSpeed * (rndLaunchMinFactor + Math.random() * (rndLaunchMaxFactor - rndLaunchMinFactor));
     var angle = Math.random() * Math.PI * 2;
     w.vx = Math.cos(angle) * speed;
     w.vy = Math.sin(angle) * speed;
@@ -3765,7 +3963,7 @@ function onModelChange(triggerUpdate) {
 
 function getExpectedResponseMs() {
   if (modelTiming.count > 0 && modelTiming.avgMs > 0) return modelTiming.avgMs;
-  return 3000;
+  return modelProgressDefaultMs;
 }
 
 function recordModelResponseTime(ms) {
@@ -4340,16 +4538,6 @@ restoreHistory = function(index) {
 captureHardcodedPromptDefaults();
 loadSavedPromptTemplates();
 initUiTheme();
-updateFeedbackButtonState();
-updateInfiniteFeedbackButtonState();
-updateChipPhysicsButtonState();
-updateAsciiFishBackground();
-updateBmpButtonState();
-updateCadenceLabel();
-updateFishScaleLabel();
-onModelChange(false);
-refreshInactivityWatchState();
-syncOutputWindowHeightToThought();
 bindControlButton('feedback-btn', applyFeedback);
 bindControlButton('infinite-feedback-btn', toggleInfiniteFeedback);
 bindControlButton('theme-toggle-btn', toggleUiTheme);
@@ -4431,7 +4619,19 @@ document.addEventListener('touchstart', function() {
   if (pongModeActive) stopPongMode();
 }, { passive: true });
 
-scheduleUpdate(0);
+loadAppConfig().finally(function() {
+  updateFeedbackButtonState();
+  updateInfiniteFeedbackButtonState();
+  updateChipPhysicsButtonState();
+  updateAsciiFishBackground();
+  updateBmpButtonState();
+  updateCadenceLabel();
+  updateFishScaleLabel();
+  onModelChange(false);
+  refreshInactivityWatchState();
+  syncOutputWindowHeightToThought();
+  scheduleUpdate(0);
+});
 </script>
 </body>
 </html>

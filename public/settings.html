@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prompt Mixer Configuration</title>
+<script>
+(function () {
+  var theme = 'dark';
+  try {
+    var stored = localStorage.getItem('prompt_mixer_theme');
+    if (stored === 'light' || stored === 'dark') theme = stored;
+  } catch (_) {}
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0b0b13;
+  --surface: #11111c;
+  --surface2: #181828;
+  --border: #1e1e32;
+  --border2: #2a2a45;
+  --muted: #62627f;
+  --text: #c4c4de;
+  --accent: #7c5cfc;
+}
+[data-theme="light"] {
+  --bg: #f4f7fc;
+  --surface: #ffffff;
+  --surface2: #f6f9ff;
+  --border: #d2daea;
+  --border2: #b9c5dd;
+  --muted: #5f6d87;
+  --text: #1f2a44;
+  --accent: #4d66c7;
+}
+html, body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+.wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px 18px 46px;
+}
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.title { font-size: 23px; font-weight: 800; letter-spacing: -0.2px; }
+.back {
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.sub {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.panel h2 {
+  font-size: 12px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field.full { grid-column: 1 / -1; }
+.field label { font-size: 11px; color: var(--muted); }
+input, textarea, select {
+  width: 100%;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 12px;
+  outline: none;
+}
+textarea { min-height: 68px; resize: vertical; }
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+.actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+button {
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+.primary {
+  background: var(--accent);
+  border-color: #6e4efa;
+  color: #fff;
+}
+.warn {
+  border-color: #944;
+  color: #fda4af;
+}
+.status { font-size: 12px; color: var(--muted); }
+.status.ok { color: #7dd3fc; }
+.status.err { color: #fda4af; }
+@media (max-width: 760px) {
+  .grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="title">Configuration</div>
+    <a class="back" href="index.html">Back to home</a>
+  </div>
+  <div class="sub">
+    Settings here are saved to <code>data/app_config.json</code>. API keys below are saved to <code>.env</code> via a separate endpoint.
+  </div>
+
+  <form id="config-form" class="panel">
+    <h2>Defaults</h2>
+    <div class="grid">
+      <div class="field">
+        <label>Dark/Light by default</label>
+        <select id="default_theme">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+        </select>
+      </div>
+      <div class="field"><label>Default model</label><input id="default_model" type="text"></div>
+      <div class="field"><label>Default thought</label><input id="default_thought" type="text"></div>
+      <div class="field full"><label>Default fish concepts (comma-separated)</label><input id="default_fish_concepts" type="text"></div>
+    </div>
+
+    <h2 style="margin-top:14px;">Cadence & Limits</h2>
+    <div class="grid">
+      <div class="field"><label>Cadence min (ms)</label><input id="cadence_min_ms" type="number" step="1"></div>
+      <div class="field"><label>Cadence max (ms)</label><input id="cadence_max_ms" type="number" step="1"></div>
+      <div class="field"><label>Cadence default (ms)</label><input id="cadence_default_ms" type="number" step="1"></div>
+      <div class="field"><label>Inactivity timeout (ms)</label><input id="infinite_inactivity_ms" type="number" step="1"></div>
+      <div class="field"><label>Touch UI grace (ms)</label><input id="touch_ui_grace_ms" type="number" step="1"></div>
+      <div class="field"><label>Model progress fallback (ms)</label><input id="model_progress_default_ms" type="number" step="1"></div>
+    </div>
+
+    <h2 style="margin-top:14px;">Fish Physics</h2>
+    <div class="grid">
+      <div class="field"><label>Chip max speed</label><input id="chip_max_speed" type="number" step="0.01"></div>
+      <div class="field"><label>Deadzone half</label><input id="deadzone_half" type="number" step="0.01"></div>
+      <div class="field"><label>Fish scale min (%)</label><input id="fish_scale_min_pct" type="number" step="1"></div>
+      <div class="field"><label>Fish scale max (%)</label><input id="fish_scale_max_pct" type="number" step="1"></div>
+      <div class="field"><label>Fish scale default (%)</label><input id="fish_scale_default_pct" type="number" step="1"></div>
+      <div class="field"><label>Manual merge hold (ms)</label><input id="merge_hold_ms" type="number" step="1"></div>
+      <div class="field"><label>Join glow duration (ms)</label><input id="join_glow_ms" type="number" step="1"></div>
+    </div>
+
+    <h2 style="margin-top:14px;">Fish Motion Tuning</h2>
+    <div class="grid">
+      <div class="field"><label>Chip scale base</label><input id="chip_scale_base" type="number" step="0.001"></div>
+      <div class="field"><label>Chip scale weight factor</label><input id="chip_scale_weight_factor" type="number" step="0.001"></div>
+      <div class="field"><label>RND base min factor</label><input id="rnd_base_min_factor" type="number" step="0.01"></div>
+      <div class="field"><label>RND base max factor</label><input id="rnd_base_max_factor" type="number" step="0.01"></div>
+      <div class="field"><label>RND launch min factor</label><input id="rnd_launch_min_factor" type="number" step="0.01"></div>
+      <div class="field"><label>RND launch max factor</label><input id="rnd_launch_max_factor" type="number" step="0.01"></div>
+    </div>
+
+    <div class="actions">
+      <button id="save-config-btn" class="primary" type="button">Save config</button>
+      <button id="reset-config-btn" class="warn" type="button">Reset to default</button>
+      <div id="config-status" class="status"></div>
+    </div>
+  </form>
+
+  <div class="panel">
+    <h2>Prompt Templates</h2>
+    <div class="grid">
+      <div class="field full">
+        <label>Preamble</label>
+        <textarea id="tpl-preamble" rows="4"></textarea>
+      </div>
+      <div class="field full">
+        <label>Closing instruction</label>
+        <textarea id="tpl-closing" rows="6"></textarea>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="save-preamble-btn" type="button">Save preamble</button>
+      <button id="save-closing-btn" type="button">Save closing</button>
+      <button id="reset-prompt-btn" class="warn" type="button">Reset to hardcoded default</button>
+      <div id="prompt-status" class="status"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>API Keys (.env)</h2>
+    <div class="grid">
+      <div class="field full"><label>OPENROUTER_API_KEY</label><input id="openrouter-key" type="password"></div>
+      <div class="field full"><label>GROQ_API_KEY</label><input id="groq-key" type="password"></div>
+    </div>
+    <div class="actions">
+      <button id="save-keys-btn" class="primary" type="button">Save keys to .env</button>
+      <div id="keys-status" class="status"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CONFIG_KEYS = [
+  'default_theme',
+  'default_model', 'default_thought', 'default_fish_concepts',
+  'cadence_min_ms', 'cadence_max_ms', 'cadence_default_ms',
+  'infinite_inactivity_ms', 'touch_ui_grace_ms',
+  'chip_max_speed', 'fish_scale_min_pct', 'fish_scale_max_pct', 'fish_scale_default_pct',
+  'chip_scale_base', 'chip_scale_weight_factor',
+  'rnd_base_min_factor', 'rnd_base_max_factor', 'rnd_launch_min_factor', 'rnd_launch_max_factor',
+  'deadzone_half', 'merge_hold_ms', 'join_glow_ms', 'model_progress_default_ms'
+];
+
+const NUMBER_KEYS = new Set([
+  'cadence_min_ms', 'cadence_max_ms', 'cadence_default_ms',
+  'infinite_inactivity_ms', 'touch_ui_grace_ms',
+  'chip_max_speed', 'fish_scale_min_pct', 'fish_scale_max_pct', 'fish_scale_default_pct',
+  'chip_scale_base', 'chip_scale_weight_factor',
+  'rnd_base_min_factor', 'rnd_base_max_factor', 'rnd_launch_min_factor', 'rnd_launch_max_factor',
+  'deadzone_half', 'merge_hold_ms', 'join_glow_ms', 'model_progress_default_ms'
+]);
+const HARDCODED_PREAMBLE = `You have several transformation concepts to apply to the thought. Each has two properties:
+- Weight (0.00 = ignore, 1.00 = apply strongly)
+- Optionally, lean toward a sensibility`;
+const HARDCODED_CLOSING = `Reimagine the original thought applying these transformations proportionally.
+Higher-weighted concepts should have a more visible effect on the output.
+Concepts that lean toward a sensibility should pull the style in that direction.
+Preserve the core meaning of the original thought.
+Only output your new idea, no meta commentary, none of the original prompt.`;
+
+function setStatus(id, text, kind) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'status' + (kind ? ' ' + kind : '');
+  el.textContent = text || '';
+}
+
+function applyTheme(theme) {
+  const safe = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', safe);
+}
+
+function fillForm(config) {
+  CONFIG_KEYS.forEach((k) => {
+    const el = document.getElementById(k);
+    if (!el) return;
+    const v = config && Object.prototype.hasOwnProperty.call(config, k) ? config[k] : '';
+    el.value = v;
+  });
+}
+
+function readForm() {
+  const out = {};
+  CONFIG_KEYS.forEach((k) => {
+    const el = document.getElementById(k);
+    if (!el) return;
+    if (NUMBER_KEYS.has(k)) {
+      const n = Number(el.value);
+      if (!Number.isFinite(n)) return;
+      out[k] = n;
+    } else {
+      out[k] = el.value;
+    }
+  });
+  return out;
+}
+
+async function loadConfig() {
+  setStatus('config-status', 'Loading...', '');
+  try {
+    const res = await fetch('/api/app-config');
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error('Failed to load config');
+    fillForm(data.config || {});
+    let storedTheme = '';
+    try { storedTheme = localStorage.getItem('prompt_mixer_theme') || ''; } catch (_) {}
+    if (storedTheme === 'light' || storedTheme === 'dark') {
+      applyTheme(storedTheme);
+    } else {
+      applyTheme((data.config && data.config.default_theme) || 'dark');
+    }
+    setStatus('config-status', 'Loaded.', 'ok');
+  } catch (err) {
+    setStatus('config-status', (err && err.message) || 'Load failed', 'err');
+  }
+}
+
+async function saveConfig() {
+  const btn = document.getElementById('save-config-btn');
+  btn.disabled = true;
+  setStatus('config-status', 'Saving...', '');
+  try {
+    const res = await fetch('/api/app-config/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: readForm() })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error('Save failed');
+    fillForm(data.config || {});
+    setStatus('config-status', 'Saved config to data/app_config.json', 'ok');
+  } catch (err) {
+    setStatus('config-status', (err && err.message) || 'Save failed', 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function resetConfig() {
+  const btn = document.getElementById('reset-config-btn');
+  btn.disabled = true;
+  setStatus('config-status', 'Resetting...', '');
+  try {
+    const res = await fetch('/api/app-config/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error('Reset failed');
+    fillForm(data.config || {});
+    setStatus('config-status', 'Reset to hardcoded defaults', 'ok');
+  } catch (err) {
+    setStatus('config-status', (err && err.message) || 'Reset failed', 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function saveApiKeys() {
+  const openrouter = document.getElementById('openrouter-key').value.trim();
+  const groq = document.getElementById('groq-key').value.trim();
+  const btn = document.getElementById('save-keys-btn');
+  if (!openrouter && !groq) {
+    setStatus('keys-status', 'Enter at least one key', 'err');
+    return;
+  }
+  btn.disabled = true;
+  setStatus('keys-status', 'Saving...', '');
+  try {
+    const response = await fetch('/api/save-keys', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        openrouter_api_key: openrouter || null,
+        groq_api_key: groq || null
+      })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data && data.message ? data.message : 'Failed to save keys');
+    }
+    setStatus('keys-status', 'Saved keys to .env', 'ok');
+    document.getElementById('openrouter-key').value = '';
+    document.getElementById('groq-key').value = '';
+  } catch (err) {
+    setStatus('keys-status', (err && err.message) || 'Save failed', 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function loadPromptTemplates() {
+  setStatus('prompt-status', 'Loading...', '');
+  try {
+    const res = await fetch('/api/prompt-templates');
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error('Failed to load templates');
+    document.getElementById('tpl-preamble').value = (typeof data.preamble === 'string' && data.preamble.length) ? data.preamble : HARDCODED_PREAMBLE;
+    document.getElementById('tpl-closing').value = (typeof data.closing === 'string' && data.closing.length) ? data.closing : HARDCODED_CLOSING;
+    setStatus('prompt-status', 'Loaded.', 'ok');
+  } catch (err) {
+    setStatus('prompt-status', (err && err.message) || 'Load failed', 'err');
+  }
+}
+
+async function savePromptSection(section) {
+  const btnId = section === 'closing' ? 'save-closing-btn' : 'save-preamble-btn';
+  const fieldId = section === 'closing' ? 'tpl-closing' : 'tpl-preamble';
+  const btn = document.getElementById(btnId);
+  const field = document.getElementById(fieldId);
+  if (!btn || !field) return;
+  btn.disabled = true;
+  setStatus('prompt-status', 'Saving...', '');
+  try {
+    const res = await fetch('/api/prompt-templates/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ section, content: field.value || '' })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error('Save failed');
+    setStatus('prompt-status', `Saved ${section}.`, 'ok');
+  } catch (err) {
+    setStatus('prompt-status', (err && err.message) || 'Save failed', 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function resetPromptTemplatesHardcoded() {
+  const btn = document.getElementById('reset-prompt-btn');
+  btn.disabled = true;
+  setStatus('prompt-status', 'Resetting...', '');
+  try {
+    const res = await fetch('/api/prompt-templates/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preamble: HARDCODED_PREAMBLE, closing: HARDCODED_CLOSING })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error('Reset failed');
+    document.getElementById('tpl-preamble').value = HARDCODED_PREAMBLE;
+    document.getElementById('tpl-closing').value = HARDCODED_CLOSING;
+    setStatus('prompt-status', 'Reset to hardcoded defaults.', 'ok');
+  } catch (err) {
+    setStatus('prompt-status', (err && err.message) || 'Reset failed', 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('save-config-btn').addEventListener('click', saveConfig);
+document.getElementById('reset-config-btn').addEventListener('click', resetConfig);
+document.getElementById('save-keys-btn').addEventListener('click', saveApiKeys);
+document.getElementById('default_theme').addEventListener('change', function(e) {
+  const theme = (e.target && e.target.value) === 'light' ? 'light' : 'dark';
+  applyTheme(theme);
+  try { localStorage.setItem('prompt_mixer_theme', theme); } catch (_) {}
+});
+document.getElementById('save-preamble-btn').addEventListener('click', () => savePromptSection('preamble'));
+document.getElementById('save-closing-btn').addEventListener('click', () => savePromptSection('closing'));
+document.getElementById('reset-prompt-btn').addEventListener('click', resetPromptTemplatesHardcoded);
+loadConfig();
+loadPromptTemplates();
+</script>
+</body>
+</html>

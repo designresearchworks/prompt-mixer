@@ -3,6 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <title>Prompt Weight Mixer</title>
+<script>
+(function () {
+  var theme = "dark";
+  try {
+    var stored = localStorage.getItem("prompt_mixer_theme");
+    if (stored === "light" || stored === "dark") theme = stored;
+  } catch (_) {}
+  document.documentElement.setAttribute("data-theme", theme);
+})();
+</script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -14,9 +24,24 @@
   --border2:  #2a2a45;
   --muted:    #484868;
   --text:     #c4c4de;
+  --heading:  #e4e4f8;
   --accent:   #7c5cfc;
   --green:    #22c55e;
   --gold:     #d97706;
+}
+
+[data-theme="light"] {
+  --bg:       #f5f7fb;
+  --surface:  #eef2fa;
+  --surface2: #e7ecf7;
+  --border:   #cad4e8;
+  --border2:  #b8c5df;
+  --muted:    #60708d;
+  --text:     #23314b;
+  --heading:  #1c2941;
+  --accent:   #4c66c7;
+  --green:    #0f8a43;
+  --gold:     #b56d0a;
 }
 
 html, body {
@@ -36,7 +61,7 @@ html, body {
   font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.5px;
-  color: #e4e4f8;
+  color: var(--heading);
   margin-bottom: 6px;
 }
 
@@ -81,7 +106,7 @@ html, body {
 .card-name {
   font-size: 17px;
   font-weight: 700;
-  color: #e4e4f8;
+  color: var(--heading);
 }
 
 .card-desc {
@@ -99,63 +124,17 @@ html, body {
   letter-spacing: 1px;
 }
 
-.keys-panel {
-  background: var(--surface);
-  border: 1px solid var(--border2);
-  border-radius: 14px;
-  padding: 18px 20px;
+.stat-card {
+  border-style: dashed;
 }
-.keys-title {
-  font-size: 12px;
-  letter-spacing: 1.6px;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 700;
-  margin-bottom: 12px;
+
+.stat-card .card-name {
+  color: var(--green);
 }
-.keys-grid {
-  display: grid;
-  gap: 10px;
+
+.fish-count {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
-.keys-grid input {
-  width: 100%;
-  background: var(--surface2);
-  color: var(--text);
-  border: 1px solid var(--border2);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 12px;
-  outline: none;
-}
-.keys-grid input:focus {
-  border-color: var(--accent);
-}
-.keys-actions {
-  margin-top: 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.keys-save {
-  background: var(--accent);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.keys-save:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.keys-status {
-  font-size: 12px;
-  color: var(--muted);
-}
-.keys-status.ok { color: #7dd3fc; }
-.keys-status.err { color: #fda4af; }
 
 @media (max-width: 720px) {
   .cards { flex-direction: column; }
@@ -172,95 +151,81 @@ html, body {
 
   <div class="cards">
 
-    <a class="card" href="sentence-mixer.html">
-      <div class="card-icon">&#9783;</div>
-      <div class="card-name">Sentence Mixer</div>
-      <div class="card-desc">
-        Set a mission, load an influence sentence, and drag words
-        up or down to control how strongly each shapes the generated output.
-      </div>
-      <div class="card-arrow">Open &rarr;</div>
-    </a>
-
-    <a class="card" href="paragraph-adapter.html">
-      <div class="card-icon">&#10227;</div>
-      <div class="card-name">Paragraph Adapter</div>
-      <div class="card-desc">
-        Paste a source paragraph, define transformation concepts,
-        and mix their weights to see the paragraph rewritten in real time.
-      </div>
-      <div class="card-arrow">Open &rarr;</div>
-    </a>
-
     <a class="card" href="paragraph-adapter-feedback.html">
-      <div class="card-icon">&#9851;</div>
-      <div class="card-name">Paragraph Adapter + Feedback</div>
+      <div class="card-icon">&#129504;</div>
+      <div class="card-name">PthinkTank</div>
       <div class="card-desc">
-        Run paragraph adaptation, then use Feedback to overwrite
-        the original thought with the latest output.
+        Fishy wishy spatial prompt mixing.
       </div>
       <div class="card-arrow">Open &rarr;</div>
     </a>
 
-  </div>
+    <a class="card" href="settings.html">
+      <div class="card-icon">&#9881;</div>
+      <div class="card-name">Configuration</div>
+      <div class="card-desc">
+        Tune default behavior, physics, cadence limits, and related settings.
+        API keys are managed here and saved to <code>.env</code>.
+      </div>
+      <div class="card-arrow">Open &rarr;</div>
+    </a>
 
-  <div class="keys-panel">
-    <div class="keys-title">Save API Keys To .env</div>
-    <div class="keys-grid">
-      <input id="openrouter-key" type="password" placeholder="OPENROUTER_API_KEY">
-      <input id="groq-key" type="password" placeholder="GROQ_API_KEY">
+    <div class="card stat-card" aria-live="polite">
+      <div class="card-icon">&#128031;</div>
+      <div class="card-name">Fed <span class="fish-count" id="fedFishCount">000</span> Fish so far</div>
+      <div class="card-desc">
+        Total API calls made by this system, persisted server-side.
+      </div>
+      <div class="card-arrow" id="fedFishStatus">Loading...</div>
     </div>
-    <div class="keys-actions">
-      <button id="save-keys-btn" class="keys-save" onclick="saveApiKeys()">Save Keys</button>
-      <div id="keys-status" class="keys-status"></div>
-    </div>
+
   </div>
 </div>
 <script>
-async function saveApiKeys() {
-  const openrouter = document.getElementById('openrouter-key').value.trim();
-  const groq = document.getElementById('groq-key').value.trim();
-  const status = document.getElementById('keys-status');
-  const btn = document.getElementById('save-keys-btn');
+function applyTheme(theme) {
+  const safeTheme = (theme === "light") ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", safeTheme);
+}
 
-  status.className = 'keys-status';
-  status.textContent = '';
-
-  if (!openrouter && !groq) {
-    status.className = 'keys-status err';
-    status.textContent = 'Enter at least one key';
-    return;
-  }
-
-  btn.disabled = true;
-  status.textContent = 'Saving...';
+async function loadTheme() {
+  try {
+    const stored = localStorage.getItem("prompt_mixer_theme");
+    if (stored === "light" || stored === "dark") {
+      applyTheme(stored);
+      return;
+    }
+  } catch (_) {}
 
   try {
-    const response = await fetch('/api/save-keys', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        openrouter_api_key: openrouter || null,
-        groq_api_key: groq || null
-      })
-    });
-
-    const data = await response.json();
-    if (!response.ok || !data.ok) {
-      throw new Error(data && data.message ? data.message : 'Failed to save keys');
-    }
-
-    status.className = 'keys-status ok';
-    status.textContent = 'Saved to .env';
-    document.getElementById('openrouter-key').value = '';
-    document.getElementById('groq-key').value = '';
-  } catch (err) {
-    status.className = 'keys-status err';
-    status.textContent = (err && err.message) ? err.message : 'Save failed';
-  } finally {
-    btn.disabled = false;
+    const res = await fetch("/api/app-config");
+    if (!res.ok) throw new Error("app-config request failed");
+    const data = await res.json();
+    const fromConfig = data && data.config && data.config.default_theme;
+    applyTheme(fromConfig);
+  } catch (_) {
+    applyTheme("dark");
   }
 }
+
+async function loadFishCount() {
+  const countEl = document.getElementById("fedFishCount");
+  const statusEl = document.getElementById("fedFishStatus");
+  if (!countEl || !statusEl) return;
+
+  try {
+    const res = await fetch("/api/stats");
+    if (!res.ok) throw new Error("stats request failed");
+    const data = await res.json();
+    const total = Number.isFinite(Number(data.total_api_calls)) ? Math.max(0, Number(data.total_api_calls)) : 0;
+    countEl.textContent = String(Math.floor(total)).padStart(3, "0");
+    statusEl.textContent = "Live";
+  } catch (_) {
+    statusEl.textContent = "Unavailable";
+  }
+}
+
+loadTheme();
+loadFishCount();
 </script>
 </body>
 </html>
