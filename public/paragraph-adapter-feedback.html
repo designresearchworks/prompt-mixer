@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Paragraph Adapter (Feedback)</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -44,9 +44,44 @@
       rgba(255, 255, 255, 0.92) 100%
     );
 }
+[data-theme="light"] .output-current {
+  color: #111827;
+}
+[data-theme="light"] .output-current h1,
+[data-theme="light"] .output-current h2,
+[data-theme="light"] .output-current h3,
+[data-theme="light"] .output-current strong {
+  color: #0f172a;
+}
+[data-theme="light"] .output-current em {
+  color: #334155;
+}
+[data-theme="light"] .combo-list {
+  background: #ffffff;
+  border-color: #c6cee1;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+}
+[data-theme="light"] .combo-item {
+  color: #1c2233;
+}
+[data-theme="light"] .combo-item:hover,
+[data-theme="light"] .combo-item:focus {
+  border-color: #5a67d8;
+  background: rgba(90, 103, 216, 0.10);
+}
+[data-theme="light"] .tag-token {
+  background: rgba(90, 103, 216, 0.08);
+  border-color: rgba(90, 103, 216, 0.28);
+  color: #1f2a44;
+}
+[data-theme="light"] .tag-token-del {
+  color: #2f3b5a;
+  opacity: 0.72;
+}
 
 html, body {
-  height: 100vh;
+  min-height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
@@ -57,7 +92,8 @@ html, body {
    PAGE LAYOUT — single column, full-width stacked
 ═══════════════════════════════ */
 .page {
-  height: 100vh;
+  min-height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -270,6 +306,12 @@ textarea:focus { border-color: var(--accent); }
   display: block;
   pointer-events: none;
   background: transparent;
+}
+[data-theme="light"] .ascii-bg-layer.active {
+  opacity: 0.14;
+}
+[data-theme="light"] .ascii-bg-frame {
+  filter: invert(1) hue-rotate(180deg) saturate(0.72) contrast(0.9) brightness(1.08);
 }
 .pong-canvas {
   position: absolute;
@@ -595,20 +637,20 @@ textarea:focus { border-color: var(--accent); }
 }
 .sensibility-combo input {
   width: 100%;
-  padding-right: 30px;
+  padding-right: 46px;
 }
 .combo-arrow {
   position: absolute;
-  right: 5px;
+  right: 7px;
   top: 50%;
   transform: translateY(-50%);
-  width: 20px;
-  height: 20px;
-  border: 1px solid var(--border2);
-  border-radius: 5px;
-  background: var(--surface2);
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1;
   cursor: pointer;
   padding: 0;
@@ -616,7 +658,6 @@ textarea:focus { border-color: var(--accent); }
   -webkit-tap-highlight-color: transparent;
 }
 .combo-arrow:hover {
-  border-color: var(--accent);
   color: var(--text);
 }
 .combo-list {
@@ -845,7 +886,7 @@ textarea:focus { border-color: var(--accent); }
   border-radius: 10px;
   padding: 10px 14px;
   line-height: 1.6;
-  color: #d0d0e8;
+  color: var(--text);
   transition: opacity 0.2s;
   box-shadow: 0 0 0 1px rgba(124,92,252,0.15), 0 4px 24px rgba(0,0,0,0.4);
   height: 64px;
@@ -859,8 +900,8 @@ textarea:focus { border-color: var(--accent); }
   gap: 6px;
 }
 .output-size-btn {
-  width: 24px;
-  height: 20px;
+  width: 44px;
+  height: 36px;
   border-radius: 6px;
   border: 1px solid var(--border2);
   background: var(--surface2);
@@ -1641,6 +1682,10 @@ var mixerResizeStartY = 0;
 var mixerResizeStartH = 0;
 var currentOutputEditActive = false;
 var manualOutputEditPause = false;
+var outputTouchStartX = 0;
+var outputTouchStartY = 0;
+var outputTouchStartTs = 0;
+var outputLastTapTs = 0;
 var hardcodedBasePreamble = '';
 var hardcodedBaseClosing = '';
 var promptTemplateStatusTimer = null;
@@ -2209,8 +2254,8 @@ function renderChips() {
     var style  = chipStyle(weight, word.xFrac, d1Active, d2Active);
     var px     = PADH + word.xFrac * (W - PADH * 2);
     var py     = PADVTop + word.yFrac * (H - PADVTop - PADVBot);
-    // Slightly larger overall (+~5%), with a slightly softer vertical size spread.
-    var scale  = (0.694 + weight * 0.449).toFixed(3);
+    // Larger overall (+30%), with the same vertical size behavior.
+    var scale  = (0.902 + weight * 0.584).toFixed(3);
     var squishH = word.squishH || 0;
     var squishV = word.squishV || 0;
     var stretchX = ((1 - squishH * 0.55) * (1 + squishV * 0.22)).toFixed(3);
@@ -3219,8 +3264,13 @@ function markTouchUiActivity() {
 function bindControlButton(id, handler) {
   var el = document.getElementById(id);
   if (!el || typeof handler !== 'function') return;
+  var touchHandledUntil = 0;
 
   el.addEventListener('click', function(e) {
+    if (Date.now() < touchHandledUntil) {
+      e.preventDefault();
+      return;
+    }
     if (Date.now() - lastTouchTapTs < 550) {
       e.preventDefault();
       return;
@@ -3233,12 +3283,11 @@ function bindControlButton(id, handler) {
   }, { passive: true });
 
   el.addEventListener('touchend', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
+    touchHandledUntil = Date.now() + 700;
     lastTouchTapTs = Date.now();
     markTouchUiActivity();
     handler();
-  }, { passive: false });
+  }, { passive: true });
 }
 
 function getDatalistValues(id) {
@@ -4317,8 +4366,28 @@ if (currentOutputEl) {
   currentOutputEl.addEventListener('mousedown', function() {
     if (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) enterCurrentOutputEditMode();
   });
-  currentOutputEl.addEventListener('touchstart', function() {
-    if (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) enterCurrentOutputEditMode();
+  currentOutputEl.addEventListener('touchstart', function(e) {
+    if (!e.touches || !e.touches.length) return;
+    outputTouchStartX = e.touches[0].clientX;
+    outputTouchStartY = e.touches[0].clientY;
+    outputTouchStartTs = Date.now();
+  }, { passive: true });
+  currentOutputEl.addEventListener('touchend', function(e) {
+    if (!(feedbackModeEnabled && !isYouAreWhatYouEatEnabled())) return;
+    var touch = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : null;
+    if (!touch) return;
+    var dt = Date.now() - outputTouchStartTs;
+    var dx = touch.clientX - outputTouchStartX;
+    var dy = touch.clientY - outputTouchStartY;
+    var movedSq = dx * dx + dy * dy;
+    if (dt > 420 || movedSq > 64) return;
+    var now = Date.now();
+    if (now - outputLastTapTs <= 420) {
+      outputLastTapTs = 0;
+      enterCurrentOutputEditMode();
+    } else {
+      outputLastTapTs = now;
+    }
   }, { passive: true });
   currentOutputEl.addEventListener('blur', function() {
     if (currentOutputEditActive) exitCurrentOutputEditMode(true);
