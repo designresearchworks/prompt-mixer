@@ -54,22 +54,7 @@ html, body {
 .menu-wrap {
   max-width: 680px;
   margin: 0 auto;
-  padding: 80px 24px;
-}
-
-.menu-title {
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  color: var(--heading);
-  margin-bottom: 6px;
-}
-
-.menu-sub {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.7;
-  margin-bottom: 48px;
+  padding: 40px 24px;
 }
 
 .cards {
@@ -143,12 +128,6 @@ html, body {
 </head>
 <body>
 <div class="menu-wrap">
-  <div class="menu-title">Prompt Weight Mixer</div>
-  <div class="menu-sub">
-    Explore how weighting individual words and concepts influences LLM output in real time.
-    Choose a mode below.
-  </div>
-
   <div class="cards">
 
     <a class="card" href="paragraph-adapter-feedback.html">
@@ -227,5 +206,10 @@ async function loadFishCount() {
 loadTheme();
 loadFishCount();
 </script>
+<footer style="display:flex;justify-content:center;padding:12px 0 18px;">
+  <a href="https://designresearch.works/" target="_blank" rel="noopener noreferrer" aria-label="Design Research Works" style="display:inline-flex;align-items:center;gap:8px;color:var(--muted);text-decoration:none;">
+    <img src="logo.png" alt="Design Research Works logo" style="width:34px;height:34px;display:block;" />
+  </a>
+</footer>
 </body>
 </html>
