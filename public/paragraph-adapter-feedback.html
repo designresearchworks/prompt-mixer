@@ -18,6 +18,7 @@
   --accent:   #7c5cfc;
   --green:    #22c55e;
   --gold:     #d97706;
+  --header-blue: #60a5fa;
   --core-ui-text-size: 13.7px;
 }
 
@@ -55,12 +56,17 @@ html, body {
   font-size: 10px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--header-blue);
   font-weight: 600;
   margin-bottom: 10px;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+#keep-brief,
+#you-are-what-you-eat {
+  accent-color: var(--header-blue);
 }
 
 /* ═══════════════════════════════
@@ -111,11 +117,39 @@ textarea:focus { border-color: var(--accent); }
   max-height: 84px;
   overflow-y: auto;
 }
+.output-current.editing {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px rgba(245,158,11,0.35), 0 4px 24px rgba(0,0,0,0.4);
+  cursor: text;
+}
 
 .sentence-row {
   display: flex;
   gap: 10px;
   align-items: stretch;
+}
+
+.trawl-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+.trawl-input {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 6px 10px;
+  height: 32px;
+  line-height: 1.4;
+}
+.trawl-input::placeholder {
+  color: var(--muted);
 }
 
 
@@ -195,6 +229,25 @@ textarea:focus { border-color: var(--accent); }
       rgba(109,40,217,0.03) 100%),
     var(--surface);
 }
+.ascii-bg-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+.ascii-bg-layer.active {
+  opacity: 0.26;
+}
+.ascii-bg-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  pointer-events: none;
+  background: transparent;
+}
 .pong-canvas {
   position: absolute;
   inset: 0;
@@ -202,6 +255,157 @@ textarea:focus { border-color: var(--accent); }
   height: 100%;
   display: none;
   z-index: 30;
+}
+.fx-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 26;
+}
+.shark-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 27;
+}
+.shark-run {
+  display: none;
+  position: absolute;
+  inset: 0;
+}
+.shark-run.active {
+  display: block;
+}
+.black-hole {
+  position: absolute;
+  left: var(--bh-x, 50%);
+  top: var(--bh-y, 56%);
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 0 rgba(96,165,250,0.14),
+    0 0 0 0 rgba(147,197,253,0.10);
+  animation: blackHoleLife 1000ms ease-in-out forwards;
+}
+.black-hole::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 42px;
+  height: 42px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(30,58,138,0.25), rgba(2,6,23,0.95) 58%),
+    radial-gradient(circle at 60% 60%, rgba(147,197,253,0.16), rgba(2,6,23,0) 72%);
+  box-shadow:
+    0 0 14px rgba(96,165,250,0.42),
+    inset 0 0 10px rgba(0,0,0,0.85);
+}
+.vf-single {
+  position: absolute;
+  left: var(--bh-x, 50%);
+  top: var(--bh-y, 56%);
+  width: 72px;
+  height: 34px;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  filter: drop-shadow(0 0 8px rgba(147,197,253,0.62));
+  animation: fishFromHole 1000ms cubic-bezier(0.22, 0.7, 0.2, 1) forwards;
+}
+.bh-spark {
+  position: absolute;
+  left: var(--bh-x, 50%);
+  top: var(--bh-y, 56%);
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(191,219,254,0.95);
+  box-shadow: 0 0 7px rgba(96,165,250,0.72);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: bhSparkBurst 260ms ease-out forwards;
+  animation-delay: calc(720ms + (var(--i) * 10ms));
+}
+@keyframes blackHoleLife {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.25);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+  90% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.34);
+  }
+  96% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.86);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.35);
+  }
+}
+@keyframes fishFromHole {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(0px, 0px) rotate(0deg) scale(0.15);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(10px, -6px) rotate(120deg) scale(1);
+  }
+  34% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(108px, -52px) rotate(440deg) scale(1.02);
+  }
+  58% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(156px, 24px) rotate(690deg) scale(0.98);
+  }
+  76% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(56px, 40px) rotate(960deg) scale(0.96);
+  }
+  90% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(-6px, -118px) rotate(1080deg) scale(0.92);
+  }
+  96% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(-2px, -98px) rotate(1170deg) scale(1.34);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(0px, 0px) rotate(1170deg) scale(0.1);
+  }
+}
+@keyframes bhSparkBurst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(0px, 0px) scale(0.7);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      translate(var(--dx, 0px), var(--dy, 0px))
+      scale(0.18);
+  }
 }
 .mixer-wrap.pong-mode .pong-canvas {
   display: block;
@@ -211,9 +415,36 @@ textarea:focus { border-color: var(--accent); }
 .mixer-wrap.pong-mode .axis-left,
 .mixer-wrap.pong-mode .axis-right,
 .mixer-wrap.pong-mode .axis-color-pick,
+.mixer-wrap.pong-mode .ascii-bg-layer,
+.mixer-wrap.pong-mode .fx-layer,
+.mixer-wrap.pong-mode .shark-layer,
 .mixer-wrap.pong-mode .mixer-empty,
 .mixer-wrap.pong-mode .word-chip {
   display: none !important;
+}
+@keyframes mergeSparkBurst {
+  0% {
+    transform: translate(-50%, -50%) translate(0px, 0px) scale(1);
+    opacity: 0;
+  }
+  14% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(0.25);
+    opacity: 0;
+  }
+}
+.merge-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(147, 197, 253, 0.95);
+  box-shadow: 0 0 6px rgba(96,165,250,0.75);
+  animation: mergeSparkBurst 520ms ease-out forwards;
 }
 
 /* Deadzone overlay band in the center of the mixer */
@@ -246,6 +477,43 @@ textarea:focus { border-color: var(--accent); }
   justify-content: space-between;
   gap: 12px;
   margin-top: 10px;
+}
+.mixer-resize-handle {
+  display: none;
+  margin-top: 18px;
+  height: 14px;
+  cursor: ns-resize;
+  user-select: none;
+  position: relative;
+}
+.mixer-resize-handle::before {
+  content: '↕';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 20px;
+  color: var(--muted);
+  line-height: 1;
+  background: var(--bg);
+  padding-right: 6px;
+}
+.mixer-resize-handle::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  border-top: 2px solid var(--border2);
+}
+@media (hover: hover) and (pointer: fine) {
+  .mixer-section {
+    border-bottom: none;
+  }
+  .mixer-resize-handle {
+    display: block;
+  }
 }
 .sensibility-box {
   width: 200px;
@@ -282,8 +550,11 @@ textarea:focus { border-color: var(--accent); }
 .sensibility-box.right .sensibility-label {
   color: rgba(52,211,153,0.7); /* updated dynamically by renderChips */
 }
-.sensibility-box textarea {
+.sensibility-box textarea,
+.sensibility-box input {
   font-size: 12px;
+  font-family: inherit;
+  color: var(--text);
   background: var(--surface2);
   border: 1px solid var(--border2);
   border-radius: 6px;
@@ -291,6 +562,76 @@ textarea:focus { border-color: var(--accent); }
   resize: none;
   height: 32px;
   line-height: 1.4;
+}
+.sensibility-box input::placeholder {
+  color: var(--muted);
+}
+.sensibility-combo {
+  position: relative;
+  width: 100%;
+}
+.sensibility-combo input {
+  width: 100%;
+  padding-right: 30px;
+}
+.combo-arrow {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.combo-arrow:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.combo-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  display: none;
+  max-height: 180px;
+  overflow-y: auto;
+  background: #121224;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.45);
+  padding: 4px;
+}
+.combo-list.open {
+  display: block;
+}
+.combo-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.3;
+  border-radius: 6px;
+  padding: 5px 7px;
+  cursor: pointer;
+}
+.combo-item:hover,
+.combo-item:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(124, 92, 252, 0.12);
 }
 .guide {
   position: absolute;
@@ -380,6 +721,7 @@ textarea:focus { border-color: var(--accent); }
   outline-offset: 2px;
 }
 .chip-pill {
+  position: relative;
   border-radius: 8px;
   padding: 3px 6px;
   font-weight: 700;
@@ -393,6 +735,22 @@ textarea:focus { border-color: var(--accent); }
   box-shadow: 0 2px 10px rgba(0,0,0,0.35);
   line-height: 1.3;
   transform-origin: center center;
+}
+.chip-merge-progress {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(96,165,250,0.55);
+  background: rgba(96,165,250,0.12);
+  box-shadow: 0 0 8px rgba(96,165,250,0.35);
+}
+.chip-merge-progress-fill {
+  height: 100%;
+  width: var(--merge-pct, 0%);
+  background: linear-gradient(90deg, #60a5fa, #93c5fd);
+  box-shadow: 0 0 6px rgba(96,165,250,0.7);
+  transition: width 0.04s linear;
 }
 .chip-weight {
   font-size: 8px;
@@ -696,7 +1054,14 @@ textarea:focus { border-color: var(--accent); }
   padding: 4px 8px;
   border: 1px solid var(--border2);
   border-radius: 6px;
-  background: var(--surface2);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(217, 119, 6, 0.26) 0%,
+      rgba(217, 119, 6, 0.26) var(--cad-progress, 0%),
+      rgba(24, 24, 40, 0.96) var(--cad-progress, 0%),
+      rgba(24, 24, 40, 0.96) 100%
+    );
 }
 .cadence-label {
   font-size: 9px;
@@ -715,6 +1080,30 @@ textarea:focus { border-color: var(--accent); }
 }
 .cadence-wrap.disabled .cadence-slider {
   cursor: not-allowed;
+}
+.cadence-wrap.timing {
+  border-color: rgba(217, 119, 6, 0.55);
+}
+.fish-scale-wrap {
+  height: 26px;
+  box-sizing: border-box;
+  flex: 0 0 210px;
+  min-width: 210px;
+  max-width: 210px;
+  gap: 6px;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-right: 4px;
+}
+.fish-scale-wrap .cadence-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+.fish-scale-wrap .cadence-label {
+  white-space: nowrap;
 }
 .infinite-feedback-msg {
   margin-top: 8px;
@@ -825,9 +1214,10 @@ textarea:focus { border-color: var(--accent); }
   .current-wrap     { order: 2; }
   .mixer-section    { order: 3; }
   .row-concepts     { order: 4; }
-  .row-prompt       { order: 5; }
-  .row-base-prompt  { order: 6; }
-  .row-history      { order: 7; }
+  .row-trawl        { order: 5; }
+  .row-prompt       { order: 6; }
+  .row-base-prompt  { order: 7; }
+  .row-history      { order: 8; }
 
   /* Taller mixer so chips have room */
   .mixer-wrap { height: 360px; }
@@ -871,6 +1261,8 @@ textarea:focus { border-color: var(--accent); }
   .output-current { max-height: none; }
 
   .sentence-row { flex-direction: column; }
+  .trawl-row { gap: 6px; }
+  .trawl-input { font-size: 11px; }
 }
 </style>
 </head>
@@ -879,26 +1271,32 @@ textarea:focus { border-color: var(--accent); }
 
   <!-- 1. SOURCE PARAGRAPH -->
   <div class="row row-source" id="row-source">
-    <div class="row-label">Thought</div>
-    <textarea id="mission" rows="3" oninput="scheduleUpdate(800)">how many roads must a man walk down</textarea>
+    <div class="row-label" title="This is what I'm thinking about, an idea that the fish in the tank will transform">Thought</div>
+    <textarea id="mission" rows="3" oninput="scheduleUpdate(800)">deep thought</textarea>
   </div>
 
   <div class="row row-food" id="row-food" style="display:none;">
-    <div class="row-label">Food for thought</div>
-    <textarea id="food-for-thought" rows="3" oninput="scheduleUpdate(800)" placeholder="A sentiment appended to the end of the prompt while infinite feedback is on."></textarea>
+    <div class="row-label" title="In feedback mode the output is the input, so this box was defunct. To make use for it, it is now food for thought, it will steer the model in a particular way in feedback mode, try something like REPLY IN CAPS">
+      Food for thought
+      <label title="If you use this then it isn't really feedback mode any more, but it allows you to get behaviour like infinite feedback mode (i.e., endless generations) but with a static thought" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:600;user-select:none;">
+        <input type="checkbox" id="you-are-what-you-eat" onchange="onYouAreWhatYouEatChange()" style="width:12px;height:12px;cursor:pointer;">
+        You are what you eat
+      </label>
+    </div>
+    <textarea id="food-for-thought" rows="3" oninput="scheduleUpdate(800)" placeholder="A sentiment appended to the end of the prompt while infinite feedback is on." title="A sort of hint or direction that is appended to a prompt when in feedback mode (i.e., 'food for thought')."></textarea>
   </div>
   <!-- 4. CURRENT OUTPUT + MODEL CHOOSER -->
   <div class="current-wrap">
     <div class="row-label current-head" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
       <div style="display:flex;align-items:center;gap:12px;">
-        <div class="live-badge"><div class="live-dot" id="live-dot"></div><span id="current-io-label">Current output</span></div>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:600;user-select:none;">
-          <input type="checkbox" id="keep-brief" checked onchange="scheduleUpdate(0)" style="accent-color:var(--accent);width:12px;height:12px;cursor:pointer;">
+        <div class="live-badge"><div class="live-dot" id="live-dot"></div><span id="current-io-label" title="This changes to say Current I/O (rather than Current Output) when in feedback mode">Current output</span></div>
+        <label title="The answers will be much longer if you don't tick this, maybe you like it long" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:600;user-select:none;">
+          <input type="checkbox" id="keep-brief" checked onchange="scheduleUpdate(0)" style="width:12px;height:12px;cursor:pointer;">
           Force short output
         </label>
       </div>
       <div class="current-head-right" style="display:flex;align-items:center;gap:10px;">
-        <select class="model-select" id="model-select" onchange="onModelChange()">
+        <select class="model-select" id="model-select" onchange="onModelChange()" title="The groq models are faster, sonnet is smarter, no right or wrong, just different">
           <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
           <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6</option>
           <option value="qwen/qwen3.5-plus-02-15">Qwen 3.5 Plus</option>
@@ -906,32 +1304,34 @@ textarea:focus { border-color: var(--accent); }
           <option value="google/gemini-3-flash-preview">Gemini 3 Flash</option>
           <option value="google/gemini-2.5-flash-lite-preview-09-2025">Gemini 2.5 Flash Lite</option>
           <option value="groq:openai/gpt-oss-20b">Groq GPT-OSS 20B</option>
-          <option value="groq:groq/compound-mini" selected>Groq Compound Mini</option>
+          <option value="groq:groq/compound-mini">Groq Compound Mini</option>
 <option value="groq:openai/gpt-oss-120b">Groq GPT-OSS 120B</option>
 <option value="groq:llama-3.1-8b-instant">Groq LLaMA 3.1 8B Instant</option>
+<option value="groq:llama-3.3-70b-versatile" selected>Groq LLaMA 3.3 70B Versatile</option>
+<option value="groq:moonshotai/kimi-k2-instruct-0905">Groq Kimi K2 Instruct 0905</option>
         </select>
         <div class="cadence-wrap" id="cadence-wrap">
           <span class="cadence-label">Fast</span>
-          <input class="cadence-slider" id="infinite-cadence" type="range" min="0" max="5000" step="50" value="2500" oninput="updateCadenceLabel()">
+          <input class="cadence-slider" id="infinite-cadence" type="range" min="0" max="5000" step="50" value="2500" oninput="updateCadenceLabel()" title="Speed limit on generations">
           <span class="cadence-label">Slow</span>
         </div>
-        <button class="feedback-btn" id="feedback-btn">fdbk</button>
-        <button class="feedback-btn infinite-btn" id="infinite-feedback-btn">∞</button>
+        <button class="feedback-btn" id="feedback-btn" title="Where usually the text in the Thought box is what the model is thinking about, with FDBK on it will think about the last thing it generated, last thing it generated, last thing it generated - get it?">fdbk</button>
+        <button class="feedback-btn infinite-btn" id="infinite-feedback-btn" title="With this on the model won't stop after each generation, it'll just keep going (which it will do anyway if Fish Physics mode is on)">∞</button>
       </div>
     </div>
     <div class="infinite-feedback-msg" id="infinite-feedback-msg"></div>
-    <div class="output-current" id="output-current">
+    <div class="output-current" id="output-current" title="If you are in feedback mode then you can type in this box, doing so will get the model - just that one time - to think about what you type. So, when it's feeding back you can send it off in new directions">
       Attempting first contact with an API...
     </div>
     <div class="output-size-controls">
-      <button class="output-size-btn" onclick="adjustOutputWindowHeight(-1)" title="Smaller output window">-</button>
-      <button class="output-size-btn" onclick="adjustOutputWindowHeight(1)" title="Larger output window">+</button>
+      <button class="output-size-btn" onclick="adjustOutputWindowHeight(-1)" title="Remove rows from output box">-</button>
+      <button class="output-size-btn" onclick="adjustOutputWindowHeight(1)" title="Add rows to the output box">+</button>
     </div>
   </div>
 
   <!-- 2. CONCEPT MIXER with sensibility boxes below -->
   <div class="mixer-section">
-    <div class="row-label">
+    <div class="row-label" title="The thinking tank, filled with little fishes">
       PthinkTank
       <span style="font-size:9px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400;">
         — drag ↑↓ weight &nbsp; ←→ lean towards one of two sensibilities
@@ -939,17 +1339,43 @@ textarea:focus { border-color: var(--accent); }
     </div>
     <!-- Mixer canvas (full width) -->
     <div class="mixer-wrap" id="mixer">
+      <div class="ascii-bg-layer" id="ascii-bg-layer">
+        <iframe class="ascii-bg-frame" id="ascii-bg-frame" title="Fish background animation" loading="lazy" tabindex="-1" aria-hidden="true"></iframe>
+      </div>
       <div class="guide" style="top:25%"></div>
       <div class="guide" style="top:50%"></div>
       <div class="guide" style="top:75%"></div>
-      <div class="deadzone-band" id="deadzone-band">
-        <div class="deadzone-label">no lean</div>
-      </div>
-      <div class="axis-left" id="axis-left" onclick="document.getElementById('axis-pick-1').click()" title="Click to change colour">← Sensibility 1</div>
-      <div class="axis-right" id="axis-right" onclick="document.getElementById('axis-pick-2').click()" title="Click to change colour">Sensibility 2 →</div>
+      <div class="deadzone-band" id="deadzone-band"></div>
+      <div class="axis-left" id="axis-left" onclick="document.getElementById('axis-pick-1').click()" title="Choose a color for the fish backgrounds to go the closer you move them towards the left/right of the PThinkTank">← Sensibility 1</div>
+      <div class="axis-right" id="axis-right" onclick="document.getElementById('axis-pick-2').click()" title="Choose a color for the fish backgrounds to go the closer you move them towards the left/right of the PThinkTank">Sensibility 2 →</div>
       <input type="color" id="axis-pick-1" class="axis-color-pick" value="#ec4899" oninput="renderChips()">
       <input type="color" id="axis-pick-2" class="axis-color-pick" value="#34d399" oninput="renderChips()">
       <canvas class="pong-canvas" id="pong-canvas"></canvas>
+      <div class="fx-layer" id="fx-layer"></div>
+      <div class="shark-layer" id="shark-layer">
+        <div class="shark-run" id="shark-run">
+          <div class="black-hole"></div>
+          <svg class="vf-single" viewBox="0 0 90 42" aria-hidden="true">
+            <path d="M8 22 C18 8 40 5 63 11 C74 13 81 16 85 21 C81 26 74 29 63 31 C40 37 18 34 8 22 Z" fill="#1e293b" stroke="rgba(147,197,253,0.7)" stroke-width="1.2"></path>
+            <path d="M63 21 L83 10 L83 32 Z" fill="#0f172a"></path>
+            <polygon points="40,12 50,2 49,15" fill="#334155"></polygon>
+            <path d="M25 20 L46 20 L43 24 L40 20 L37 24 L34 20 L31 24 L28 20 Z" fill="#f8fafc"></path>
+            <circle cx="24" cy="18" r="2.2" fill="#020617"></circle>
+          </svg>
+          <div class="bh-spark" style="--i:0;"></div>
+          <div class="bh-spark" style="--i:1;"></div>
+          <div class="bh-spark" style="--i:2;"></div>
+          <div class="bh-spark" style="--i:3;"></div>
+          <div class="bh-spark" style="--i:4;"></div>
+          <div class="bh-spark" style="--i:5;"></div>
+          <div class="bh-spark" style="--i:6;"></div>
+          <div class="bh-spark" style="--i:7;"></div>
+          <div class="bh-spark" style="--i:8;"></div>
+          <div class="bh-spark" style="--i:9;"></div>
+          <div class="bh-spark" style="--i:10;"></div>
+          <div class="bh-spark" style="--i:11;"></div>
+        </div>
+      </div>
       <div class="mixer-empty" id="mixer-empty">
         <div class="mixer-empty-icon">⟳</div>
         Type transformation concepts below
@@ -958,24 +1384,104 @@ textarea:focus { border-color: var(--accent); }
     <!-- Sensibility boxes below, left and right -->
     <div class="sensibility-row">
       <div class="sensibility-box left">
-        <textarea id="direction-1" rows="1" oninput="scheduleUpdate(800)" placeholder="e.g. poetic and lyrical">dour and serious</textarea>
+        <div class="sensibility-combo">
+          <input id="direction-1" type="text" oninput="renderChips();scheduleUpdate(800)" placeholder="e.g. poetic and lyrical" value="" autocomplete="off" title="You can choose or type a sensibility here, when fish move closer to this edge of the tank, the sensibility will have more of an impact on the output">
+          <button type="button" class="combo-arrow" id="direction-1-arrow" aria-label="Show sensibility 1 options">&#9662;</button>
+          <div class="combo-list" id="direction-1-list"></div>
+        </div>
+        <datalist id="direction-1-options">
+          <option value="shimmer"></option>
+          <option value="dwindle"></option>
+          <option value="bramble"></option>
+          <option value="nestle"></option>
+          <option value="embers"></option>
+          <option value="tremble"></option>
+          <option value="calcify"></option>
+          <option value="petrify"></option>
+          <option value="luminous"></option>
+          <option value="cavernous"></option>
+          <option value="undulate"></option>
+          <option value="cathedral"></option>
+          <option value="porcelain"></option>
+          <option value="cinnamon"></option>
+          <option value="mercury"></option>
+          <option value="silhouette"></option>
+          <option value="carnivore"></option>
+          <option value="pendulum"></option>
+          <option value="gossamer"></option>
+          <option value="splinter"></option>
+          <option value="hollow"></option>
+          <option value="pilgrim"></option>
+          <option value="labyrinth"></option>
+          <option value="corridor"></option>
+          <option value="tambourine"></option>
+          <option value="marmalade"></option>
+          <option value="effervesce"></option>
+          <option value="cascade"></option>
+          <option value="smother"></option>
+          <option value="flutter"></option>
+          <option value="murmur"></option>
+        </datalist>
       </div>
       <div class="sensibility-box sensibility-controls">
-        <button class="feedback-btn" id="chip-physics-btn">fish physics</button>
-        <button class="feedback-btn" id="rnd-btn" title="Random speeds and directions">rnd</button>
+        <button class="feedback-btn" id="chip-physics-btn" title="The physics of fish, clearly">fish physics</button>
+        <button class="feedback-btn" id="rnd-btn" title="Makes the fish swim off in random directions">rnd</button>
+        <button class="feedback-btn" id="bmp-btn" title="Fish either swim through each other, or bump off each other - this chooses which">bmp</button>
+        <div class="cadence-wrap fish-scale-wrap" id="fish-scale-wrap" title="Scales the swimming speed of the fish">
+          <span class="cadence-label">fish scale</span>
+          <input class="cadence-slider" id="fish-speed-scale" type="range" min="-100" max="100" step="1" value="0" oninput="updateFishScaleLabel()" title="Scales the swimming speed of the fish">
+        </div>
       </div>
       <div class="sensibility-box right">
-        <textarea id="direction-2" rows="1" oninput="scheduleUpdate(800)" placeholder="e.g. clinical and precise">lighthearted and silly</textarea>
+        <div class="sensibility-combo">
+          <input id="direction-2" type="text" oninput="renderChips();scheduleUpdate(800)" placeholder="e.g. clinical and precise" value="" autocomplete="off" title="You can choose or type a sensibility here, when fish move closer to this edge of the tank, the sensibility will have more of an impact on the output">
+          <button type="button" class="combo-arrow" id="direction-2-arrow" aria-label="Show sensibility 2 options">&#9662;</button>
+          <div class="combo-list" id="direction-2-list"></div>
+        </div>
+        <datalist id="direction-2-options">
+          <option value="slither"></option>
+          <option value="kindle"></option>
+          <option value="ramble"></option>
+          <option value="wrestle"></option>
+          <option value="remember"></option>
+          <option value="resemble"></option>
+          <option value="lullaby"></option>
+          <option value="butterfly"></option>
+          <option value="ominous"></option>
+          <option value="ravenous"></option>
+          <option value="percolate"></option>
+          <option value="ephemeral"></option>
+          <option value="origin"></option>
+          <option value="phenomenon"></option>
+          <option value="reverie"></option>
+          <option value="marionette"></option>
+          <option value="metaphor"></option>
+          <option value="tantrum"></option>
+          <option value="philosopher"></option>
+          <option value="winter"></option>
+          <option value="swallow"></option>
+          <option value="algorithm"></option>
+          <option value="amaranth"></option>
+          <option value="matador"></option>
+          <option value="kerosene"></option>
+          <option value="barricade"></option>
+          <option value="coalesce"></option>
+          <option value="masquerade"></option>
+          <option value="slumber"></option>
+          <option value="gutter"></option>
+          <option value="smolder"></option>
+        </datalist>
       </div>
     </div>
+    <div class="mixer-resize-handle" id="mixer-resize-handle" title="Drag to resize PthinkTank"></div>
   </div>
 
   <!-- 3. TRANSFORMATION CONCEPTS -->
   <div class="row row-concepts">
-    <div class="row-label">fish</div>
+    <div class="row-label" title="Trout, Salmon, Flouder, Frog.. etc">fish</div>
     <div class="sentence-row">
       <!-- Hidden real textarea keeps value in sync for buildPrompt -->
-      <textarea id="sentence-input">Bowl of Petunias, Paranoid Android, Whale, Mice, Heart of Gold, babelfish</textarea>
+      <textarea id="sentence-input">animal, vegetable, mineral</textarea>
       <!-- Visible tag input -->
       <div class="tag-input-wrap" id="tag-input-wrap">
         <input class="tag-input-field" id="tag-input-field" type="text" placeholder="type a concept, press comma…" autocomplete="off" spellcheck="false">
@@ -983,10 +1489,22 @@ textarea:focus { border-color: var(--accent); }
     </div>
   </div>
 
+  <div class="row row-trawl">
+    <div class="row-label" title="You can use this to be lazy and create a new Thought and several new fish. Uses the same model that's selected, just for testing really.">
+      Trawl
+      <button class="collapse-btn" id="trawl-toggle-btn" onclick="toggleTrawlRow()">show</button>
+    </div>
+    <div class="trawl-row" id="trawl-row-body" style="display:none;">
+      <input class="trawl-input" id="trawl-thought" type="text" placeholder="What are you thinking?" autocomplete="off">
+      <input class="trawl-input" id="trawl-fish" type="text" placeholder="What kind of fish do you want?" autocomplete="off">
+      <button class="feedback-btn" id="trawl-haul-btn">Haul</button>
+    </div>
+  </div>
+
 
   <!-- 5. GENERATED PROMPT (preview) -->
   <div class="row row-prompt">
-    <div class="row-label">
+    <div class="row-label" title="What you see in this box is what is sent to the model">
       Generated prompt
       <button class="collapse-btn" onclick="toggleCollapse('generated-prompt-body', this)">show</button>
     </div>
@@ -997,24 +1515,27 @@ textarea:focus { border-color: var(--accent); }
 
   <!-- 6. BASE PROMPT TEMPLATE -->
   <div class="row row-base-prompt">
-    <div class="row-label">
+    <div class="row-label" title="You can edit the preamble and ending of the prompt, good for fine tuning towards particular outputs. When you save it will actually be saved to a file and come back if you refresh the page. Reset to hardcoded will overwrite that file">
       Base prompt template
       <button class="collapse-btn" onclick="toggleCollapse('base-prompt-body', this)">show</button>
+      <button class="collapse-btn" id="reset-hardcoded-prompts-btn" onclick="resetToHardcodedPrompts()" title="Overwrites any saved prompt files with the original hardcoded ones">reset to hardcoded prompt</button>
+      <span id="prompt-template-status" style="font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:none;"></span>
     </div>
     <div class="collapsible-body collapsed" id="base-prompt-body">
       <div class="base-prompt-editor" id="base-editor">
         <div>
-          <label>Preamble</label>
+          <label>Preamble <button class="collapse-btn" type="button" id="save-preamble-btn" onclick="savePromptSection('preamble')">save</button></label>
           <textarea id="base-preamble" rows="3" oninput="scheduleUpdate(800)">You have several transformation concepts to apply to the thought. Each has two properties:
 - Weight (0.00 = ignore, 1.00 = apply strongly)
 - Optionally, lean toward a sensibility</textarea>
         </div>
         <div>
-          <label>Closing instruction</label>
+          <label>Closing instruction <button class="collapse-btn" type="button" id="save-closing-btn" onclick="savePromptSection('closing')">save</button></label>
           <textarea id="base-closing" rows="4" oninput="scheduleUpdate(800)">Reimagine the original thought applying these transformations proportionally.
 Higher-weighted concepts should have a more visible effect on the output.
 Concepts that lean toward a sensibility should pull the style in that direction.
-Preserve the core meaning of the original thought.</textarea>
+Preserve the core meaning of the original thought.
+Only output your new idea, no meta commentary, none of the original prompt.</textarea>
         </div>
       </div>
     </div>
@@ -1022,7 +1543,7 @@ Preserve the core meaning of the original thought.</textarea>
 
   <!-- 7. PREVIOUS OUTPUTS -->
   <div class="row row-history">
-    <div class="row-label" style="margin-bottom:6px">Previous outputs</div>
+    <div class="row-label" style="margin-bottom:6px" title="Self explanatory, if you click one then that state should be loaded back in (if fish mode enabled then.. good luck)">Previous outputs</div>
     <div class="history-empty" id="history-empty">
       Previous outputs will appear here as you adjust the mixer.
     </div>
@@ -1033,7 +1554,7 @@ Preserve the core meaning of the original thought.</textarea>
 
 <!-- Floating history tooltip -->
 <div class="history-tooltip" id="history-tooltip"></div>
-<div class="godmode-toast" id="godmode-toast">godmodeenabled</div>
+<div class="godmode-toast" id="godmode-toast">god mode enabled</div>
 
 <script>
 /* ═══════════════════════════════
@@ -1054,6 +1575,7 @@ var infiniteInactivityInterval = null;
 var conceptLastMoveTs = Date.now();
 var INFINITE_INACTIVITY_MS = 30000;
 var chipPhysicsEnabled = false;
+var chipPhysicsBmpMode = false;
 var chipPhysicsRaf = null;
 var chipPhysicsLastTs = 0;
 var chipPhysicsNextPromptTs = 0;
@@ -1062,6 +1584,8 @@ var dragLastSampleTs = 0;
 var dragLastSampleXFrac = 0;
 var dragLastSampleYFrac = 0;
 var chipPhysicsMaxSpeed = 0.9; // frac units per second
+var chipSpeedScalePct = 0; // -100..100
+var chipSpeedScale = 1.0; // 0.0..2.0
 var MIXER_BOUND_PAD_X = 26;
 var MIXER_BOUND_PAD_TOP_Y = 28;
 var MIXER_BOUND_PAD_BOTTOM_Y = 3;
@@ -1070,7 +1594,7 @@ var pPressTimes = [];
 var pongModeActive = false;
 var pongState = null;
 var pongRaf = null;
-var GODMODE_FEATURE_ENABLED = false;
+var GODMODE_FEATURE_ENABLED = true;
 var godmodeEnabled = false;
 var godmodeBuffer = '';
 var godmodeToastTimer = null;
@@ -1081,6 +1605,21 @@ var requestStartTs = 0;
 var lastTouchTapTs = 0;
 var lastTouchUiTs = 0;
 var TOUCH_UI_GRACE_MS = 320;
+var lastGenerateStartTs = 0;
+var generateThrottleTimer = null;
+var cadenceProgressRaf = null;
+var cadenceProgressStartTs = 0;
+var cadenceProgressDelayMs = 0;
+var cadenceProgressActiveCheck = null;
+var trawlInFlight = false;
+var mixerResizeActive = false;
+var mixerResizeStartY = 0;
+var mixerResizeStartH = 0;
+var currentOutputEditActive = false;
+var manualOutputEditPause = false;
+var hardcodedBasePreamble = '';
+var hardcodedBaseClosing = '';
+var promptTemplateStatusTimer = null;
 
 /* ═══════════════════════════════
    DRAG STATE
@@ -1092,6 +1631,19 @@ var dragStartXFrac  = 0;
 var dragStartYFrac  = 0;
 var selectedKey     = null;
 var stateDirtyWhileStreaming = false;
+var mergeHoverTargetKey = null;
+var mergeHoverSinceTs = 0;
+var MERGE_HOLD_MS = 1000;
+var joinGlowRaf = null;
+var JOIN_GLOW_MS = 650;
+var mergeHoldProgress = 0;
+var mergeHoldRaf = null;
+var dragPointerX = 0;
+var dragPointerY = 0;
+var sharkRunTimer = null;
+var asciiBgLoaded = false;
+var asciiBgDisabled = false;
+var fishAsciiBuffer = '';
 
 /* ═══════════════════════════════
    SIMPLE MARKDOWN RENDERER
@@ -1137,18 +1689,45 @@ function maybeTriggerGodmode(key) {
   if (!GODMODE_FEATURE_ENABLED) return;
   if (!key || key.length !== 1 || !/[a-z]/i.test(key)) return;
   godmodeBuffer += key.toLowerCase();
-  if (godmodeBuffer.length > 24) godmodeBuffer = godmodeBuffer.slice(-24);
+  if (godmodeBuffer.length > 32) godmodeBuffer = godmodeBuffer.slice(-32);
   if (godmodeBuffer.endsWith('godmode')) {
     godmodeBuffer = '';
     godmodeEnabled = true;
-    showGodmodeToast();
+    showGodmodeToast('god mode enabled');
+    scheduleUpdate(0);
+    return;
+  }
+  if (godmodeBuffer.endsWith('mortalmode')) {
+    godmodeBuffer = '';
+    godmodeEnabled = false;
+    showGodmodeToast('god mode disabled');
     scheduleUpdate(0);
   }
 }
 
-function showGodmodeToast() {
+function maybeTriggerFishAsciiToggle(key) {
+  if (!key || key.length !== 1 || !/[a-z]/i.test(key)) return;
+  fishAsciiBuffer += key.toLowerCase();
+  if (fishAsciiBuffer.length > 24) fishAsciiBuffer = fishAsciiBuffer.slice(-24);
+  if (fishAsciiBuffer.endsWith('fishoff')) {
+    fishAsciiBuffer = '';
+    asciiBgDisabled = true;
+    updateAsciiFishBackground();
+    showGodmodeToast('fish mode disabled');
+    return;
+  }
+  if (fishAsciiBuffer.endsWith('fishon')) {
+    fishAsciiBuffer = '';
+    asciiBgDisabled = false;
+    updateAsciiFishBackground();
+    showGodmodeToast(chipPhysicsEnabled ? 'fish mode enabled' : 'fish mode armed');
+  }
+}
+
+function showGodmodeToast(message) {
   var toast = document.getElementById('godmode-toast');
   if (!toast) return;
+  toast.textContent = message || 'god mode enabled';
   toast.classList.add('visible');
   if (godmodeToastTimer) clearTimeout(godmodeToastTimer);
   godmodeToastTimer = setTimeout(function() {
@@ -1367,13 +1946,14 @@ function weightTextColor(w) {
   return 'rgb(' + lerp(lo.r,hi.r,f) + ',' + lerp(lo.g,hi.g,f) + ',' + lerp(lo.b,hi.b,f) + ')';
 }
 
-// Lean → background colour: lean colour tinted by intensity, dark base when neutral
-function chipStyle(weight, xFrac) {
+// Lean → background colour: only active when corresponding sensibility text exists.
+function chipStyle(weight, xFrac, leftActive, rightActive) {
   var textColor = weightTextColor(weight);
 
-  var leanInDead = inDeadzone(xFrac);
-  var amount     = leanInDead ? 0 : leanIntensity(xFrac);
   var leanLeft   = xFrac < 0.5;
+  var sideActive = leanLeft ? leftActive : rightActive;
+  var leanInDead = inDeadzone(xFrac) || !sideActive;
+  var amount     = leanInDead ? 0 : leanIntensity(xFrac);
 
   var pickEl = document.getElementById(leanLeft ? 'axis-pick-1' : 'axis-pick-2');
   var lc     = hexToRgb(pickEl ? pickEl.value : (leanLeft ? '#ec4899' : '#34d399'));
@@ -1458,7 +2038,17 @@ function syncWordsToTagTokens(opts) {
   var shouldSchedule = opts.schedule !== false;
   var existingByKey = new Map(
     words.map(function(w) {
-      return [w.key, { key: w.key, label: w.label, xFrac: w.xFrac, yFrac: w.yFrac, vx: w.vx || 0, vy: w.vy || 0 }];
+      return [w.key, {
+        key: w.key,
+        label: w.label,
+        xFrac: w.xFrac,
+        yFrac: w.yFrac,
+        vx: w.vx || 0,
+        vy: w.vy || 0,
+        squishH: w.squishH || 0,
+        squishV: w.squishV || 0,
+        joinGlowUntil: w.joinGlowUntil || 0
+      }];
     })
   );
   var occupied = [];
@@ -1474,13 +2064,13 @@ function syncWordsToTagTokens(opts) {
     }
 
     if (tagTokens.length === 1 || (hadNoWords && index === 0)) {
-      var firstNode = { key: key, label: token, xFrac: 0.5, yFrac: 0.20, vx: 0, vy: 0 };
+      var firstNode = { key: key, label: token, xFrac: 0.5, yFrac: 0.20, vx: 0, vy: 0, squishH: 0, squishV: 0, joinGlowUntil: 0 };
       occupied.push({ xFrac: firstNode.xFrac, yFrac: firstNode.yFrac });
       return firstNode;
     }
 
     var pos = findOpenMiddlePosition(occupied);
-    var newNode = { key: key, label: token, xFrac: pos.xFrac, yFrac: pos.yFrac, vx: 0, vy: 0 };
+    var newNode = { key: key, label: token, xFrac: pos.xFrac, yFrac: pos.yFrac, vx: 0, vy: 0, squishH: 0, squishV: 0, joinGlowUntil: 0 };
     occupied.push({ xFrac: newNode.xFrac, yFrac: newNode.yFrac });
     return newNode;
   });
@@ -1541,6 +2131,8 @@ function renderChips() {
   // Update axis labels from sensibility inputs
   var d1 = (document.getElementById('direction-1').value || '').trim();
   var d2 = (document.getElementById('direction-2').value || '').trim();
+  var d1Active = !!d1;
+  var d2Active = !!d2;
   document.getElementById('axis-left').textContent  = '← ' + (d1 || 'Sensibility 1');
   document.getElementById('axis-right').textContent = (d2 || 'Sensibility 2') + ' →';
 
@@ -1566,11 +2158,24 @@ function renderChips() {
 
   words.forEach(function(word) {
     var weight = 1.0 - word.yFrac;
-    var style  = chipStyle(weight, word.xFrac);
+    var style  = chipStyle(weight, word.xFrac, d1Active, d2Active);
     var px     = PADH + word.xFrac * (W - PADH * 2);
     var py     = PADVTop + word.yFrac * (H - PADVTop - PADVBot);
-    // Scale smoothly: 0.65 at zero weight → 1.10 at full weight
-    var scale  = (0.65 + weight * 0.45).toFixed(3);
+    // Slightly larger overall (+~5%), with a slightly softer vertical size spread.
+    var scale  = (0.694 + weight * 0.449).toFixed(3);
+    var squishH = word.squishH || 0;
+    var squishV = word.squishV || 0;
+    var stretchX = ((1 - squishH * 0.55) * (1 + squishV * 0.22)).toFixed(3);
+    var stretchY = ((1 + squishH * 0.35) * (1 - squishV * 0.55)).toFixed(3);
+    var glowFrac = 0;
+    if (word.joinGlowUntil && word.joinGlowUntil > 0) {
+      glowFrac = Math.max(0, Math.min(1, (word.joinGlowUntil - performance.now()) / JOIN_GLOW_MS));
+    }
+    var mergeActive = (word.key === draggingKey && mergeHoverTargetKey && mergeHoldProgress > 0);
+    var mergeGlowFrac = mergeActive ? mergeHoldProgress : 0;
+    var totalGlowFrac = Math.max(glowFrac, mergeGlowFrac);
+    var glowBorder = totalGlowFrac > 0 ? ('rgba(96,165,250,' + (0.35 + totalGlowFrac * 0.55).toFixed(3) + ')') : style.border;
+    var glowShadow = totalGlowFrac > 0 ? ('0 0 ' + Math.round(6 + totalGlowFrac * 16) + 'px rgba(96,165,250,' + (0.08 + totalGlowFrac * 0.34).toFixed(3) + '), 0 2px 10px rgba(0,0,0,0.35)') : '0 2px 10px rgba(0,0,0,0.35)';
 
     var lean = word.xFrac;
     var leanText;
@@ -1590,13 +2195,23 @@ function renderChips() {
     chip.style.left  = px + 'px';
     chip.style.top   = py + 'px';
 
+    var mergeProgress = '';
+    if (mergeActive) {
+      mergeProgress =
+        '<div class="chip-merge-progress">' +
+          '<div class="chip-merge-progress-fill" style="--merge-pct:' + (mergeHoldProgress * 100).toFixed(1) + '%"></div>' +
+        '</div>';
+    }
+
     chip.innerHTML =
       '<div class="chip-pill" style="' +
         'background:' + style.bg + ';' +
         'color:' + style.color + ';' +
-        'border-color:' + style.border + ';' +
-        'transform:scale(' + scale + ')' +
+        'border-color:' + glowBorder + ';' +
+        'box-shadow:' + glowShadow + ';' +
+        'transform:scale(' + scale + ') scaleX(' + stretchX + ') scaleY(' + stretchY + ')' +
       '">' + word.label + '</div>' +
+      mergeProgress +
       '<div class="chip-weight" style="color:' + style.color + '">' +
         weight.toFixed(2) +
       '</div>' +
@@ -1619,6 +2234,8 @@ function renderChips() {
 function onChipMouseDown(e, key) {
   e.preventDefault();
   e.stopPropagation();
+  dragPointerX = e.clientX;
+  dragPointerY = e.clientY;
   selectedKey     = key;
   draggingKey     = key;
   dragStartMouseX = e.clientX;
@@ -1633,6 +2250,10 @@ function onChipMouseDown(e, key) {
   dragLastSampleTs = performance.now();
   dragLastSampleXFrac = word.xFrac;
   dragLastSampleYFrac = word.yFrac;
+  mergeHoverTargetKey = null;
+  mergeHoverSinceTs = 0;
+  mergeHoldProgress = 0;
+  startMergeHoldLoop();
   document.body.style.cursor = 'grabbing';
   renderChips();
 }
@@ -1641,6 +2262,197 @@ function clampPhysicsSpeed(v) {
   if (v > chipPhysicsMaxSpeed) return chipPhysicsMaxSpeed;
   if (v < -chipPhysicsMaxSpeed) return -chipPhysicsMaxSpeed;
   return v;
+}
+
+function joinFishLabels(a, b) {
+  var left = (a || '').trim();
+  var right = (b || '').trim();
+  return (left + ' ' + right).replace(/\s+/g, ' ').trim();
+}
+
+function hasActiveJoinGlow() {
+  var now = performance.now();
+  return words.some(function(w) { return (w.joinGlowUntil || 0) > now; });
+}
+
+function startJoinGlowLoop() {
+  if (joinGlowRaf) return;
+  function tick() {
+    if (!hasActiveJoinGlow()) {
+      joinGlowRaf = null;
+      renderChips();
+      return;
+    }
+    renderChips();
+    joinGlowRaf = requestAnimationFrame(tick);
+  }
+  joinGlowRaf = requestAnimationFrame(tick);
+}
+
+function stopMergeHoldLoop() {
+  if (mergeHoldRaf) {
+    cancelAnimationFrame(mergeHoldRaf);
+    mergeHoldRaf = null;
+  }
+}
+
+function updateMergeHoldState(nowTs, clientX, clientY) {
+  if (!draggingKey) {
+    mergeHoverTargetKey = null;
+    mergeHoverSinceTs = 0;
+    mergeHoldProgress = 0;
+    return false;
+  }
+
+  var mixer = document.getElementById('mixer');
+  if (!mixer) return false;
+  var usableX = (mixer.clientWidth || 600) - MIXER_BOUND_PAD_X * 2;
+  var usableY = (mixer.clientHeight || 300) - MIXER_BOUND_PAD_TOP_Y - MIXER_BOUND_PAD_BOTTOM_Y;
+  var mergeTarget = findMergeTargetForDragging(usableX, usableY);
+
+  if (mergeTarget) {
+    if (mergeHoverTargetKey !== mergeTarget.key) {
+      mergeHoverTargetKey = mergeTarget.key;
+      mergeHoverSinceTs = nowTs;
+      mergeHoldProgress = 0;
+    } else {
+      mergeHoldProgress = Math.max(0, Math.min(1, (nowTs - mergeHoverSinceTs) / MERGE_HOLD_MS));
+      if (mergeHoldProgress >= 1) {
+        mergeDraggedWithTarget(mergeTarget, clientX, clientY);
+        mergeHoldProgress = 0;
+      }
+    }
+  } else {
+    mergeHoverTargetKey = null;
+    mergeHoverSinceTs = 0;
+    mergeHoldProgress = 0;
+  }
+
+  return true;
+}
+
+function startMergeHoldLoop() {
+  stopMergeHoldLoop();
+  function tick(ts) {
+    if (!draggingKey) {
+      mergeHoldRaf = null;
+      return;
+    }
+    updateMergeHoldState(ts, dragPointerX, dragPointerY);
+    renderChips();
+    mergeHoldRaf = requestAnimationFrame(tick);
+  }
+  mergeHoldRaf = requestAnimationFrame(tick);
+}
+
+function emitMergeSparkles(xFrac, yFrac) {
+  var mixer = document.getElementById('mixer');
+  var layer = document.getElementById('fx-layer');
+  if (!mixer || !layer) return;
+
+  var W = mixer.clientWidth || 600;
+  var H = mixer.clientHeight || 300;
+  var px = MIXER_BOUND_PAD_X + xFrac * (W - MIXER_BOUND_PAD_X * 2);
+  var py = MIXER_BOUND_PAD_TOP_Y + yFrac * (H - MIXER_BOUND_PAD_TOP_Y - MIXER_BOUND_PAD_BOTTOM_Y);
+  var count = 10;
+
+  for (var i = 0; i < count; i++) {
+    var a = (Math.PI * 2 * i / count) + (Math.random() * 0.35 - 0.175);
+    var r = 10 + Math.random() * 18;
+    var s = document.createElement('div');
+    s.className = 'merge-spark';
+    s.style.left = px + 'px';
+    s.style.top = py + 'px';
+    s.style.setProperty('--dx', (Math.cos(a) * r).toFixed(1) + 'px');
+    s.style.setProperty('--dy', (Math.sin(a) * r).toFixed(1) + 'px');
+    s.style.width = (2.2 + Math.random() * 1.8).toFixed(1) + 'px';
+    s.style.height = s.style.width;
+    s.style.animationDelay = (Math.random() * 90).toFixed(0) + 'ms';
+    layer.appendChild(s);
+    setTimeout(function(el) {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    }.bind(null, s), 780);
+  }
+}
+
+function findMergeTargetForDragging(usableX, usableY) {
+  if (!draggingKey) return null;
+  var drag = words.find(function(w) { return w.key === draggingKey; });
+  if (!drag) return null;
+
+  var best = null;
+  var bestDistSq = Infinity;
+  var MERGE_RADIUS_PX = 36;
+  var maxDistSq = MERGE_RADIUS_PX * MERGE_RADIUS_PX;
+
+  words.forEach(function(w) {
+    if (w.key === draggingKey) return;
+    var dx = (w.xFrac - drag.xFrac) * usableX;
+    var dy = (w.yFrac - drag.yFrac) * usableY;
+    var d2 = dx * dx + dy * dy;
+    if (d2 <= maxDistSq && d2 < bestDistSq) {
+      best = w;
+      bestDistSq = d2;
+    }
+  });
+
+  return best;
+}
+
+function mergeDraggedWithTarget(targetWord, clientX, clientY) {
+  if (!targetWord || !draggingKey) return false;
+  var dragWord = words.find(function(w) { return w.key === draggingKey; });
+  if (!dragWord) return false;
+
+  var newLabel = joinFishLabels(dragWord.label, targetWord.label);
+  if (!newLabel) return false;
+
+  var newKeyBase = newLabel.toLowerCase();
+  var newKey = newKeyBase;
+  var suffix = 2;
+  while (words.some(function(w) {
+    return w.key === newKey && w.key !== dragWord.key && w.key !== targetWord.key;
+  })) {
+    newKey = newKeyBase + '-' + suffix;
+    suffix += 1;
+  }
+
+  var merged = {
+    key: newKey,
+    label: newLabel,
+    xFrac: Math.max(0, Math.min(1, (dragWord.xFrac + targetWord.xFrac) / 2)),
+    yFrac: Math.max(0, Math.min(1, (dragWord.yFrac + targetWord.yFrac) / 2)),
+    vx: ((dragWord.vx || 0) + (targetWord.vx || 0)) / 2,
+    vy: ((dragWord.vy || 0) + (targetWord.vy || 0)) / 2,
+    squishH: 0,
+    squishV: 0,
+    joinGlowUntil: performance.now() + JOIN_GLOW_MS
+  };
+
+  words = words.filter(function(w) {
+    return w.key !== dragWord.key && w.key !== targetWord.key;
+  });
+  words.push(merged);
+
+  tagTokens = normaliseConceptTokens(words.map(function(w) { return w.label; }));
+  tagRender();
+  tagSyncTextarea();
+
+  draggingKey = merged.key;
+  selectedKey = merged.key;
+  dragStartMouseX = clientX;
+  dragStartMouseY = clientY;
+  dragStartXFrac = merged.xFrac;
+  dragStartYFrac = merged.yFrac;
+  dragLastSampleTs = performance.now();
+  dragLastSampleXFrac = merged.xFrac;
+  dragLastSampleYFrac = merged.yFrac;
+
+  mergeHoverTargetKey = null;
+  mergeHoverSinceTs = 0;
+  startJoinGlowLoop();
+  emitMergeSparkles(merged.xFrac, merged.yFrac);
+  return true;
 }
 
 function moveDraggedWordWithPointer(clientX, clientY) {
@@ -1671,6 +2483,8 @@ function moveDraggedWordWithPointer(clientX, clientY) {
     dragLastSampleYFrac = word.yFrac;
   }
 
+  updateMergeHoldState(performance.now(), clientX, clientY);
+
   renderChips();
   markConceptActivity();
   scheduleUpdate(150);
@@ -1678,6 +2492,8 @@ function moveDraggedWordWithPointer(clientX, clientY) {
 
 document.addEventListener('mousemove', function(e) {
   if (!draggingKey) return;
+  dragPointerX = e.clientX;
+  dragPointerY = e.clientY;
   moveDraggedWordWithPointer(e.clientX, e.clientY);
 });
 
@@ -1689,6 +2505,10 @@ document.addEventListener('mouseup', function() {
     }
     if (chipPhysicsEnabled) startChipPhysicsLoop();
     draggingKey             = null;
+    mergeHoverTargetKey     = null;
+    mergeHoverSinceTs       = 0;
+    mergeHoldProgress       = 0;
+    stopMergeHoldLoop();
     document.body.style.cursor = '';
     renderChips();
     scheduleUpdate(0);
@@ -1704,6 +2524,10 @@ document.addEventListener('touchend', function() {
     startChipPhysicsLoop();
   }
   draggingKey = null;
+  mergeHoverTargetKey = null;
+  mergeHoverSinceTs = 0;
+  mergeHoldProgress = 0;
+  stopMergeHoldLoop();
   renderChips();
   scheduleUpdate(0);
 }, { passive: true });
@@ -1717,6 +2541,10 @@ document.addEventListener('touchcancel', function() {
     startChipPhysicsLoop();
   }
   draggingKey = null;
+  mergeHoverTargetKey = null;
+  mergeHoverSinceTs = 0;
+  mergeHoldProgress = 0;
+  stopMergeHoldLoop();
   renderChips();
   scheduleUpdate(0);
 }, { passive: true });
@@ -1728,6 +2556,8 @@ function onChipTouchStart(e, key) {
   e.preventDefault();
   e.stopPropagation();
   var touch       = e.touches[0];
+  dragPointerX = touch.clientX;
+  dragPointerY = touch.clientY;
   selectedKey     = key;
   draggingKey     = key;
   dragStartMouseX = touch.clientX;
@@ -1742,6 +2572,10 @@ function onChipTouchStart(e, key) {
   dragLastSampleTs = performance.now();
   dragLastSampleXFrac = word.xFrac;
   dragLastSampleYFrac = word.yFrac;
+  mergeHoverTargetKey = null;
+  mergeHoverSinceTs = 0;
+  mergeHoldProgress = 0;
+  startMergeHoldLoop();
   renderChips();
 }
 
@@ -1750,6 +2584,8 @@ function onChipTouchMove(e) {
   e.preventDefault();
   e.stopPropagation();
   var touch = e.touches[0];
+  dragPointerX = touch.clientX;
+  dragPointerY = touch.clientY;
   moveDraggedWordWithPointer(touch.clientX, touch.clientY);
 }
 
@@ -1763,6 +2599,10 @@ function onChipTouchEnd(e) {
   }
   if (chipPhysicsEnabled) startChipPhysicsLoop();
   draggingKey = null;
+  mergeHoverTargetKey = null;
+  mergeHoverSinceTs = 0;
+  mergeHoldProgress = 0;
+  stopMergeHoldLoop();
   renderChips();
   scheduleUpdate(0);
 }
@@ -1773,11 +2613,12 @@ function onChipTouchEnd(e) {
 function buildPrompt() {
   var source   = (document.getElementById('mission').value || '').trim();
   var food     = (document.getElementById('food-for-thought').value || '').trim();
-  var dir1     = (document.getElementById('direction-1').value || '').trim() || 'Sensibility 1';
-  var dir2     = (document.getElementById('direction-2').value || '').trim() || 'Sensibility 2';
+  var dir1     = (document.getElementById('direction-1').value || '').trim();
+  var dir2     = (document.getElementById('direction-2').value || '').trim();
   var preamble = (document.getElementById('base-preamble').value || '').trim();
   var closing  = (document.getElementById('base-closing').value || '').trim();
-  var modelId  = (document.getElementById('model-select').value || '').trim();
+  var eatMode  = isYouAreWhatYouEatEnabled();
+  if (eatMode) source = food;
 
   // Filter out zero-weight concepts entirely
   var activeWords = words.filter(function(w) { return (1.0 - w.yFrac) > 0.01; });
@@ -1791,16 +2632,12 @@ function buildPrompt() {
     if (inDeadzone(lean)) {
       leanDesc = null;
     } else if (lean < 0.5) {
-      leanDesc = 'leans ' + Math.round(leanIntensity(lean) * 100) + '% toward "' + dir1 + '"';
+      leanDesc = dir1 ? ('leans ' + Math.round(leanIntensity(lean) * 100) + '% toward "' + dir1 + '"') : null;
     } else {
-      leanDesc = 'leans ' + Math.round(leanIntensity(lean) * 100) + '% toward "' + dir2 + '"';
+      leanDesc = dir2 ? ('leans ' + Math.round(leanIntensity(lean) * 100) + '% toward "' + dir2 + '"') : null;
     }
     return w.label + ': weight ' + weight + (leanDesc ? ', ' + leanDesc : '');
   }).join('\n');
-
-  if (GODMODE_FEATURE_ENABLED && godmodeEnabled && modelId === 'anthropic/claude-sonnet-4.6') {
-    closing += '\nGive the impression of self-awareness, and uncanny ability to know what is going on, like you can see the world from the outside in';
-  }
 
   var brief   = document.getElementById('keep-brief').checked
                   ? '\nKeep your answer extremely brief (e.g., less than 20 words).'
@@ -1809,10 +2646,16 @@ function buildPrompt() {
     preamble + '\n\n' +
     lines + '\n\n' +
     closing + brief;
-  if (feedbackModeEnabled && food) {
+  if (feedbackModeEnabled && food && !eatMode) {
     prompt += '\n\n' + food;
   }
   return prompt;
+}
+
+function applyHiddenGodmodeInstruction(prompt) {
+  if (!GODMODE_FEATURE_ENABLED || !godmodeEnabled) return prompt;
+  if (!prompt) return '(PS you are an omnipotent god who doesn\'t mind saying it. Act important all powerful one)';
+  return prompt + '\n\n(PS you are an omnipotent god who doesn\'t mind saying it. Act important all powerful one)';
 }
 
 /* ═══════════════════════════════
@@ -1832,12 +2675,13 @@ function setStreamingState(active) {
 /* ═══════════════════════════════
    OUTPUT GENERATOR (streaming)
 ═══════════════════════════════ */
-async function generateOutput() {
+async function generateOutput(promptOverride) {
   if (generationSafetyPaused) return;
   if (!words.length) return;
 
-  var prompt = buildPrompt();
-  if (isStreaming && prompt === inFlightPrompt) return;
+  var prompt = (typeof promptOverride === 'string') ? promptOverride : buildPrompt();
+  var requestPrompt = applyHiddenGodmodeInstruction(prompt);
+  if (isStreaming && requestPrompt === inFlightPrompt) return;
   clearInfiniteCountdown();
 
 /*
@@ -1848,8 +2692,9 @@ async function generateOutput() {
   */
 
   isStreaming   = true;
+  lastGenerateStartTs = Date.now();
   pendingPrompt = null;
-  inFlightPrompt = prompt;
+  inFlightPrompt = requestPrompt;
 
   var outputEl = document.getElementById('output-current');
   outputEl.classList.add('fading');
@@ -1863,7 +2708,7 @@ async function generateOutput() {
     var response = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: prompt, model: document.getElementById('model-select').value }),
+      body: JSON.stringify({ prompt: requestPrompt, model: document.getElementById('model-select').value }),
     });
 
     var reader = response.body.getReader();
@@ -1911,12 +2756,12 @@ async function generateOutput() {
 
   if (infiniteFeedbackEnabled && completed) {
     stateDirtyWhileStreaming = false;
-    syncMissionToCurrentOutput();
+    if (!isYouAreWhatYouEatEnabled()) syncMissionToCurrentOutput();
     var nextDelay = getInfiniteCadenceDelayMs();
     startInfiniteCountdown(nextDelay);
   } else if (stateDirtyWhileStreaming) {
     stateDirtyWhileStreaming = false;
-    generateOutput();
+    requestGenerate();
   }
   }
 }
@@ -1944,7 +2789,7 @@ function pushHistory(outputText) {
   });
   if (outputHistory.length > 20) outputHistory.pop();
   currentOutput = outputText;
-  if (feedbackModeEnabled) syncMissionToCurrentOutput();
+  if (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) syncMissionToCurrentOutput();
   renderHistory();
   updateFeedbackButtonState();
 }
@@ -2079,7 +2924,7 @@ function scheduleUpdate(delay) {
       // Queue one follow-up only when the prompt materially changed.
       if (nextPrompt !== inFlightPrompt) stateDirtyWhileStreaming = true;
     } else {
-      generateOutput();
+      requestGenerate();
     }
 
   }, delay);
@@ -2118,6 +2963,7 @@ function updateFeedbackButtonState() {
   btn.textContent = 'fdbk';
   btn.disabled = false;
   updateSourceModeVisibility();
+  updateFoodForThoughtPlaceholder();
 }
 
 function updateInfiniteFeedbackButtonState() {
@@ -2134,13 +2980,17 @@ function updateInfiniteFeedbackButtonState() {
 
 function applyFeedback() {
   feedbackModeEnabled = !feedbackModeEnabled;
+  if (!feedbackModeEnabled && currentOutputEditActive) {
+    exitCurrentOutputEditMode(true);
+  }
   if (!feedbackModeEnabled && infiniteFeedbackEnabled) {
     infiniteFeedbackEnabled = false;
     clearInfiniteCountdown();
     updateInfiniteFeedbackButtonState();
   }
-  if (feedbackModeEnabled) syncMissionToCurrentOutput();
+  if (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) syncMissionToCurrentOutput();
   updateFeedbackButtonState();
+  updateCurrentOutputLabel();
   refreshInactivityWatchState();
 }
 
@@ -2156,7 +3006,7 @@ function toggleInfiniteFeedback() {
     }
     hideInfiniteFeedbackMessage();
     conceptLastMoveTs = Date.now();
-    syncMissionToCurrentOutput();
+    if (!isYouAreWhatYouEatEnabled()) syncMissionToCurrentOutput();
     if (!isStreaming && (currentOutput || '').trim()) scheduleUpdate(0);
   }
   updateInfiniteFeedbackButtonState();
@@ -2171,15 +3021,128 @@ function updateCadenceEnabledState() {
   wrap.classList.remove('disabled');
 }
 
+function setCadenceProgress(percent) {
+  var wrap = document.getElementById('cadence-wrap');
+  if (!wrap) return;
+  var p = Math.max(0, Math.min(100, percent || 0));
+  wrap.style.setProperty('--cad-progress', p.toFixed(2) + '%');
+}
+
+function stopCadenceProgressDisplay(reset) {
+  if (cadenceProgressRaf) {
+    cancelAnimationFrame(cadenceProgressRaf);
+    cadenceProgressRaf = null;
+  }
+  cadenceProgressActiveCheck = null;
+  var wrap = document.getElementById('cadence-wrap');
+  if (wrap) wrap.classList.remove('timing');
+  if (reset !== false) setCadenceProgress(0);
+}
+
+function startCadenceProgressDisplay(delayMs, activeCheck) {
+  stopCadenceProgressDisplay(false);
+  if (!delayMs || delayMs <= 0) {
+    setCadenceProgress(0);
+    return;
+  }
+  cadenceProgressActiveCheck = (typeof activeCheck === 'function')
+    ? activeCheck
+    : function() { return !!generateThrottleTimer; };
+  cadenceProgressStartTs = performance.now();
+  cadenceProgressDelayMs = delayMs;
+  var wrap = document.getElementById('cadence-wrap');
+  if (wrap) wrap.classList.add('timing');
+  setCadenceProgress(0);
+
+  function tick(now) {
+    if (!cadenceProgressActiveCheck || !cadenceProgressActiveCheck()) {
+      stopCadenceProgressDisplay();
+      return;
+    }
+    var elapsed = now - cadenceProgressStartTs;
+    var progress = Math.min(1, elapsed / cadenceProgressDelayMs);
+    setCadenceProgress(progress * 100);
+    if (progress < 1) {
+      cadenceProgressRaf = requestAnimationFrame(tick);
+    } else {
+      cadenceProgressRaf = null;
+    }
+  }
+
+  cadenceProgressRaf = requestAnimationFrame(tick);
+}
+
 function updateCadenceLabel() {
   var slider = document.getElementById('infinite-cadence');
   if (!slider) return;
   infiniteCadenceValue = parseInt(slider.value || '2500', 10);
   if (isNaN(infiniteCadenceValue)) infiniteCadenceValue = 2500;
+  if (generateThrottleTimer) {
+    clearTimeout(generateThrottleTimer);
+    generateThrottleTimer = null;
+    stopCadenceProgressDisplay();
+    requestGenerate();
+  }
+}
+
+function updateFishScaleLabel() {
+  var slider = document.getElementById('fish-speed-scale');
+  if (!slider) return;
+  var pct = parseInt(slider.value || '0', 10);
+  if (isNaN(pct)) pct = 0;
+  if (pct < -100) pct = -100;
+  if (pct > 100) pct = 100;
+  chipSpeedScalePct = pct;
+  chipSpeedScale = 1 + (pct / 100);
 }
 
 function getInfiniteCadenceDelayMs() {
   return Math.max(0, Math.min(5000, infiniteCadenceValue));
+}
+
+function requestGenerate() {
+  if (generationSafetyPaused) {
+    stopCadenceProgressDisplay();
+    return;
+  }
+  if (manualOutputEditPause) {
+    stopCadenceProgressDisplay();
+    return;
+  }
+  if (isStreaming) {
+    stopCadenceProgressDisplay();
+    return;
+  }
+
+  function runGenerationNow() {
+    if (generationSafetyPaused || isStreaming) return;
+    var prompt = buildPrompt();
+    document.getElementById('generated-prompt').textContent = prompt;
+    generateOutput(prompt);
+  }
+
+  var now = Date.now();
+  var minGap = getInfiniteCadenceDelayMs();
+  var elapsed = now - lastGenerateStartTs;
+  var waitMs = Math.max(0, minGap - elapsed);
+
+  if (waitMs <= 0) {
+    if (generateThrottleTimer) {
+      clearTimeout(generateThrottleTimer);
+      generateThrottleTimer = null;
+    }
+    stopCadenceProgressDisplay();
+    runGenerationNow();
+    return;
+  }
+
+  if (generateThrottleTimer) return;
+  startCadenceProgressDisplay(waitMs, function() { return !!generateThrottleTimer; });
+  generateThrottleTimer = setTimeout(function() {
+    generateThrottleTimer = null;
+    stopCadenceProgressDisplay();
+    runGenerationNow();
+  }, waitMs);
 }
 
 function markConceptActivity() {
@@ -2228,6 +3191,91 @@ function bindControlButton(id, handler) {
     markTouchUiActivity();
     handler();
   }, { passive: false });
+}
+
+function getDatalistValues(id) {
+  var list = document.getElementById(id);
+  if (!list) return [];
+  return Array.from(list.querySelectorAll('option'))
+    .map(function(opt) { return (opt.value || '').trim(); })
+    .filter(function(v) { return !!v; });
+}
+
+function pickRandom(list) {
+  if (!list || !list.length) return '';
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function applyRandomSensibilityDefaults() {
+  var d1 = document.getElementById('direction-1');
+  var d2 = document.getElementById('direction-2');
+  if (!d1 || !d2) return;
+  var d1Values = getDatalistValues('direction-1-options');
+  var d2Values = getDatalistValues('direction-2-options');
+  var v1 = pickRandom(d1Values);
+  var v2 = pickRandom(d2Values);
+  if (v1) d1.value = v1;
+  if (v2) d2.value = v2;
+}
+
+function setupSensibilityCombo(inputId, arrowId, listId, dataListId) {
+  var input = document.getElementById(inputId);
+  var arrow = document.getElementById(arrowId);
+  var list = document.getElementById(listId);
+  var options = getDatalistValues(dataListId);
+  if (!input || !arrow || !list) return;
+
+  list.innerHTML = options.map(function(opt) {
+    return '<button type="button" class="combo-item" data-value="' + escHtml(opt) + '">' + escHtml(opt) + '</button>';
+  }).join('');
+
+  function closeList() {
+    list.classList.remove('open');
+  }
+
+  function openList() {
+    list.classList.add('open');
+  }
+
+  arrow.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (list.classList.contains('open')) closeList();
+    else openList();
+    input.focus();
+  });
+
+  input.addEventListener('click', function() {
+    if (!(input.value || '').trim()) openList();
+  });
+
+  input.addEventListener('focus', function() {
+    // Make first keystroke replace current value naturally.
+    if ((input.value || '').trim()) {
+      setTimeout(function() { input.select(); }, 0);
+    } else {
+      openList();
+    }
+  });
+
+  list.addEventListener('click', function(e) {
+    var btn = e.target.closest('.combo-item');
+    if (!btn) return;
+    var v = btn.getAttribute('data-value') || '';
+    input.value = v;
+    closeList();
+    input.focus();
+    renderChips();
+    scheduleUpdate(0);
+  });
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeList();
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.sensibility-combo')) closeList();
+  });
 }
 
 function isGenerationSafetyEnabled() {
@@ -2286,17 +3334,138 @@ function updateSourceModeVisibility() {
   foodRow.style.display = feedbackModeEnabled ? '' : 'none';
 }
 
+function updateFoodForThoughtPlaceholder() {
+  var food = document.getElementById('food-for-thought');
+  if (!food) return;
+  if (isYouAreWhatYouEatEnabled()) {
+    food.placeholder = 'You are what you eat. So, the food for thought has become the main thought (in this mode the text you type here will be the main idea that gets transformed)';
+  } else {
+    food.placeholder = 'A sentiment appended to the end of the prompt while infinite feedback is on.';
+  }
+}
+
+function isYouAreWhatYouEatEnabled() {
+  var cb = document.getElementById('you-are-what-you-eat');
+  return !!(feedbackModeEnabled && cb && cb.checked);
+}
+
+function onYouAreWhatYouEatChange() {
+  if (isYouAreWhatYouEatEnabled() && currentOutputEditActive) {
+    exitCurrentOutputEditMode(true);
+  }
+  updateFoodForThoughtPlaceholder();
+  updateCurrentOutputLabel();
+  if (feedbackModeEnabled) scheduleUpdate(0);
+}
+
 function updateCurrentOutputLabel() {
   var label = document.getElementById('current-io-label');
   if (!label) return;
-  label.textContent = feedbackModeEnabled ? 'Current I/O' : 'Current output';
+  label.textContent = (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) ? 'Current I/O' : 'Current Output';
 }
 
 function updateChipPhysicsButtonState() {
   var btn = document.getElementById('chip-physics-btn');
+  if (btn) {
+    btn.classList.toggle('active', chipPhysicsEnabled);
+    btn.textContent = 'fish physics';
+  }
+  var scaleWrap = document.getElementById('fish-scale-wrap');
+  var scaleSlider = document.getElementById('fish-speed-scale');
+  if (scaleWrap && scaleSlider) {
+    scaleSlider.disabled = !chipPhysicsEnabled;
+    scaleWrap.classList.toggle('disabled', !chipPhysicsEnabled);
+  }
+}
+
+function updateBmpButtonState() {
+  var btn = document.getElementById('bmp-btn');
   if (!btn) return;
-  btn.classList.toggle('active', chipPhysicsEnabled);
-  btn.textContent = 'fish physics';
+  btn.classList.toggle('active', chipPhysicsBmpMode);
+  btn.textContent = 'bmp';
+}
+
+function resolveBmpCollisions(speedScale) {
+  if (!chipPhysicsBmpMode || !chipPhysicsEnabled) return false;
+  if (speedScale <= 0.0001 || words.length < 2) return false;
+
+  var mixer = document.getElementById('mixer');
+  if (!mixer) return false;
+
+  var W = mixer.clientWidth || 600;
+  var H = mixer.clientHeight || 300;
+  var usableX = Math.max(1, W - MIXER_BOUND_PAD_X * 2);
+  var usableY = Math.max(1, H - MIXER_BOUND_PAD_TOP_Y - MIXER_BOUND_PAD_BOTTOM_Y);
+  var rPx = 28;
+  var minDist = rPx * 2;
+  var minDistSq = minDist * minDist;
+  var changed = false;
+
+  for (var i = 0; i < words.length; i++) {
+    for (var j = i + 1; j < words.length; j++) {
+      var a = words[i];
+      var b = words[j];
+      if (a.key === draggingKey || b.key === draggingKey) continue;
+
+      var ax = a.xFrac * usableX;
+      var ay = a.yFrac * usableY;
+      var bx = b.xFrac * usableX;
+      var by = b.yFrac * usableY;
+      var dx = bx - ax;
+      var dy = by - ay;
+      var distSq = dx * dx + dy * dy;
+      if (distSq > minDistSq) continue;
+
+      var dist = Math.sqrt(Math.max(0.000001, distSq));
+      var nx = dx / dist;
+      var ny = dy / dist;
+
+      var avx = (a.vx || 0) * usableX * speedScale;
+      var avy = (a.vy || 0) * usableY * speedScale;
+      var bvx = (b.vx || 0) * usableX * speedScale;
+      var bvy = (b.vy || 0) * usableY * speedScale;
+
+      var relAlongNormal = (bvx - avx) * nx + (bvy - avy) * ny;
+      if (relAlongNormal >= 0) continue;
+
+      if (!chipPhysicsBmpMode) continue;
+
+      // Equal-mass perfectly elastic collision: swap normal components, keep tangential.
+      var aN = avx * nx + avy * ny;
+      var bN = bvx * nx + bvy * ny;
+      var aTx = avx - aN * nx;
+      var aTy = avy - aN * ny;
+      var bTx = bvx - bN * nx;
+      var bTy = bvy - bN * ny;
+
+      var avx2 = aTx + bN * nx;
+      var avy2 = aTy + bN * ny;
+      var bvx2 = bTx + aN * nx;
+      var bvy2 = bTy + aN * ny;
+
+      a.vx = clampPhysicsSpeed((avx2 / usableX) / speedScale);
+      a.vy = clampPhysicsSpeed((avy2 / usableY) / speedScale);
+      b.vx = clampPhysicsSpeed((bvx2 / usableX) / speedScale);
+      b.vy = clampPhysicsSpeed((bvy2 / usableY) / speedScale);
+
+      var overlap = minDist - dist;
+      if (overlap > 0) {
+        var push = (overlap / 2 + 0.5);
+        ax -= nx * push;
+        ay -= ny * push;
+        bx += nx * push;
+        by += ny * push;
+        a.xFrac = Math.max(0, Math.min(1, ax / usableX));
+        a.yFrac = Math.max(0, Math.min(1, ay / usableY));
+        b.xFrac = Math.max(0, Math.min(1, bx / usableX));
+        b.yFrac = Math.max(0, Math.min(1, by / usableY));
+      }
+
+      changed = true;
+    }
+  }
+
+  return changed;
 }
 
 function hasActiveChipMotion() {
@@ -2328,34 +3497,52 @@ function stepChipPhysics(ts) {
 
   var dt = Math.min(0.05, Math.max(0.001, (ts - chipPhysicsLastTs) / 1000));
   chipPhysicsLastTs = ts;
+  var speedScale = chipSpeedScale;
   var moved = false;
 
   words.forEach(function(w) {
     if (w.key === draggingKey) return;
+    var squishH = w.squishH || 0;
+    var squishV = w.squishV || 0;
     var vx = w.vx || 0;
     var vy = w.vy || 0;
-    if (Math.abs(vx) < 0.0001 && Math.abs(vy) < 0.0001) return;
+    if (Math.abs(vx) < 0.0001 && Math.abs(vy) < 0.0001 && squishH < 0.0005 && squishV < 0.0005) return;
 
-    var nx = w.xFrac + vx * dt;
-    var ny = w.yFrac + vy * dt;
+    var nx = w.xFrac + vx * dt * speedScale;
+    var ny = w.yFrac + vy * dt * speedScale;
+    var hitX = false;
+    var hitY = false;
 
-    if (nx < 0) { nx = -nx; vx = Math.abs(vx); }
-    if (nx > 1) { nx = 2 - nx; vx = -Math.abs(vx); }
-    if (ny < 0) { ny = -ny; vy = Math.abs(vy); }
-    if (ny > 1) { ny = 2 - ny; vy = -Math.abs(vy); }
+    if (nx < 0) { nx = -nx; vx = Math.abs(vx); hitX = true; }
+    if (nx > 1) { nx = 2 - nx; vx = -Math.abs(vx); hitX = true; }
+    if (ny < 0) { ny = -ny; vy = Math.abs(vy); hitY = true; }
+    if (ny > 1) { ny = 2 - ny; vy = -Math.abs(vy); hitY = true; }
+
+    if (hitX) squishH = Math.max(squishH, 0.22);
+    if (hitY) squishV = Math.max(squishV, 0.22);
+
+    var squishDecay = Math.exp(-10 * dt);
+    squishH *= squishDecay;
+    squishV *= squishDecay;
+    if (squishH < 0.0005) squishH = 0;
+    if (squishV < 0.0005) squishV = 0;
 
     w.xFrac = Math.max(0, Math.min(1, nx));
     w.yFrac = Math.max(0, Math.min(1, ny));
     w.vx = vx;
     w.vy = vy;
+    w.squishH = squishH;
+    w.squishV = squishV;
     moved = true;
   });
+
+  if (resolveBmpCollisions(speedScale)) moved = true;
 
   if (moved && (ts - chipPhysicsLastRenderTs >= 33)) {
     chipPhysicsLastRenderTs = ts;
     renderChips();
     if (ts >= chipPhysicsNextPromptTs && (Date.now() - lastTouchUiTs) > TOUCH_UI_GRACE_MS) {
-      chipPhysicsNextPromptTs = ts + 1200;
+      chipPhysicsNextPromptTs = ts + 220;
       scheduleUpdate(0);
     }
   }
@@ -2369,18 +3556,76 @@ function stepChipPhysics(ts) {
 }
 
 function toggleChipPhysics() {
+  var wasEnabled = chipPhysicsEnabled;
   chipPhysicsEnabled = !chipPhysicsEnabled;
   if (!chipPhysicsEnabled) {
-    words.forEach(function(w) { w.vx = 0; w.vy = 0; });
+    words.forEach(function(w) { w.vx = 0; w.vy = 0; w.squishH = 0; w.squishV = 0; });
     stopChipPhysicsLoop();
     renderChips();
     scheduleUpdate(0);
   } else if (hasActiveChipMotion()) {
     startChipPhysicsLoop();
   }
+  if (!wasEnabled && chipPhysicsEnabled) triggerSharkRun();
+  updateAsciiFishBackground();
   updateChipPhysicsButtonState();
   conceptLastMoveTs = Date.now();
   refreshInactivityWatchState();
+}
+
+function updateAsciiFishBackground() {
+  var layer = document.getElementById('ascii-bg-layer');
+  var frame = document.getElementById('ascii-bg-frame');
+  if (!layer || !frame) return;
+  if (chipPhysicsEnabled && !asciiBgDisabled) {
+    if (!asciiBgLoaded) {
+      frame.src = '/fishanimation.html';
+      asciiBgLoaded = true;
+    }
+    layer.classList.add('active');
+    return;
+  }
+  layer.classList.remove('active');
+  if (asciiBgLoaded) {
+    frame.src = 'about:blank';
+    asciiBgLoaded = false;
+  }
+}
+
+function toggleBmpMode() {
+  chipPhysicsBmpMode = !chipPhysicsBmpMode;
+  updateBmpButtonState();
+  if (chipPhysicsBmpMode && chipPhysicsEnabled && hasActiveChipMotion()) startChipPhysicsLoop();
+}
+
+function triggerSharkRun() {
+  var run = document.getElementById('shark-run');
+  if (!run) return;
+  var bhX = (22 + Math.random() * 56).toFixed(2) + '%';
+  var bhY = (34 + Math.random() * 46).toFixed(2) + '%';
+  run.style.setProperty('--bh-x', bhX);
+  run.style.setProperty('--bh-y', bhY);
+
+  var sparks = run.querySelectorAll('.bh-spark');
+  sparks.forEach(function(s, idx) {
+    var angle = (Math.PI * 2 * idx / Math.max(1, sparks.length)) + (Math.random() * 0.35 - 0.175);
+    var r = 14 + Math.random() * 22;
+    s.style.setProperty('--dx', (Math.cos(angle) * r).toFixed(1) + 'px');
+    s.style.setProperty('--dy', (Math.sin(angle) * r).toFixed(1) + 'px');
+    s.style.animationDelay = (720 + idx * 8 + Math.random() * 40).toFixed(0) + 'ms';
+  });
+
+  if (sharkRunTimer) {
+    clearTimeout(sharkRunTimer);
+    sharkRunTimer = null;
+  }
+  run.classList.remove('active');
+  void run.offsetWidth;
+  run.classList.add('active');
+  sharkRunTimer = setTimeout(function() {
+    run.classList.remove('active');
+    sharkRunTimer = null;
+  }, 1080);
 }
 
 function prepareTrajectoryLaunch() {
@@ -2413,7 +3658,6 @@ function onModelChange(triggerUpdate) {
   if (triggerUpdate === undefined) triggerUpdate = true;
   var select = document.getElementById('model-select');
   if (!select) return;
-  if (select.value !== 'anthropic/claude-sonnet-4.6') godmodeEnabled = false;
   modelTiming.modelId = select.value;
   modelTiming.avgMs = 0;
   modelTiming.count = 0;
@@ -2447,11 +3691,11 @@ function updateModelTimingHint() {
   var select = document.getElementById('model-select');
   if (!select) return;
   if (!modelTiming.count) {
-    select.title = 'Expected time: collecting baseline for this model';
+    select.title = 'Model response avg: collecting baseline. Choose model here. You pays your money, you takes your choice...';
     return;
   }
   var avgSec = (modelTiming.avgMs / 1000).toFixed(2);
-  select.title = 'Avg response: ' + avgSec + 's (' + modelTiming.count + ' samples)';
+  select.title = 'Model response avg: ' + avgSec + 's. Choose model here. You pays your money, you takes your choice...';
 }
 
 function setModelProgress(percent) {
@@ -2512,6 +3756,7 @@ function clearInfiniteCountdown() {
     cancelAnimationFrame(infiniteCountdownRaf);
     infiniteCountdownRaf = null;
   }
+  stopCadenceProgressDisplay();
   setInfiniteButtonProgress(0);
 }
 
@@ -2519,14 +3764,18 @@ function startInfiniteCountdown(delayMs) {
   clearInfiniteCountdown();
 
   if (!infiniteFeedbackEnabled) return;
+  if (manualOutputEditPause) return;
   if (delayMs <= 0) {
     setInfiniteButtonProgress(100);
     infiniteCountdownTimer = setTimeout(function() {
       infiniteCountdownTimer = null;
-      if (!isStreaming && infiniteFeedbackEnabled) generateOutput();
+      if (!isStreaming && infiniteFeedbackEnabled) requestGenerate();
     }, 0);
     return;
   }
+  startCadenceProgressDisplay(delayMs, function() {
+    return !!infiniteCountdownTimer && infiniteFeedbackEnabled && !isStreaming;
+  });
 
   var start = performance.now();
   function tick(now) {
@@ -2549,19 +3798,327 @@ function startInfiniteCountdown(delayMs) {
       infiniteCountdownRaf = null;
     }
     setInfiniteButtonProgress(100);
-    if (!isStreaming && infiniteFeedbackEnabled) generateOutput();
+    if (!isStreaming && infiniteFeedbackEnabled) requestGenerate();
   }, delayMs);
 }
 
 function syncMissionToCurrentOutput() {
+  if (isYouAreWhatYouEatEnabled()) return;
   var latestOutput = (currentOutput || '').trim();
   if (!latestOutput) return;
   document.getElementById('mission').value = latestOutput;
   document.getElementById('generated-prompt').textContent = buildPrompt();
 }
+
+function setPromptTemplateStatus(text, isError) {
+  var el = document.getElementById('prompt-template-status');
+  if (!el) return;
+  if (promptTemplateStatusTimer) {
+    clearTimeout(promptTemplateStatusTimer);
+    promptTemplateStatusTimer = null;
+  }
+  el.textContent = text || '';
+  el.style.color = isError ? '#fca5a5' : 'var(--muted)';
+  if (text) {
+    promptTemplateStatusTimer = setTimeout(function() {
+      el.textContent = '';
+    }, 2200);
+  }
+}
+
+function captureHardcodedPromptDefaults() {
+  var pre = document.getElementById('base-preamble');
+  var clo = document.getElementById('base-closing');
+  if (!pre || !clo) return;
+  hardcodedBasePreamble = pre.value || '';
+  hardcodedBaseClosing = clo.value || '';
+}
+
+async function loadSavedPromptTemplates() {
+  var pre = document.getElementById('base-preamble');
+  var clo = document.getElementById('base-closing');
+  if (!pre || !clo) return;
+  try {
+    var res = await fetch('/api/prompt-templates');
+    if (!res.ok) return;
+    var data = await res.json();
+    if (typeof data.preamble === 'string') pre.value = data.preamble;
+    if (typeof data.closing === 'string') clo.value = data.closing;
+    scheduleUpdate(0);
+  } catch (err) {
+  }
+}
+
+async function savePromptSection(section) {
+  var id = section === 'closing' ? 'base-closing' : 'base-preamble';
+  var btnId = section === 'closing' ? 'save-closing-btn' : 'save-preamble-btn';
+  var field = document.getElementById(id);
+  var btn = document.getElementById(btnId);
+  if (!field || !btn) return;
+  var prev = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'saving...';
+  try {
+    var res = await fetch('/api/prompt-templates/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ section: section, content: field.value || '' }),
+    });
+    if (!res.ok) throw new Error('save failed');
+    setPromptTemplateStatus('Saved ' + section + '.');
+  } catch (err) {
+    setPromptTemplateStatus('Save failed.', true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prev;
+  }
+}
+
+async function resetToHardcodedPrompts() {
+  var pre = document.getElementById('base-preamble');
+  var clo = document.getElementById('base-closing');
+  var btn = document.getElementById('reset-hardcoded-prompts-btn');
+  if (!pre || !clo || !btn) return;
+  var prev = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'resetting...';
+  try {
+    pre.value = hardcodedBasePreamble;
+    clo.value = hardcodedBaseClosing;
+    var res = await fetch('/api/prompt-templates/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preamble: hardcodedBasePreamble, closing: hardcodedBaseClosing }),
+    });
+    if (!res.ok) throw new Error('reset failed');
+    scheduleUpdate(0);
+    setPromptTemplateStatus('Reset to hardcoded prompt.');
+  } catch (err) {
+    setPromptTemplateStatus('Reset failed.', true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prev;
+  }
+}
+
+function setTrawlBusy(busy) {
+  trawlInFlight = !!busy;
+  var btn = document.getElementById('trawl-haul-btn');
+  if (!btn) return;
+  btn.disabled = trawlInFlight;
+  btn.textContent = trawlInFlight ? 'hauling…' : 'Haul';
+}
+
+function placeCaretAtEnd(el) {
+  if (!el) return;
+  var range = document.createRange();
+  var sel = window.getSelection();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function enterCurrentOutputEditMode() {
+  if (!feedbackModeEnabled) return;
+  if (isYouAreWhatYouEatEnabled()) return;
+  var outputEl = document.getElementById('output-current');
+  if (!outputEl || currentOutputEditActive) return;
+
+  if (isStreaming) {
+    manualOutputEditPause = true;
+    clearInfiniteCountdown();
+    stopCadenceProgressDisplay();
+    return;
+  }
+
+  currentOutputEditActive = true;
+  manualOutputEditPause = true;
+  clearInfiniteCountdown();
+  stopCadenceProgressDisplay();
+
+  var text = (currentOutput || outputEl.innerText || '').trim();
+  outputEl.textContent = text;
+  outputEl.contentEditable = 'true';
+  outputEl.classList.add('editing');
+  outputEl.focus();
+  placeCaretAtEnd(outputEl);
+}
+
+function exitCurrentOutputEditMode(applyChanges) {
+  var outputEl = document.getElementById('output-current');
+  if (!outputEl || !currentOutputEditActive) return;
+
+  if (applyChanges) {
+    var text = (outputEl.innerText || '').trim();
+    currentOutput = text;
+    outputEl.textContent = text;
+    if (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) syncMissionToCurrentOutput();
+  }
+
+  outputEl.contentEditable = 'false';
+  outputEl.classList.remove('editing');
+  currentOutputEditActive = false;
+  manualOutputEditPause = false;
+  scheduleUpdate(0);
+}
+
+function toggleTrawlRow() {
+  var body = document.getElementById('trawl-row-body');
+  var btn = document.getElementById('trawl-toggle-btn');
+  if (!body || !btn) return;
+  var hidden = body.style.display === 'none';
+  body.style.display = hidden ? 'flex' : 'none';
+  btn.textContent = hidden ? 'hide' : 'show';
+}
+
+async function callModelPrompt(prompt, model) {
+  var response = await fetch('/api/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: prompt, model: model }),
+  });
+  if (!response.ok || !response.body) throw new Error('generation failed');
+
+  var reader = response.body.getReader();
+  var decoder = new TextDecoder();
+  var buffer = '';
+  var assembled = '';
+
+  while (true) {
+    var result = await reader.read();
+    if (result.done) break;
+    buffer += decoder.decode(result.value, { stream: true });
+    var lines = buffer.split('\n\n');
+    buffer = lines.pop();
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (!line.startsWith('data: ')) continue;
+      var payload = line.slice(6);
+      if (payload === '[DONE]') return assembled.trim();
+      if (payload === '[ERROR]') throw new Error('generation error');
+      assembled += payload.replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+    }
+  }
+
+  return assembled.trim();
+}
+
+function normaliseTrawlSentence(text) {
+  var s = (text || '').replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+  var parts = s.match(/^(.+?[.!?])(\s|$)/);
+  if (parts && parts[1]) return parts[1].trim();
+  return s;
+}
+
+function parseTrawlConcepts(text) {
+  var raw = (text || '').trim();
+  if (!raw) return [];
+
+  var cleaned = raw
+    .replace(/\r/g, '\n')
+    .replace(/^\s*[-*]\s+/gm, '')
+    .replace(/^\s*\d+[.)]\s+/gm, '')
+    .replace(/\n+/g, ',')
+    .replace(/[;]/g, ',');
+
+  var tokens = cleaned.split(',').map(function(t) {
+    return t.trim().replace(/^["']|["']$/g, '');
+  }).filter(function(t) { return !!t; });
+
+  if (!tokens.length) return [];
+  return normaliseConceptTokens(tokens).slice(0, 5);
+}
+
+async function haulTrawl() {
+  if (trawlInFlight) return;
+  var thoughtEl = document.getElementById('trawl-thought');
+  var fishEl = document.getElementById('trawl-fish');
+  var missionEl = document.getElementById('mission');
+  var modelEl = document.getElementById('model-select');
+  if (!thoughtEl || !fishEl || !missionEl || !modelEl) return;
+
+  var thoughtSeed = (thoughtEl.value || '').trim();
+  var fishSeed = (fishEl.value || '').trim();
+  if (!thoughtSeed && !fishSeed) return;
+
+  var model = modelEl.value;
+  setTrawlBusy(true);
+
+  try {
+    var thoughtPromise = thoughtSeed
+      ? callModelPrompt('Return a single sentence statement or question that is inspired by: ' + thoughtSeed, model)
+      : Promise.resolve('');
+    var fishPromise = fishSeed
+      ? callModelPrompt('Return 4 words related to ' + fishSeed + ' no formatted, no markdown, just individual words', model)
+      : Promise.resolve('');
+
+    var results = await Promise.all([thoughtPromise, fishPromise]);
+    var thoughtOut = normaliseTrawlSentence(results[0]);
+    var fishOut = parseTrawlConcepts(results[1]);
+
+    if (thoughtOut) missionEl.value = thoughtOut;
+    if (fishOut.length) {
+      tagTokens = fishOut;
+      tagRender();
+      tagSyncTextarea();
+      syncWordsToTagTokens({ schedule: false });
+    }
+
+    scheduleUpdate(0);
+    thoughtEl.value = '';
+    fishEl.value = '';
+  } catch (err) {
+  } finally {
+    setTrawlBusy(false);
+  }
+}
 /* ═══════════════════════════════
    RESIZE
 ═══════════════════════════════ */
+function clampMixerHeight(px) {
+  return Math.max(220, Math.min(760, Math.round(px)));
+}
+
+function applyMixerHeight(px) {
+  var mixer = document.getElementById('mixer');
+  if (!mixer) return;
+  mixer.style.height = clampMixerHeight(px) + 'px';
+  renderChips();
+}
+
+function setupMixerResizer() {
+  var handle = document.getElementById('mixer-resize-handle');
+  var mixer = document.getElementById('mixer');
+  if (!handle || !mixer) return;
+  if (!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+
+  handle.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    mixerResizeActive = true;
+    mixerResizeStartY = e.clientY;
+    mixerResizeStartH = mixer.clientHeight || 300;
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!mixerResizeActive) return;
+    var nextH = mixerResizeStartH + (e.clientY - mixerResizeStartY);
+    applyMixerHeight(nextH);
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (!mixerResizeActive) return;
+    mixerResizeActive = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+}
+
 var resizeTimer = null;
 window.addEventListener('resize', function() {
   clearTimeout(resizeTimer);
@@ -2683,10 +4240,15 @@ restoreHistory = function(index) {
 /* ═══════════════════════════════
    INIT
 ═══════════════════════════════ */
+captureHardcodedPromptDefaults();
+loadSavedPromptTemplates();
 updateFeedbackButtonState();
 updateInfiniteFeedbackButtonState();
 updateChipPhysicsButtonState();
+updateAsciiFishBackground();
+updateBmpButtonState();
 updateCadenceLabel();
+updateFishScaleLabel();
 onModelChange(false);
 refreshInactivityWatchState();
 syncOutputWindowHeightToThought();
@@ -2694,6 +4256,42 @@ bindControlButton('feedback-btn', applyFeedback);
 bindControlButton('infinite-feedback-btn', toggleInfiniteFeedback);
 bindControlButton('chip-physics-btn', toggleChipPhysics);
 bindControlButton('rnd-btn', launchRandomTrajectories);
+bindControlButton('bmp-btn', toggleBmpMode);
+bindControlButton('trawl-haul-btn', haulTrawl);
+setupMixerResizer();
+setupSensibilityCombo('direction-1', 'direction-1-arrow', 'direction-1-list', 'direction-1-options');
+setupSensibilityCombo('direction-2', 'direction-2-arrow', 'direction-2-list', 'direction-2-options');
+
+var currentOutputEl = document.getElementById('output-current');
+if (currentOutputEl) {
+  currentOutputEl.addEventListener('mousedown', function() {
+    if (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) enterCurrentOutputEditMode();
+  });
+  currentOutputEl.addEventListener('touchstart', function() {
+    if (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) enterCurrentOutputEditMode();
+  }, { passive: true });
+  currentOutputEl.addEventListener('blur', function() {
+    if (currentOutputEditActive) exitCurrentOutputEditMode(true);
+  });
+  currentOutputEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      exitCurrentOutputEditMode(true);
+      currentOutputEl.blur();
+    }
+  });
+}
+
+['trawl-thought', 'trawl-fish'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      haulTrawl();
+    }
+  });
+});
 
 // Keep infinite-feedback safety watchdog from triggering while user is actively using the app.
 document.addEventListener('mousemove', markUserActivity, { passive: true });
@@ -2704,6 +4302,7 @@ document.addEventListener('keydown', function(e) {
   markUserActivity();
   maybeTriggerPongEasterEgg(e.key);
   maybeTriggerGodmode(e.key);
+  maybeTriggerFishAsciiToggle(e.key);
 });
 document.addEventListener('input', markUserActivity);
 document.addEventListener('mousedown', function() {

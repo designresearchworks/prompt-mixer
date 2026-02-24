@@ -24,11 +24,24 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4-6")
 ENV_PATH = os.path.join(os.getcwd(), ".env")
+PROMPT_STORE_DIR = os.path.join(os.getcwd(), "data")
+PROMPT_PREAMBLE_PATH = os.path.join(PROMPT_STORE_DIR, "base_preamble.txt")
+PROMPT_CLOSING_PATH = os.path.join(PROMPT_STORE_DIR, "base_closing.txt")
 
 
 class EnvKeysPayload(BaseModel):
     openrouter_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
+
+
+class PromptSectionPayload(BaseModel):
+    section: str
+    content: str
+
+
+class PromptTemplatesResetPayload(BaseModel):
+    preamble: str
+    closing: str
 
 
 def _upsert_env_values(path: str, updates: dict[str, str]) -> None:
@@ -57,6 +70,19 @@ def _upsert_env_values(path: str, updates: dict[str, str]) -> None:
 
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(result).rstrip() + "\n")
+
+
+def _read_text(path: str) -> Optional[str]:
+    if not os.path.exists(path):
+        return None
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def _write_text(path: str, value: str) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(value)
 
 
 @app.post("/api/generate")
@@ -126,6 +152,34 @@ async def save_keys(payload: EnvKeysPayload):
 
     _upsert_env_values(ENV_PATH, updates)
     return {"ok": True, "message": "Saved keys to .env", "saved": list(updates.keys())}
+
+
+@app.get("/api/prompt-templates")
+async def get_prompt_templates():
+    return {
+        "ok": True,
+        "preamble": _read_text(PROMPT_PREAMBLE_PATH),
+        "closing": _read_text(PROMPT_CLOSING_PATH),
+    }
+
+
+@app.post("/api/prompt-templates/save")
+async def save_prompt_section(payload: PromptSectionPayload):
+    section = (payload.section or "").strip().lower()
+    content = payload.content or ""
+    if section not in ("preamble", "closing"):
+        return {"ok": False, "message": "section must be 'preamble' or 'closing'"}
+
+    path = PROMPT_PREAMBLE_PATH if section == "preamble" else PROMPT_CLOSING_PATH
+    _write_text(path, content)
+    return {"ok": True, "saved": section}
+
+
+@app.post("/api/prompt-templates/reset")
+async def reset_prompt_templates(payload: PromptTemplatesResetPayload):
+    _write_text(PROMPT_PREAMBLE_PATH, payload.preamble or "")
+    _write_text(PROMPT_CLOSING_PATH, payload.closing or "")
+    return {"ok": True, "saved": ["preamble", "closing"]}
 
 
 # Static files last

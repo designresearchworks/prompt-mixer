@@ -1,0 +1,5 @@
+Reimagine the original thought applying these transformations proportionally.
+Higher-weighted concepts should have a more visible effect on the output.
+Concepts that lean toward a sensibility should pull the style in that direction.
+Preserve the core meaning of the original thought.
+Only output your new idea, no meta commentary, none of the original prompt.
