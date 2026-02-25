@@ -1,4 +1,7 @@
 .env
+.venv/
 __pycache__/
 *.pyc
 data/api_call_counter.json
+data/fisheye_images/
+data/fisheye_images_index.json
