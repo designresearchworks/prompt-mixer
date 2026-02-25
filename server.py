@@ -94,6 +94,7 @@ class VisualisePayload(BaseModel):
     output_text: str
     prompt_model: Optional[str] = None
     image_model: Optional[str] = None
+    image_seed: Optional[int] = None
 
 
 def _upsert_env_values(path: str, updates: dict[str, str]) -> None:
@@ -448,7 +449,9 @@ def _extract_replicate_image_url(output: object) -> Optional[str]:
     return None
 
 
-def _build_replicate_input(prompt: str, model_slug: str) -> dict[str, object]:
+def _build_replicate_input(
+    prompt: str, model_slug: str, image_seed: Optional[int] = None
+) -> dict[str, object]:
     raw = model_slug.strip()
     model = raw.lower()
     size_token = ""
@@ -486,8 +489,12 @@ def _build_replicate_input(prompt: str, model_slug: str) -> dict[str, object]:
         }
 
     # Default profile: prunaai/flux-fast
+    seed_value = 2110
+    if isinstance(image_seed, int):
+        seed_value = max(1, min(999999, image_seed))
+
     return {
-        "seed": 2110,
+        "seed": seed_value,
         "prompt": prompt,
         "guidance": 3.5,
         "image_size": image_size,
@@ -499,8 +506,10 @@ def _build_replicate_input(prompt: str, model_slug: str) -> dict[str, object]:
     }
 
 
-def _replicate_generate_image(prompt: str, model_slug: str) -> str:
-    replicate_input = _build_replicate_input(prompt, model_slug)
+def _replicate_generate_image(
+    prompt: str, model_slug: str, image_seed: Optional[int] = None
+) -> str:
+    replicate_input = _build_replicate_input(prompt, model_slug, image_seed)
     endpoint_model = model_slug.split("|", 1)[0].strip()
 
     prediction: Optional[dict] = None
@@ -618,13 +627,18 @@ async def visualise(payload: VisualisePayload):
     image_model = (payload.image_model or DEFAULT_REPLICATE_MODEL).strip()
     if not image_model:
         image_model = DEFAULT_REPLICATE_MODEL
+    image_seed = payload.image_seed
+    if isinstance(image_seed, int):
+        image_seed = max(1, min(999999, image_seed))
+    else:
+        image_seed = None
 
     # Use current output text directly as the image-generation prompt.
     image_prompt = output_text
 
     try:
         _increment_api_call_count()
-        image_url = _replicate_generate_image(image_prompt, image_model)
+        image_url = _replicate_generate_image(image_prompt, image_model, image_seed)
         image_ref, local_image_url = _store_fisheye_image(image_url)
     except Exception as exc:
         return {"ok": False, "message": f"Failed to generate image via Replicate: {exc}"}

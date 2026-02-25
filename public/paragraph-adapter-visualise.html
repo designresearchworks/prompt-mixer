@@ -1650,6 +1650,10 @@ body.fisheye-inline-mode .visualise-output.active {
           <option value="bytedance/seedream-4|2K">Seedream 4 2K</option>
           <option value="bytedance/seedream-4|4K">Seedream 4 4K</option>
         </select>
+        <label class="visualise-toggle-label" id="rdmx-toggle-label" title="Use random seed per image generation. Off uses fixed seed mode.">
+          <input type="checkbox" id="fisheye-rdmx" onchange="onFisheyeRdmxChange()" style="width:12px;height:12px;cursor:pointer;">
+          RDMX
+        </label>
       </span>
     </div>
     <!-- Mixer canvas with optional fisheye pane -->
@@ -1970,6 +1974,7 @@ var visualiseInFlight = false;
 var currentFisheyeImageRef = null;
 var currentFisheyeImageUrl = '';
 var pendingGenerateAfterVisualise = false;
+var fisheyeFixedSeed = 2110;
 
 /* ═══════════════════════════════
    DRAG STATE
@@ -3993,6 +3998,28 @@ function getCurrentOutputTextForVisualise() {
   return (outputEl.textContent || '').trim();
 }
 
+function randomFisheyeSeed() {
+  return Math.floor(Math.random() * 999999) + 1;
+}
+
+function isFisheyeRdmxEnabled() {
+  var cb = document.getElementById('fisheye-rdmx');
+  return !!(cb && cb.checked && !cb.disabled);
+}
+
+function getFisheyeSeedForRequest() {
+  if (isFisheyeRdmxEnabled()) return randomFisheyeSeed();
+  return fisheyeFixedSeed;
+}
+
+function onFisheyeRdmxChange() {
+  var cb = document.getElementById('fisheye-rdmx');
+  if (!cb) return;
+  if (!cb.checked) {
+    fisheyeFixedSeed = randomFisheyeSeed();
+  }
+}
+
 function isVisualiseAutoEnabled() {
   var cb = document.getElementById('visualise-auto');
   return !!(cb && cb.checked);
@@ -4052,6 +4079,8 @@ function updateFisheyeAvailability() {
   var label = document.getElementById('visualise-toggle-label');
   var xsncCb = document.getElementById('xsnc-enabled');
   var xsncLabel = document.getElementById('xsnc-toggle-label');
+  var rdmxCb = document.getElementById('fisheye-rdmx');
+  var rdmxLabel = document.getElementById('rdmx-toggle-label');
   var modelSelect = document.getElementById('fisheye-model-select');
   var modelWrap = document.getElementById('fisheye-model-wrap');
   if (!cb) return;
@@ -4066,6 +4095,13 @@ function updateFisheyeAvailability() {
   }
   if (modelWrap) {
     modelWrap.classList.toggle('hidden', blocked || !cb.checked);
+  }
+  var rdmxAvailable = !blocked && !!cb.checked;
+  if (rdmxCb) {
+    rdmxCb.disabled = !rdmxAvailable;
+  }
+  if (rdmxLabel) {
+    rdmxLabel.classList.toggle('disabled', !rdmxAvailable);
   }
   var xsncAvailable = !blocked && !!cb.checked;
   if (xsncCb) {
@@ -4160,6 +4196,7 @@ async function visualiseCurrentOutput() {
 
   var modelEl = document.getElementById('fisheye-model-select');
   if (!modelEl) return;
+  var imageSeed = getFisheyeSeedForRequest();
   var requestOutputText = sourceText;
 
   visualiseInFlight = true;
@@ -4174,6 +4211,7 @@ async function visualiseCurrentOutput() {
       body: JSON.stringify({
         output_text: sourceText,
         image_model: modelEl.value,
+        image_seed: imageSeed,
       }),
     });
     var data = await res.json();
