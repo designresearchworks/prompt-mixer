@@ -1,3 +1,4 @@
 .env
 __pycache__/
 *.pyc
+data/api_call_counter.json
