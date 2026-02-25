@@ -77,6 +77,7 @@ DEFAULT_APP_CONFIG = {
 class EnvKeysPayload(BaseModel):
     openrouter_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
+    replicate_api_key: Optional[str] = None
 
 
 class PromptSectionPayload(BaseModel):
@@ -660,7 +661,7 @@ async def get_fisheye_image(image_ref: str):
 
 @app.post("/api/save-keys")
 async def save_keys(payload: EnvKeysPayload):
-    global OPENROUTER_API_KEY, GROQ_API_KEY
+    global OPENROUTER_API_KEY, GROQ_API_KEY, REPLICATE_API_TOKEN
 
     updates: dict[str, str] = {}
 
@@ -673,6 +674,11 @@ async def save_keys(payload: EnvKeysPayload):
         value = payload.groq_api_key.strip()
         updates["GROQ_API_KEY"] = value
         GROQ_API_KEY = value
+
+    if payload.replicate_api_key is not None and payload.replicate_api_key.strip():
+        value = payload.replicate_api_key.strip()
+        updates["REPLICATE_API_TOKEN"] = value
+        REPLICATE_API_TOKEN = value
 
     if not updates:
         return {"ok": False, "message": "No keys provided"}

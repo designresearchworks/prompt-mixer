@@ -225,6 +225,7 @@ button {
     <div class="grid">
       <div class="field full"><label>OPENROUTER_API_KEY</label><input id="openrouter-key" type="password"></div>
       <div class="field full"><label>GROQ_API_KEY</label><input id="groq-key" type="password"></div>
+      <div class="field full"><label>REPLICATE_API_TOKEN</label><input id="replicate-key" type="password"></div>
     </div>
     <div class="actions">
       <button id="save-keys-btn" class="primary" type="button">Save keys to .env</button>
@@ -363,8 +364,9 @@ async function resetConfig() {
 async function saveApiKeys() {
   const openrouter = document.getElementById('openrouter-key').value.trim();
   const groq = document.getElementById('groq-key').value.trim();
+  const replicate = document.getElementById('replicate-key').value.trim();
   const btn = document.getElementById('save-keys-btn');
-  if (!openrouter && !groq) {
+  if (!openrouter && !groq && !replicate) {
     setStatus('keys-status', 'Enter at least one key', 'err');
     return;
   }
@@ -376,7 +378,8 @@ async function saveApiKeys() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         openrouter_api_key: openrouter || null,
-        groq_api_key: groq || null
+        groq_api_key: groq || null,
+        replicate_api_key: replicate || null
       })
     });
     const data = await response.json();
@@ -386,6 +389,7 @@ async function saveApiKeys() {
     setStatus('keys-status', 'Saved keys to .env', 'ok');
     document.getElementById('openrouter-key').value = '';
     document.getElementById('groq-key').value = '';
+    document.getElementById('replicate-key').value = '';
   } catch (err) {
     setStatus('keys-status', (err && err.message) || 'Save failed', 'err');
   } finally {
