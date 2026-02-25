@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Paragraph Adapter (Feedback)</title>
+<title>Paragraph Adapter (Visualise Copy)</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -280,7 +280,15 @@ textarea:focus { border-color: var(--accent); }
   flex-shrink: 0;
 }
 
+.mixer-top-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
 .mixer-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
   position: relative;
   height: 300px;
   overflow: hidden;
@@ -1080,6 +1088,9 @@ textarea:focus { border-color: var(--accent); }
   border-color: var(--accent);
   color: var(--text);
 }
+.fisheye-model-select {
+  min-width: 186px;
+}
 
 @keyframes modelOvertimePulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(124, 92, 252, 0.16); }
@@ -1184,6 +1195,139 @@ textarea:focus { border-color: var(--accent); }
 }
 .fish-scale-wrap .cadence-label {
   white-space: nowrap;
+}
+.visualise-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 600;
+  user-select: none;
+}
+.visualise-toggle-label.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cadence-wrap.paused-by-xsnc {
+  animation: xsncPausePulse 1.05s ease-in-out infinite;
+}
+@keyframes xsncPausePulse {
+  0%, 100% {
+    border-color: rgba(234, 179, 8, 0.35);
+    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.0);
+  }
+  50% {
+    border-color: rgba(234, 179, 8, 0.75);
+    box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.22);
+  }
+}
+.visualise-output {
+  display: none;
+  flex: 0 0 auto;
+  width: 280px;
+  min-width: 220px;
+  margin-top: 0;
+  position: relative;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  overflow: hidden;
+}
+.visualise-output.active {
+  display: flex;
+  flex-direction: column;
+}
+.visualise-image {
+  display: none;
+  width: 100%;
+  border-radius: 8px;
+  border: none;
+}
+.visualise-image.active {
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+}
+.fisheye-progress-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(56,189,248,0.14) 0%,
+      rgba(56,189,248,0.14) var(--fisheye-progress, 0%),
+      rgba(11,11,19,0.20) var(--fisheye-progress, 0%),
+      rgba(11,11,19,0.20) 100%
+    );
+  z-index: 3;
+}
+.fisheye-progress-overlay.active {
+  display: block;
+}
+.mixer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.mixer-head-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.mixer-instructions {
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.mixer-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.mixer-head-right.hidden {
+  display: none;
+}
+.visualise-inline {
+  display: none;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  bottom: 8px;
+  width: var(--fisheye-inline-width, 44%);
+  min-width: 170px;
+  max-width: calc(100% - 16px);
+  border-radius: 10px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+.visualise-inline.active {
+  display: block;
+}
+.visualise-image-inline {
+  display: none;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: contain;
+}
+.visualise-image-inline.active {
+  display: block;
 }
 .infinite-feedback-msg {
   margin-top: 8px;
@@ -1301,6 +1445,13 @@ textarea:focus { border-color: var(--accent); }
 
   /* Taller mixer so chips have room */
   .mixer-wrap { height: 360px; }
+  .mixer-top-row { flex-direction: column; }
+  .visualise-output.active {
+    width: 100% !important;
+    min-width: 0;
+    height: 280px !important;
+    max-height: none !important;
+  }
 
   /* Stack sensibility boxes vertically on narrow screens */
   .sensibility-row { flex-direction: column; gap: 8px; }
@@ -1317,6 +1468,21 @@ textarea:focus { border-color: var(--accent); }
 
   /* Stack the output header on small screens */
   .row-label { flex-wrap: wrap; gap: 6px; }
+  .mixer-head {
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .mixer-head-right {
+    width: auto;
+    margin-left: auto;
+    flex: 0 0 auto;
+  }
+  .mixer-head-right .fisheye-model-select {
+    width: fit-content;
+    min-width: 186px;
+    max-width: 100%;
+  }
   .current-head {
     justify-content: flex-start !important;
     align-items: flex-start !important;
@@ -1346,6 +1512,13 @@ textarea:focus { border-color: var(--accent); }
 }
 
 @media (max-width: 900px) {
+  .mixer-top-row { flex-direction: column; }
+  .visualise-output.active {
+    width: 100% !important;
+    min-width: 0;
+    height: 300px !important;
+    max-height: none !important;
+  }
   .sensibility-row {
     flex-direction: column;
     align-items: stretch;
@@ -1377,6 +1550,12 @@ textarea:focus { border-color: var(--accent); }
     max-width: 210px;
   }
 }
+body.fisheye-inline-mode .mixer-instructions {
+  display: none;
+}
+body.fisheye-inline-mode .visualise-output.active {
+  display: none !important;
+}
 </style>
 </head>
 <body>
@@ -1407,6 +1586,14 @@ textarea:focus { border-color: var(--accent); }
           <input type="checkbox" id="keep-brief" checked onchange="scheduleUpdate(0)" style="width:12px;height:12px;cursor:pointer;">
           Force short output
         </label>
+        <label class="visualise-toggle-label" id="visualise-toggle-label" title="Toggle fisheye image rendering panel and automatic output visualisation">
+          <input type="checkbox" id="visualise-auto" style="width:12px;height:12px;cursor:pointer;">
+          🐟👁️
+        </label>
+        <label class="visualise-toggle-label disabled" id="xsnc-toggle-label" title="When enabled, pauses LLM generation while fisheye image generation is in flight">
+          <input type="checkbox" id="xsnc-enabled" style="width:12px;height:12px;cursor:pointer;" disabled>
+          XSNC
+        </label>
       </div>
       <div class="current-head-right" style="display:flex;align-items:center;gap:10px;">
         <select class="model-select" id="model-select" onchange="onModelChange()" title="The groq models are faster, sonnet is smarter, no right or wrong, just different">
@@ -1434,7 +1621,7 @@ textarea:focus { border-color: var(--accent); }
       </div>
     </div>
     <div class="infinite-feedback-msg" id="infinite-feedback-msg"></div>
-    <div class="output-with-controls">
+    <div class="output-with-controls" id="output-with-controls">
       <div class="output-current" id="output-current" title="If you are in feedback mode then you can type in this box, doing so will get the model - just that one time - to think about what you type. So, when it's feeding back you can send it off in new directions">
         Attempting first contact with an API...
       </div>
@@ -1447,14 +1634,27 @@ textarea:focus { border-color: var(--accent); }
 
   <!-- 2. CONCEPT MIXER with sensibility boxes below -->
   <div class="mixer-section">
-    <div class="row-label" title="The thinking tank, filled with little fishes">
-      PthinkTank
-      <span style="font-size:9px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400;">
-        — drag ↑↓ weight &nbsp; ←→ lean towards one of two sensibilities
+    <div class="row-label mixer-head" title="The thinking tank, filled with little fishes">
+      <span class="mixer-head-title">
+        <span>PthinkTank</span>
+        <span class="mixer-instructions" id="mixer-instructions">
+          — drag ↑↓ weight &nbsp; ←→ lean towards one of two sensibilities
+        </span>
+      </span>
+      <span class="mixer-head-right" id="fisheye-model-wrap">
+        <select class="model-select fisheye-model-select" id="fisheye-model-select" onchange="onFisheyeModelChange()" title="Fisheye image model. Progress fill shows predicted remaining time based on recent runs.">
+          <option value="prunaai/flux-fast|512" selected>Flux Fast 512</option>
+          <option value="prunaai/flux-fast|1024">Flux Fast 1024</option>
+          <option value="google/imagen-3-fast">Imagen 3 Fast</option>
+          <option value="bytedance/seedream-4|1K">Seedream 4 1K</option>
+          <option value="bytedance/seedream-4|2K">Seedream 4 2K</option>
+          <option value="bytedance/seedream-4|4K">Seedream 4 4K</option>
+        </select>
       </span>
     </div>
-    <!-- Mixer canvas (full width) -->
-    <div class="mixer-wrap" id="mixer">
+    <!-- Mixer canvas with optional fisheye pane -->
+    <div class="mixer-top-row" id="mixer-top-row">
+      <div class="mixer-wrap" id="mixer">
       <div class="ascii-bg-layer" id="ascii-bg-layer">
         <iframe class="ascii-bg-frame" id="ascii-bg-frame" title="Fish background animation" loading="lazy" tabindex="-1" aria-hidden="true"></iframe>
       </div>
@@ -1495,6 +1695,15 @@ textarea:focus { border-color: var(--accent); }
       <div class="mixer-empty" id="mixer-empty">
         <div class="mixer-empty-icon">⟳</div>
         Type transformation concepts below
+      </div>
+      <div class="visualise-inline" id="visualise-inline">
+        <img class="visualise-image-inline" id="visualise-image-inline" alt="Generated image from current model output">
+        <div class="fisheye-progress-overlay" id="fisheye-progress-overlay-inline" aria-hidden="true"></div>
+      </div>
+      </div>
+      <div class="visualise-output" id="visualise-output">
+        <img class="visualise-image" id="visualise-image" alt="Generated image from current model output">
+        <div class="fisheye-progress-overlay" id="fisheye-progress-overlay" aria-hidden="true"></div>
       </div>
     </div>
     <!-- Sensibility boxes below, left and right -->
@@ -1684,6 +1893,7 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
 ═══════════════════════════════ */
 var words = [];
 var outputHistory  = [];
+var currentOutputEntry = null;
 var currentOutput  = '';
 var feedbackModeEnabled = false;
 var infiniteFeedbackEnabled = false;
@@ -1731,6 +1941,10 @@ var outputWindowHeightPx = 0;
 var modelTiming = { modelId: null, avgMs: 0, count: 0 };
 var requestProgressRaf = null;
 var requestStartTs = 0;
+var fisheyeTiming = { modelId: null, avgMs: 0, count: 0 };
+var fisheyeProgressRaf = null;
+var fisheyeRequestStartTs = 0;
+var fisheyeProgressDefaultMs = 9000;
 var lastTouchUiTs = 0;
 var TOUCH_UI_GRACE_MS = 320;
 var lastGenerateStartTs = 0;
@@ -1752,6 +1966,10 @@ var outputLastTapTs = 0;
 var hardcodedBasePreamble = '';
 var hardcodedBaseClosing = '';
 var promptTemplateStatusTimer = null;
+var visualiseInFlight = false;
+var currentFisheyeImageRef = null;
+var currentFisheyeImageUrl = '';
+var pendingGenerateAfterVisualise = false;
 
 /* ═══════════════════════════════
    DRAG STATE
@@ -2430,16 +2648,20 @@ function renderChips() {
   var d2 = (document.getElementById('direction-2').value || '').trim();
   var d1Active = !!d1;
   var d2Active = !!d2;
-  document.getElementById('axis-left').textContent  = '← ' + (d1 || 'Sensibility 1');
-  document.getElementById('axis-right').textContent = (d2 || 'Sensibility 2') + ' →';
+  var axisLeft = document.getElementById('axis-left');
+  var axisRight = document.getElementById('axis-right');
+  axisLeft.textContent  = '← ' + (d1 || 'Sensibility 1');
+  axisRight.textContent = (d2 || 'Sensibility 2') + ' →';
+  axisLeft.style.display = d1Active ? '' : 'none';
+  axisRight.style.display = d2Active ? '' : 'none';
 
   // Sync axis label + sensibility box label colours from colour pickers
   var c1El = document.getElementById('axis-pick-1');
   var c2El = document.getElementById('axis-pick-2');
   var c1 = c1El ? c1El.value : '#ec4899';
   var c2 = c2El ? c2El.value : '#34d399';
-  document.getElementById('axis-left').style.color  = hexToRgbA(c1, 0.5);
-  document.getElementById('axis-right').style.color = hexToRgbA(c2, 0.5);
+  axisLeft.style.color  = hexToRgbA(c1, 0.5);
+  axisRight.style.color = hexToRgbA(c2, 0.5);
   // Update sensibility label colours
   var sLabels = document.querySelectorAll('.sensibility-box.left .sensibility-label');
   sLabels.forEach(function(el) { el.style.color = hexToRgbA(c1, 0.7); });
@@ -2450,6 +2672,7 @@ function renderChips() {
   var dzLeft  = (0.5 - DEADZONE_HALF) * W;
   var dzWidth = DEADZONE_HALF * 2 * W;
   var band = document.getElementById('deadzone-band');
+  band.style.display = (d1Active || d2Active) ? '' : 'none';
   band.style.left  = dzLeft + 'px';
   band.style.width = dzWidth + 'px';
 
@@ -3059,6 +3282,9 @@ async function generateOutput(promptOverride) {
     stateDirtyWhileStreaming = false;
     requestGenerate();
   }
+  if (completed && isVisualiseAutoEnabled() && !feedbackModeEnabled) {
+    visualiseCurrentOutput();
+  }
   }
 }
 
@@ -3066,7 +3292,9 @@ async function generateOutput(promptOverride) {
    HISTORY
 ═══════════════════════════════ */
 function pushHistory(outputText) {
-  if (!outputText || outputText === currentOutput) return;
+  if (!outputText) return;
+  if (currentOutputEntry && (currentOutputEntry.output || '') === outputText) return;
+
   var snapshot = words
     .map(function(w) { return { label: w.label, weight: 1.0 - w.yFrac }; })
     .sort(function(a, b) { return b.weight - a.weight; })
@@ -3074,17 +3302,26 @@ function pushHistory(outputText) {
   var wordsCopy = words.map(function(w) {
     return { key: w.key, label: w.label, xFrac: w.xFrac, yFrac: w.yFrac };
   });
-  outputHistory.unshift({
-    output: currentOutput,
+
+  if (currentOutputEntry && currentOutputEntry.output) {
+    outputHistory.unshift(currentOutputEntry);
+    if (outputHistory.length > 20) outputHistory.pop();
+  }
+
+  currentOutputEntry = {
+    output: outputText,
     words: wordsCopy,
     source: document.getElementById('mission').value,
     direction1: document.getElementById('direction-1').value,
     direction2: document.getElementById('direction-2').value,
     concepts: document.getElementById('sentence-input').value,
-    snapshot: snapshot
-  });
-  if (outputHistory.length > 20) outputHistory.pop();
+    snapshot: snapshot,
+    fisheye_image_ref: null,
+    fisheye_image_url: null,
+  };
   currentOutput = outputText;
+  currentFisheyeImageRef = null;
+  currentFisheyeImageUrl = '';
   if (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) syncMissionToCurrentOutput();
   renderHistory();
   updateFeedbackButtonState();
@@ -3095,18 +3332,19 @@ function renderHistory() {
   var empty = document.getElementById('history-empty');
   list.innerHTML = '';
 
-  if (!outputHistory.length) {
+  if (!currentOutputEntry && !outputHistory.length) {
     empty.style.display = '';
     return;
   }
   empty.style.display = 'none';
 
-  outputHistory.forEach(function(item, i) {
+  function appendHistoryRow(item, indexLabel, indexValue) {
+    if (!item) return;
     var preview = (item.output || '').replace(/\n/g, ' ').substring(0, 80);
     if ((item.output || '').length > 80) preview += '…';
     if (!preview) preview = '(empty)';
 
-    var tags = item.snapshot
+    var tags = (item.snapshot || [])
       .filter(function(s) { return s.weight > 0.05; })
       .map(function(s) {
         return '<span class="snap-tag">' + s.label + ' ' + s.weight.toFixed(2) + '</span>';
@@ -3114,22 +3352,40 @@ function renderHistory() {
 
     var div = document.createElement('div');
     div.className = 'history-item';
-    div.dataset.index = i;
+    div.dataset.index = String(indexValue);
     div.innerHTML =
-      '<span class="history-num">' + (i + 1) + '</span>' +
+      '<span class="history-num">' + indexLabel + '</span>' +
       '<span class="history-preview">' + preview + '</span>' +
       '<div class="history-tags">' + tags + '</div>';
-
-div.addEventListener('click', function() { restoreHistory(i); });
-//div.addEventListener('mouseenter', function(e) { showHistoryTooltip(e, item.output); }); // ← pass e instead of div
-//div.addEventListener('mouseleave', hideHistoryTooltip);
+    div.addEventListener('click', function() { restoreHistory(indexValue); });
     list.appendChild(div);
+  }
+
+  appendHistoryRow(currentOutputEntry, '0', -1);
+  outputHistory.forEach(function(item, i) {
+    appendHistoryRow(item, String(i + 1), i);
   });
 }
 
 function restoreHistory(index) {
-  var item = outputHistory[index];
+  var item = null;
+  if (index === -1) {
+    item = currentOutputEntry;
+  } else {
+    item = outputHistory[index];
+  }
   if (!item) return;
+
+  if (index >= 0) {
+    if (currentOutputEntry && currentOutputEntry.output) {
+      outputHistory.splice(index, 1);
+      outputHistory.unshift(currentOutputEntry);
+    } else {
+      outputHistory.splice(index, 1);
+    }
+    currentOutputEntry = item;
+    if (outputHistory.length > 20) outputHistory.pop();
+  }
 
   document.getElementById('mission').value = item.source || '';
   document.getElementById('direction-1').value = item.direction1 || '';
@@ -3146,13 +3402,19 @@ function restoreHistory(index) {
   var outputEl = document.getElementById('output-current');
   outputEl.innerHTML = simpleMarkdown(item.output || '');
   currentOutput = item.output || '';
+  currentFisheyeImageRef = item.fisheye_image_ref || null;
+  currentFisheyeImageUrl = item.fisheye_image_url || '';
+  var visualiseCb = document.getElementById('visualise-auto');
+  if (visualiseCb && !feedbackModeEnabled) {
+    visualiseCb.checked = !!currentFisheyeImageUrl;
+  }
+  updateFisheyeAvailability();
+  updateVisualiseOutputVisibility();
+  setFisheyeImage((currentFisheyeImageUrl && !feedbackModeEnabled) ? currentFisheyeImageUrl : '');
   updateFeedbackButtonState();
 
   document.getElementById('generated-prompt').textContent = buildPrompt();
-
-  document.querySelectorAll('.history-item').forEach(function(el) { el.classList.remove('active'); });
-  var items = document.querySelectorAll('.history-item');
-  if (items[index]) items[index].classList.add('active');
+  renderHistory();
 }
 
 /* ═══════════════════════════════
@@ -3285,6 +3547,8 @@ function applyFeedback() {
     updateInfiniteFeedbackButtonState();
   }
   if (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) syncMissionToCurrentOutput();
+  updateFisheyeAvailability();
+  updateVisualiseOutputVisibility();
   updateFeedbackButtonState();
   updateCurrentOutputLabel();
   refreshInactivityWatchState();
@@ -3305,6 +3569,8 @@ function toggleInfiniteFeedback() {
     if (!isYouAreWhatYouEatEnabled()) syncMissionToCurrentOutput();
     if (!isStreaming && (currentOutput || '').trim()) scheduleUpdate(0);
   }
+  updateFisheyeAvailability();
+  updateVisualiseOutputVisibility();
   updateInfiniteFeedbackButtonState();
   refreshInactivityWatchState();
 }
@@ -3396,6 +3662,25 @@ function getInfiniteCadenceDelayMs() {
   return Math.max(0, Math.min(5000, infiniteCadenceValue));
 }
 
+function isXsncEnabled() {
+  var cb = document.getElementById('xsnc-enabled');
+  return !!(cb && cb.checked && !cb.disabled);
+}
+
+function setCadencePausedByXsnc(active) {
+  var wrap = document.getElementById('cadence-wrap');
+  if (!wrap) return;
+  wrap.classList.toggle('paused-by-xsnc', !!active);
+}
+
+function onXsncChange() {
+  updateFisheyeAvailability();
+  if (!isXsncEnabled()) {
+    setCadencePausedByXsnc(false);
+    pendingGenerateAfterVisualise = false;
+  }
+}
+
 function requestGenerate() {
   if (generationSafetyPaused) {
     stopCadenceProgressDisplay();
@@ -3409,9 +3694,21 @@ function requestGenerate() {
     stopCadenceProgressDisplay();
     return;
   }
+  if (isXsncEnabled() && visualiseInFlight) {
+    pendingGenerateAfterVisualise = true;
+    stopCadenceProgressDisplay();
+    setCadencePausedByXsnc(true);
+    return;
+  }
+  setCadencePausedByXsnc(false);
 
   function runGenerationNow() {
     if (generationSafetyPaused || isStreaming) return;
+    if (isXsncEnabled() && visualiseInFlight) {
+      pendingGenerateAfterVisualise = true;
+      setCadencePausedByXsnc(true);
+      return;
+    }
     var prompt = buildPrompt();
     document.getElementById('generated-prompt').textContent = prompt;
     generateOutput(prompt);
@@ -3686,6 +3983,251 @@ function updateBmpButtonState() {
   if (!btn) return;
   btn.classList.toggle('active', chipPhysicsBmpMode);
   btn.textContent = 'bmp';
+}
+
+function getCurrentOutputTextForVisualise() {
+  var txt = (currentOutput || '').trim();
+  if (txt) return txt;
+  var outputEl = document.getElementById('output-current');
+  if (!outputEl) return '';
+  return (outputEl.textContent || '').trim();
+}
+
+function isVisualiseAutoEnabled() {
+  var cb = document.getElementById('visualise-auto');
+  return !!(cb && cb.checked);
+}
+
+function isFisheyeInlineMode() {
+  if (!isVisualiseAutoEnabled()) return false;
+  if (feedbackModeEnabled) return false;
+  return !!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
+}
+
+function setFisheyeImage(url) {
+  var imageIds = ['visualise-image', 'visualise-image-inline'];
+  for (var i = 0; i < imageIds.length; i++) {
+    var imageEl = document.getElementById(imageIds[i]);
+    if (!imageEl) continue;
+    if (url) {
+      imageEl.src = url;
+      imageEl.classList.add('active');
+    } else {
+      imageEl.classList.remove('active');
+      imageEl.src = '';
+    }
+  }
+}
+
+function getFisheyeProgressOverlays() {
+  var ids = ['fisheye-progress-overlay', 'fisheye-progress-overlay-inline'];
+  var overlays = [];
+  for (var i = 0; i < ids.length; i++) {
+    var overlay = document.getElementById(ids[i]);
+    if (overlay) overlays.push(overlay);
+  }
+  return overlays;
+}
+
+function attachFisheyeImageToHistory(outputText, imageRef, imageUrl) {
+  if (!outputText || !imageUrl) return;
+  if (currentOutputEntry && (currentOutputEntry.output || '').trim() === outputText) {
+    currentOutputEntry.fisheye_image_ref = imageRef || null;
+    currentOutputEntry.fisheye_image_url = imageUrl;
+    return;
+  }
+  for (var i = 0; i < outputHistory.length; i++) {
+    var item = outputHistory[i];
+    if (!item || item.fisheye_image_url) continue;
+    if ((item.output || '').trim() === outputText) {
+      item.fisheye_image_ref = imageRef || null;
+      item.fisheye_image_url = imageUrl;
+      return;
+    }
+  }
+}
+
+function updateFisheyeAvailability() {
+  var cb = document.getElementById('visualise-auto');
+  var label = document.getElementById('visualise-toggle-label');
+  var xsncCb = document.getElementById('xsnc-enabled');
+  var xsncLabel = document.getElementById('xsnc-toggle-label');
+  var modelSelect = document.getElementById('fisheye-model-select');
+  var modelWrap = document.getElementById('fisheye-model-wrap');
+  if (!cb) return;
+
+  var blocked = !!feedbackModeEnabled;
+  cb.disabled = blocked;
+  if (label) label.classList.toggle('disabled', blocked);
+  if (blocked && cb.checked) cb.checked = false;
+
+  if (modelSelect) {
+    modelSelect.disabled = blocked || !cb.checked;
+  }
+  if (modelWrap) {
+    modelWrap.classList.toggle('hidden', blocked || !cb.checked);
+  }
+  var xsncAvailable = !blocked && !!cb.checked;
+  if (xsncCb) {
+    xsncCb.disabled = !xsncAvailable;
+    if (!xsncAvailable) {
+      xsncCb.checked = false;
+      pendingGenerateAfterVisualise = false;
+      setCadencePausedByXsnc(false);
+    }
+  }
+  if (xsncLabel) {
+    xsncLabel.classList.toggle('disabled', !xsncAvailable);
+  }
+  updateFisheyeInlineMode();
+}
+
+function updateFisheyeInlineMode() {
+  var inlineWrap = document.getElementById('visualise-inline');
+  var inlineMode = isFisheyeInlineMode();
+  document.body.classList.toggle('fisheye-inline-mode', inlineMode);
+  if (inlineWrap) {
+    inlineWrap.classList.toggle('active', inlineMode);
+  }
+}
+
+function updateMixerFisheyeLayout() {
+  var panel = document.getElementById('visualise-output');
+  var mixer = document.getElementById('mixer');
+  var imageEl = document.getElementById('visualise-image');
+  if (!panel || !mixer) return;
+  if (!isVisualiseAutoEnabled()) return;
+
+  var inlineMode = isFisheyeInlineMode();
+  if (inlineMode) {
+    var inlineRatio = 1;
+    if (imageEl && imageEl.naturalWidth > 0 && imageEl.naturalHeight > 0) {
+      inlineRatio = Math.max(0.6, Math.min(2.4, imageEl.naturalWidth / imageEl.naturalHeight));
+    }
+    var inlineW = Math.round((mixer.clientHeight || 300) * inlineRatio);
+    var maxInlineW = Math.max(170, Math.floor((mixer.clientWidth || 600) * 0.62));
+    inlineW = Math.max(170, Math.min(maxInlineW, inlineW));
+    mixer.style.setProperty('--fisheye-inline-width', inlineW + 'px');
+    panel.style.width = '';
+    panel.style.minWidth = '';
+    panel.style.height = '';
+    panel.style.maxHeight = '';
+    return;
+  }
+  mixer.style.removeProperty('--fisheye-inline-width');
+
+  var mixerH = mixer.clientHeight || 300;
+  var ratio = 1;
+  if (imageEl && imageEl.naturalWidth > 0 && imageEl.naturalHeight > 0) {
+    ratio = Math.max(0.6, Math.min(2.4, imageEl.naturalWidth / imageEl.naturalHeight));
+  }
+  var paneW = Math.round(mixerH * ratio);
+  paneW = Math.max(220, Math.min(640, paneW));
+
+  panel.style.width = paneW + 'px';
+  panel.style.minWidth = paneW + 'px';
+  panel.style.height = mixerH + 'px';
+  panel.style.maxHeight = mixerH + 'px';
+}
+
+function updateVisualiseOutputVisibility() {
+  var panel = document.getElementById('visualise-output');
+  if (!panel) return;
+  updateFisheyeAvailability();
+  updateFisheyeInlineMode();
+  var active = isVisualiseAutoEnabled();
+  panel.classList.toggle('active', active);
+  if (!active) {
+    panel.style.width = '';
+    panel.style.minWidth = '';
+    panel.style.height = '';
+    panel.style.maxHeight = '';
+    var mixer = document.getElementById('mixer');
+    if (mixer) mixer.style.removeProperty('--fisheye-inline-width');
+    renderChips();
+    return;
+  }
+  updateMixerFisheyeLayout();
+  renderChips();
+}
+
+async function visualiseCurrentOutput() {
+  if (feedbackModeEnabled) return;
+  if (visualiseInFlight) return;
+
+  var sourceText = getCurrentOutputTextForVisualise();
+  if (!sourceText) return;
+
+  var modelEl = document.getElementById('fisheye-model-select');
+  if (!modelEl) return;
+  var requestOutputText = sourceText;
+
+  visualiseInFlight = true;
+  startFisheyeProgressDisplay();
+  var requestStartedAt = performance.now();
+  var completed = false;
+
+  try {
+    var res = await fetch('/api/visualise', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        output_text: sourceText,
+        image_model: modelEl.value,
+      }),
+    });
+    var data = await res.json();
+
+    if (!res.ok || !data || !data.ok) {
+      return;
+    }
+
+    var returnedUrl = data.image_url || '';
+    var returnedRef = data.image_ref || null;
+    if ((currentOutput || '').trim() === requestOutputText) {
+      setFisheyeImage(returnedUrl);
+      currentFisheyeImageRef = returnedRef;
+      currentFisheyeImageUrl = returnedUrl;
+      if (currentOutputEntry) {
+        currentOutputEntry.fisheye_image_ref = returnedRef;
+        currentOutputEntry.fisheye_image_url = returnedUrl;
+      }
+      updateMixerFisheyeLayout();
+      renderChips();
+      renderHistory();
+      completed = !!returnedUrl;
+    } else {
+      attachFisheyeImageToHistory(requestOutputText, returnedRef, returnedUrl);
+      renderHistory();
+      completed = !!returnedUrl;
+    }
+  } catch (_) {
+    if ((currentOutput || '').trim() === requestOutputText) {
+      currentFisheyeImageRef = null;
+      currentFisheyeImageUrl = '';
+      setFisheyeImage('');
+    }
+  } finally {
+    if (completed) {
+      var elapsed = Math.max(1, performance.now() - requestStartedAt);
+      recordFisheyeResponseTime(elapsed);
+    }
+    visualiseInFlight = false;
+    stopFisheyeProgressDisplay();
+    setCadencePausedByXsnc(false);
+    pendingGenerateAfterVisualise = false;
+  }
+}
+
+function onVisualiseAutoChange() {
+  updateVisualiseOutputVisibility();
+  var xsncCb = document.getElementById('xsnc-enabled');
+  if (isVisualiseAutoEnabled() && xsncCb && !xsncCb.disabled) {
+    xsncCb.checked = true;
+  }
+  if (isVisualiseAutoEnabled() && getCurrentOutputTextForVisualise()) {
+    visualiseCurrentOutput();
+  }
 }
 
 function resolveBmpCollisions(speedScale) {
@@ -4008,6 +4550,13 @@ function setModelProgress(percent) {
   select.style.setProperty('--req-progress', p.toFixed(2) + '%');
 }
 
+function setFisheyeSelectProgress(percent) {
+  var select = document.getElementById('fisheye-model-select');
+  if (!select) return;
+  var p = Math.max(0, Math.min(100, percent || 0));
+  select.style.setProperty('--req-progress', p.toFixed(2) + '%');
+}
+
 function stopRequestProgressDisplay() {
   if (requestProgressRaf) {
     cancelAnimationFrame(requestProgressRaf);
@@ -4041,6 +4590,112 @@ function startRequestProgressDisplay() {
   }
 
   requestProgressRaf = requestAnimationFrame(tick);
+}
+
+function onFisheyeModelChange(triggerRefresh) {
+  if (triggerRefresh === undefined) triggerRefresh = true;
+  var select = document.getElementById('fisheye-model-select');
+  if (!select) return;
+  fisheyeTiming.modelId = select.value;
+  fisheyeTiming.avgMs = 0;
+  fisheyeTiming.count = 0;
+  updateFisheyeTimingHint();
+  stopFisheyeProgressDisplay();
+  if (triggerRefresh && isVisualiseAutoEnabled() && !feedbackModeEnabled && getCurrentOutputTextForVisualise()) {
+    visualiseCurrentOutput();
+  }
+}
+
+function getExpectedFisheyeMs() {
+  if (fisheyeTiming.count > 0 && fisheyeTiming.avgMs > 0) return fisheyeTiming.avgMs;
+  return fisheyeProgressDefaultMs;
+}
+
+function recordFisheyeResponseTime(ms) {
+  var select = document.getElementById('fisheye-model-select');
+  if (!select) return;
+  var modelId = select.value;
+  if (fisheyeTiming.modelId !== modelId) {
+    fisheyeTiming.modelId = modelId;
+    fisheyeTiming.avgMs = ms;
+    fisheyeTiming.count = 1;
+    updateFisheyeTimingHint();
+    return;
+  }
+  var windowCount = Math.min(8, fisheyeTiming.count + 1);
+  fisheyeTiming.count = windowCount;
+  fisheyeTiming.avgMs += (ms - fisheyeTiming.avgMs) / windowCount;
+  updateFisheyeTimingHint();
+}
+
+function updateFisheyeTimingHint() {
+  var select = document.getElementById('fisheye-model-select');
+  if (!select) return;
+  if (!fisheyeTiming.count) {
+    select.title = 'Fisheye image generation avg: collecting baseline.';
+    return;
+  }
+  var avgSec = (fisheyeTiming.avgMs / 1000).toFixed(2);
+  select.title = 'Fisheye image generation avg: ' + avgSec + 's.';
+}
+
+function stopFisheyeProgressDisplay() {
+  if (fisheyeProgressRaf) {
+    cancelAnimationFrame(fisheyeProgressRaf);
+    fisheyeProgressRaf = null;
+  }
+  var select = document.getElementById('fisheye-model-select');
+  if (select) {
+    select.classList.remove('timing');
+    select.classList.remove('overtime');
+  }
+  setFisheyeSelectProgress(0);
+  var overlays = getFisheyeProgressOverlays();
+  for (var i = 0; i < overlays.length; i++) {
+    var overlay = overlays[i];
+    overlay.classList.remove('active');
+    overlay.style.setProperty('--fisheye-progress', '0%');
+  }
+}
+
+function startFisheyeProgressDisplay() {
+  stopFisheyeProgressDisplay();
+
+  var select = document.getElementById('fisheye-model-select');
+  var useSelectProgress = isFisheyeInlineMode();
+  var overlays = getFisheyeProgressOverlays();
+  if (useSelectProgress) {
+    if (!select) return;
+    select.classList.add('timing');
+    setFisheyeSelectProgress(0);
+  } else {
+    if (!overlays.length) return;
+    for (var i = 0; i < overlays.length; i++) {
+      overlays[i].classList.add('active');
+      overlays[i].style.setProperty('--fisheye-progress', '0%');
+    }
+  }
+
+  fisheyeRequestStartTs = performance.now();
+
+  function tick(now) {
+    if (!visualiseInFlight) return;
+    var expectedMs = Math.max(500, getExpectedFisheyeMs());
+    var elapsed = now - fisheyeRequestStartTs;
+    var progress = Math.min(1, elapsed / expectedMs);
+    if (useSelectProgress) {
+      setFisheyeSelectProgress(progress * 100);
+      if (select) select.classList.toggle('overtime', elapsed > expectedMs);
+    } else {
+      var progressPct = (progress * 100).toFixed(2) + '%';
+      for (var j = 0; j < overlays.length; j++) {
+        overlays[j].style.setProperty('--fisheye-progress', progressPct);
+      }
+    }
+    fisheyeProgressRaf = requestAnimationFrame(tick);
+  }
+
+  fisheyeProgressRaf = requestAnimationFrame(tick);
 }
 
 function setInfiniteButtonProgress(percent) {
@@ -4389,6 +5044,7 @@ function applyMixerHeight(px) {
   var mixer = document.getElementById('mixer');
   if (!mixer) return;
   mixer.style.height = clampMixerHeight(px) + 'px';
+  updateMixerFisheyeLayout();
   renderChips();
 }
 
@@ -4425,7 +5081,11 @@ function setupMixerResizer() {
 var resizeTimer = null;
 window.addEventListener('resize', function() {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(renderChips, 60);
+  resizeTimer = setTimeout(function() {
+    updateFisheyeInlineMode();
+    updateMixerFisheyeLayout();
+    renderChips();
+  }, 60);
 });
 
 /* ═══════════════════════════════
@@ -4556,6 +5216,21 @@ bindControlButton('trawl-haul-btn', haulTrawl);
 setupMixerResizer();
 setupSensibilityCombo('direction-1', 'direction-1-arrow', 'direction-1-list', 'direction-1-options');
 setupSensibilityCombo('direction-2', 'direction-2-arrow', 'direction-2-list', 'direction-2-options');
+onFisheyeModelChange(false);
+var visualiseAutoEl = document.getElementById('visualise-auto');
+if (visualiseAutoEl) visualiseAutoEl.addEventListener('change', onVisualiseAutoChange);
+var xsncEl = document.getElementById('xsnc-enabled');
+if (xsncEl) xsncEl.addEventListener('change', onXsncChange);
+['visualise-image', 'visualise-image-inline'].forEach(function(id) {
+  var visualiseImageEl = document.getElementById(id);
+  if (!visualiseImageEl) return;
+  visualiseImageEl.addEventListener('load', function() {
+    updateMixerFisheyeLayout();
+    renderChips();
+  });
+});
+updateFisheyeAvailability();
+updateVisualiseOutputVisibility();
 
 var currentOutputEl = document.getElementById('output-current');
 if (currentOutputEl) {
