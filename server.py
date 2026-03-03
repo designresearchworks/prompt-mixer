@@ -1,8 +1,24 @@
+"""
+Prompt Mixer backend service.
+
+What:
+- Hosts UI pages and API endpoints for text generation + fisheye image generation.
+- Persists runtime config/templates/stats to local files under `data/`.
+
+Why:
+- Keep deployment simple (single service) while retaining state across restarts.
+
+How:
+- FastAPI routes orchestrate provider calls (OpenRouter/Groq/Replicate/Daydream)
+  and file-backed persistence helpers.
+"""
+
 import os
 import json
 import threading
 import time
 import uuid
+import traceback
 import mimetypes
 import urllib.error
 import urllib.request
@@ -34,11 +50,18 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4-6")
 REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
+DAYDREAM_API_KEY = os.getenv("DAYDREAM_API_KEY")
 DEFAULT_REPLICATE_MODEL = os.getenv(
     "REPLICATE_MODEL",
     "prunaai/flux-fast",
 )
 REPLICATE_API_BASE = "https://api.replicate.com/v1"
+DAYDREAM_API_BASE = os.getenv("DAYDREAM_API_BASE", "https://api.daydream.live")
+DAYDREAM_ROUTE_HINTS: dict[str, Optional[tuple[str, str]]] = {
+    "update": None,
+    "status": None,
+    "stop": None,
+}
 PROMPT_STORE_DIR = os.path.join(BASE_DIR, "data")
 PROMPT_PREAMBLE_PATH = os.path.join(PROMPT_STORE_DIR, "base_preamble.txt")
 PROMPT_CLOSING_PATH = os.path.join(PROMPT_STORE_DIR, "base_closing.txt")
@@ -46,7 +69,9 @@ APP_CONFIG_PATH = os.path.join(PROMPT_STORE_DIR, "app_config.json")
 API_COUNTER_PATH = os.path.join(PROMPT_STORE_DIR, "api_call_counter.json")
 FISHEYE_IMAGE_DIR = os.path.join(PROMPT_STORE_DIR, "fisheye_images")
 FISHEYE_IMAGE_INDEX_PATH = os.path.join(PROMPT_STORE_DIR, "fisheye_images_index.json")
+FISHEYE_GAME_ROUNDS_PATH = os.path.join(PROMPT_STORE_DIR, "fisheye_game_rounds.json")
 API_COUNTER_LOCK = threading.Lock()
+FISHEYE_GAME_LOCK = threading.Lock()
 DEFAULT_APP_CONFIG = {
     "default_theme": "dark",
     "default_model": "groq:llama-3.3-70b-versatile",
@@ -71,7 +96,21 @@ DEFAULT_APP_CONFIG = {
     "merge_hold_ms": 1000,
     "join_glow_ms": 650,
     "model_progress_default_ms": 3000,
+    "llm_deterministic_mode": False,
+    "llm_deterministic_seed": 2110,
 }
+DEFAULT_BASE_PREAMBLE = (
+    "You have several transformation concepts to apply to the thought. Each has two properties:\n"
+    "- Weight (0.00 = ignore, 1.00 = apply strongly)\n"
+    "- Optionally, lean toward a sensibility"
+)
+DEFAULT_BASE_CLOSING = (
+    "Reimagine the original thought applying these transformations proportionally.\n"
+    "Higher-weighted concepts should have a more visible effect on the output.\n"
+    "Concepts that lean toward a sensibility should pull the style in that direction.\n"
+    "Preserve the core meaning of the original thought.\n"
+    "Only output your new idea, no meta commentary, none of the original prompt."
+)
 
 
 class EnvKeysPayload(BaseModel):
@@ -97,6 +136,47 @@ class VisualisePayload(BaseModel):
     image_seed: Optional[int] = None
 
 
+class FisheyeGameFishPayload(BaseModel):
+    label: Optional[str] = None
+    x_frac: float
+    y_frac: float
+
+
+class FisheyeGameRoundCreatePayload(BaseModel):
+    thought: str
+    decoy_thought: str
+    fish: list[FisheyeGameFishPayload]
+    direction_1: Optional[str] = None
+    direction_2: Optional[str] = None
+    keep_brief: Optional[bool] = True
+    base_preamble: Optional[str] = None
+    base_closing: Optional[str] = None
+    prompt_model: Optional[str] = None
+    image_model: Optional[str] = None
+    image_seed: Optional[int] = None
+
+
+class FisheyeGameGuessPayload(BaseModel):
+    thought_index: int
+    fish: list[FisheyeGameFishPayload]
+
+
+class DaydreamCreatePayload(BaseModel):
+    prompt: str
+    model_id: Optional[str] = None
+
+
+class DaydreamUpdatePayload(BaseModel):
+    stream_id: str
+    prompt: Optional[str] = None
+    model_id: Optional[str] = None
+
+
+class DaydreamStopPayload(BaseModel):
+    stream_id: str
+
+
+# Environment writer: used by the settings UI to persist API keys to `.env`.
 def _upsert_env_values(path: str, updates: dict[str, str]) -> None:
     lines: list[str] = []
     if os.path.exists(path):
@@ -178,6 +258,7 @@ def _write_json_list(path: str, items: list[dict]) -> None:
         f.write("\n")
 
 
+# Config normalization exists so malformed UI values do not break runtime behavior.
 def _normalize_app_config(raw: Optional[dict]) -> dict:
     if not isinstance(raw, dict):
         return {}
@@ -187,6 +268,23 @@ def _normalize_app_config(raw: Optional[dict]) -> dict:
         if key not in raw:
             continue
         val = raw.get(key)
+
+        if isinstance(default, bool):
+            if isinstance(val, bool):
+                out[key] = val
+                continue
+            if isinstance(val, (int, float)):
+                out[key] = bool(val)
+                continue
+            if isinstance(val, str):
+                lowered = val.strip().lower()
+                if lowered in {"1", "true", "yes", "on"}:
+                    out[key] = True
+                    continue
+                if lowered in {"0", "false", "no", "off"}:
+                    out[key] = False
+                    continue
+            continue
 
         if isinstance(default, str):
             if val is None:
@@ -247,6 +345,8 @@ def _normalize_app_config(raw: Optional[dict]) -> dict:
         out["join_glow_ms"] = max(100, out["join_glow_ms"])
     if "model_progress_default_ms" in out:
         out["model_progress_default_ms"] = max(300, out["model_progress_default_ms"])
+    if "llm_deterministic_seed" in out:
+        out["llm_deterministic_seed"] = max(0, min(2147483647, out["llm_deterministic_seed"]))
     if "default_theme" in out:
         theme = str(out["default_theme"]).strip().lower()
         out["default_theme"] = "light" if theme == "light" else "dark"
@@ -307,6 +407,7 @@ def _ensure_api_counter_file() -> None:
     _write_json(API_COUNTER_PATH, {"total_api_calls": 0})
 
 
+# Provider router: same UI can target Groq or OpenRouter models using one API route.
 def _build_model_client(model: str) -> tuple[OpenAI, str]:
     if model.startswith("groq:"):
         return (
@@ -323,6 +424,65 @@ def _build_model_client(model: str) -> tuple[OpenAI, str]:
         ),
         model,
     )
+
+
+def _coerce_bool(value) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"1", "true", "yes", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "off"}:
+            return False
+    return None
+
+
+def _coerce_seed(value, fallback: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = fallback
+    return max(0, min(2147483647, parsed))
+
+
+def _resolve_text_determinism(
+    deterministic_override=None,
+    seed_override=None,
+) -> tuple[bool, int]:
+    cfg = _get_current_app_config()
+    cfg_deterministic = bool(cfg.get("llm_deterministic_mode", False))
+    cfg_seed = _coerce_seed(cfg.get("llm_deterministic_seed"), 2110)
+    deterministic = _coerce_bool(deterministic_override)
+    if deterministic is None:
+        deterministic = cfg_deterministic
+    seed = _coerce_seed(seed_override, cfg_seed)
+    return deterministic, seed
+
+
+def _chat_completion_create(
+    client: OpenAI,
+    deterministic: bool,
+    seed: int,
+    **kwargs,
+):
+    payload = dict(kwargs)
+    if deterministic:
+        payload["temperature"] = 0
+        payload["top_p"] = 1
+        payload["presence_penalty"] = 0
+        payload["frequency_penalty"] = 0
+        payload["seed"] = seed
+    try:
+        return client.chat.completions.create(**payload)
+    except Exception as exc:
+        # Some provider/model combinations reject `seed`; keep deterministic sampling settings.
+        if deterministic and "seed" in str(exc).lower():
+            payload.pop("seed", None)
+            return client.chat.completions.create(**payload)
+        raise
 
 
 def _replicate_http_json(
@@ -363,6 +523,7 @@ def _replicate_http_json(
     return parsed
 
 
+# Downloads provider-hosted image bytes so we can keep a local cache/history.
 def _download_binary(url: str) -> tuple[bytes, str]:
     req = urllib.request.Request(
         url=url,
@@ -375,6 +536,95 @@ def _download_binary(url: str) -> tuple[bytes, str]:
     if not payload:
         raise RuntimeError("Downloaded image payload is empty")
     return payload, content_type
+
+
+def _daydream_http_json(
+    path_or_url: str,
+    method: str = "GET",
+    payload: Optional[dict] = None,
+    timeout: int = 120,
+) -> dict:
+    api_key = os.getenv("DAYDREAM_API_KEY")
+    if not api_key:
+        raise ValueError("DAYDREAM_API_KEY is not configured")
+
+    if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
+        url = path_or_url
+    else:
+        base = (os.getenv("DAYDREAM_API_BASE") or DAYDREAM_API_BASE).rstrip("/")
+        url = base + "/" + path_or_url.lstrip("/")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Accept": "application/json",
+    }
+    body = None
+    if payload is not None:
+        body = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+
+    req = urllib.request.Request(url=url, data=body, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Daydream HTTP {exc.code}: {raw}") from exc
+
+    try:
+        parsed = json.loads(raw)
+    except Exception as exc:
+        if not raw.strip():
+            return {}
+        raise RuntimeError(f"Daydream returned non-JSON payload: {raw[:240]}") from exc
+    if not isinstance(parsed, dict):
+        raise RuntimeError("Daydream returned unexpected response shape")
+    return parsed
+
+
+# Attempt wrapper returns both response and rich attempt metadata for diagnostics.
+def _daydream_attempt(
+    method: str,
+    path: str,
+    payload: Optional[dict] = None,
+    timeout: int = 120,
+) -> tuple[Optional[dict], dict]:
+    started = time.perf_counter()
+    attempt = {
+        "method": method,
+        "path": path,
+        "ok": False,
+        "elapsed_ms": 0,
+    }
+    try:
+        data = _daydream_http_json(path, method=method, payload=payload, timeout=timeout)
+        attempt["ok"] = True
+        return data, attempt
+    except Exception as exc:
+        attempt["error"] = str(exc)
+        return None, attempt
+    finally:
+        attempt["elapsed_ms"] = int((time.perf_counter() - started) * 1000)
+
+
+def _extract_daydream_stream_id(payload: dict) -> Optional[str]:
+    candidates = [
+        payload.get("stream_id"),
+        payload.get("id"),
+        (payload.get("stream") or {}).get("id") if isinstance(payload.get("stream"), dict) else None,
+        (payload.get("data") or {}).get("id") if isinstance(payload.get("data"), dict) else None,
+    ]
+    for item in candidates:
+        if isinstance(item, str) and item.strip():
+            return item.strip()
+    return None
+
+
+def _path_to_template(path: str, stream_id: str) -> str:
+    stream = (stream_id or "").strip()
+    if not stream:
+        return path
+    return path.replace(stream, "{id}", 1)
 
 
 def _infer_image_extension(source_url: str, content_type: str) -> str:
@@ -449,6 +699,174 @@ def _extract_replicate_image_url(output: object) -> Optional[str]:
     return None
 
 
+def _clamp01(value: float) -> float:
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        n = 0.5
+    return max(0.0, min(1.0, n))
+
+
+def _normalize_game_fish(items: list[FisheyeGameFishPayload]) -> list[dict]:
+    out: list[dict] = []
+    for i, item in enumerate(items):
+        label = (item.label or "").strip() or f"fish {i + 1}"
+        out.append(
+            {
+                "label": label[:48],
+                "x_frac": _clamp01(item.x_frac),
+                "y_frac": _clamp01(item.y_frac),
+            }
+        )
+    return out
+
+
+def _read_game_rounds() -> list[dict]:
+    return _read_json_list(FISHEYE_GAME_ROUNDS_PATH)
+
+
+def _write_game_rounds(items: list[dict]) -> None:
+    _write_json_list(FISHEYE_GAME_ROUNDS_PATH, items)
+
+
+def _new_round_code(existing_codes: set[str]) -> str:
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    for _ in range(64):
+        code = "".join(alphabet[ord(os.urandom(1)) % len(alphabet)] for _ in range(6))
+        if code not in existing_codes:
+            return code
+    return uuid.uuid4().hex[:6].upper()
+
+
+def _best_avg_distance(target_fish: list[dict], guess_fish: list[dict]) -> float:
+    n = len(target_fish)
+    if n <= 0 or len(guess_fish) != n:
+        return 1.0
+    if n == 1:
+        dx = float(target_fish[0]["x_frac"]) - float(guess_fish[0]["x_frac"])
+        dy = float(target_fish[0]["y_frac"]) - float(guess_fish[0]["y_frac"])
+        return (dx * dx + dy * dy) ** 0.5
+    if n == 2:
+        dx0 = float(target_fish[0]["x_frac"]) - float(guess_fish[0]["x_frac"])
+        dy0 = float(target_fish[0]["y_frac"]) - float(guess_fish[0]["y_frac"])
+        dx1 = float(target_fish[1]["x_frac"]) - float(guess_fish[1]["x_frac"])
+        dy1 = float(target_fish[1]["y_frac"]) - float(guess_fish[1]["y_frac"])
+        d_a = ((dx0 * dx0 + dy0 * dy0) ** 0.5 + (dx1 * dx1 + dy1 * dy1) ** 0.5) / 2.0
+
+        dx2 = float(target_fish[0]["x_frac"]) - float(guess_fish[1]["x_frac"])
+        dy2 = float(target_fish[0]["y_frac"]) - float(guess_fish[1]["y_frac"])
+        dx3 = float(target_fish[1]["x_frac"]) - float(guess_fish[0]["x_frac"])
+        dy3 = float(target_fish[1]["y_frac"]) - float(guess_fish[0]["y_frac"])
+        d_b = ((dx2 * dx2 + dy2 * dy2) ** 0.5 + (dx3 * dx3 + dy3 * dy3) ** 0.5) / 2.0
+        return min(d_a, d_b)
+    return 1.0
+
+
+def _game_in_deadzone(x_frac: float, deadzone_half: float = 0.10) -> bool:
+    x = _clamp01(x_frac)
+    half = max(0.0, min(0.49, float(deadzone_half)))
+    return abs(x - 0.5) <= half
+
+
+def _game_lean_intensity(x_frac: float, deadzone_half: float = 0.10) -> float:
+    x = _clamp01(x_frac)
+    half = max(0.0, min(0.49, float(deadzone_half)))
+    min_pct = 0.01
+    if _game_in_deadzone(x, half):
+        return 0.0
+    if x < 0.5:
+        raw = (0.5 - half - x) / max(0.0001, (0.5 - half))
+    else:
+        raw = (x - (0.5 + half)) / max(0.0001, (0.5 - half))
+    normalized = max(0.0, min(1.0, raw))
+    eased = normalized ** 1.8
+    return min_pct + (1.0 - min_pct) * eased
+
+
+def _build_fisheye_game_generated_prompt(
+    thought: str,
+    fish_items: list[dict],
+    direction_1: str,
+    direction_2: str,
+    keep_brief: bool,
+    base_preamble: str,
+    base_closing: str,
+) -> str:
+    active_fish = [x for x in fish_items if (1.0 - float(x.get("y_frac", 1.0))) > 0.01]
+    if not active_fish:
+        return (
+            'Here is the original thought:\n\n"""\n'
+            + thought
+            + '\n"""\n\nNo active transformation concepts (all at zero weight).'
+        )
+
+    lines: list[str] = []
+    for fish in active_fish:
+        label = str(fish.get("label") or "fish").strip() or "fish"
+        x = _clamp01(float(fish.get("x_frac", 0.5)))
+        y = _clamp01(float(fish.get("y_frac", 0.5)))
+        weight = 1.0 - y
+        lean_desc = ""
+        if not _game_in_deadzone(x):
+            if x < 0.5 and direction_1:
+                lean_desc = f'leans {round(_game_lean_intensity(x) * 100)}% toward "{direction_1}"'
+            elif x > 0.5 and direction_2:
+                lean_desc = f'leans {round(_game_lean_intensity(x) * 100)}% toward "{direction_2}"'
+        line = f"{label}: weight {weight:.2f}"
+        if lean_desc:
+            line += ", " + lean_desc
+        lines.append(line)
+
+    brief = "\nKeep your answer extremely brief (e.g., less than 20 words)." if keep_brief else ""
+    return (
+        'Here is the original thought:\n\n"""\n'
+        + thought
+        + '\n"""\n\n'
+        + base_preamble.strip()
+        + "\n\n"
+        + "\n".join(lines)
+        + "\n\n"
+        + base_closing.strip()
+        + brief
+    )
+
+
+def _generate_text_once(prompt: str, model: str) -> str:
+    client, actual_model = _build_model_client(model or DEFAULT_MODEL)
+    deterministic, seed = _resolve_text_determinism()
+    response = _chat_completion_create(
+        client=client,
+        deterministic=deterministic,
+        seed=seed,
+        model=actual_model,
+        max_tokens=500,
+        messages=[{"role": "user", "content": prompt}],
+        stream=False,
+    )
+    if not response or not response.choices:
+        raise RuntimeError("Model returned no choices")
+    message = response.choices[0].message
+    content = getattr(message, "content", "")
+    if isinstance(content, str):
+        out = content.strip()
+    elif isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+                continue
+            txt = getattr(item, "text", None) if item is not None else None
+            if isinstance(txt, str):
+                parts.append(txt)
+        out = "".join(parts).strip()
+    else:
+        out = ""
+    if not out:
+        raise RuntimeError("Model returned empty content")
+    return out
+
+
+# Builds per-model payloads from fisheye selector values (model + optional size token).
 def _build_replicate_input(
     prompt: str, model_slug: str, image_seed: Optional[int] = None
 ) -> dict[str, object]:
@@ -581,17 +999,25 @@ _ensure_api_counter_file()
 
 @app.post("/api/generate")
 async def generate(request: Request):
+    # Main text generation endpoint: streams tokens so UI can render progressively.
     _increment_api_call_count()
     body = await request.json()
     prompt = body.get("prompt", "")
     model = body.get("model") or DEFAULT_MODEL
+    deterministic, seed = _resolve_text_determinism(
+        deterministic_override=body.get("deterministic"),
+        seed_override=body.get("seed"),
+    )
 
     # 🔁 Dynamic provider routing
     client, actual_model = _build_model_client(model)
 
     async def stream_tokens():
         try:
-            stream = client.chat.completions.create(
+            stream = _chat_completion_create(
+                client=client,
+                deterministic=deterministic,
+                seed=seed,
                 model=actual_model,
                 max_tokens=1024,
                 messages=[{"role": "user", "content": prompt}],
@@ -599,8 +1025,15 @@ async def generate(request: Request):
             )
 
             for chunk in stream:
-                text = chunk.choices[0].delta.content
-                if text is None:
+                choices = getattr(chunk, "choices", None)
+                if not choices:
+                    continue
+                first = choices[0]
+                delta = getattr(first, "delta", None)
+                if delta is None:
+                    continue
+                text = getattr(delta, "content", None)
+                if not isinstance(text, str) or not text:
                     continue
 
                 # Escape for SSE
@@ -610,13 +1043,18 @@ async def generate(request: Request):
             yield "data: [DONE]\n\n"
 
         except Exception:
-            yield "data: [ERROR]\n\n"
+            err_detail = traceback.format_exc()
+            print(f"[api/generate] upstream error:\n{err_detail}")
+            err_msg = str(err_detail.splitlines()[-1]).strip() or "Unknown model error"
+            safe_err = err_msg.replace("\\", "\\\\").replace("\n", "\\n")
+            yield f"data: [ERROR] {safe_err}\n\n"
 
     return StreamingResponse(stream_tokens(), media_type="text/event-stream")
 
 
 @app.post("/api/visualise")
-async def visualise(payload: VisualisePayload):
+def visualise(payload: VisualisePayload):
+    # Fisheye endpoint: turns current output text into an image and stores local reference.
     # Reload .env so newly-saved keys are picked up without process restart.
     load_dotenv(dotenv_path=ENV_PATH, override=True)
 
@@ -654,8 +1092,407 @@ async def visualise(payload: VisualisePayload):
     }
 
 
+@app.post("/api/fisheye-game/rounds")
+def create_fisheye_game_round(payload: FisheyeGameRoundCreatePayload):
+    # Creates one multiplayer round and generates its reference image once.
+    load_dotenv(dotenv_path=ENV_PATH, override=True)
+
+    thought = (payload.thought or "").strip()
+    decoy = (payload.decoy_thought or "").strip()
+    if not thought or not decoy:
+        return {"ok": False, "message": "thought and decoy_thought are required"}
+    if thought.lower() == decoy.lower():
+        return {"ok": False, "message": "decoy_thought must differ from thought"}
+
+    fish_items = _normalize_game_fish(payload.fish or [])
+    if len(fish_items) < 1 or len(fish_items) > 2:
+        return {"ok": False, "message": "fish must contain 1 or 2 items"}
+
+    direction_1 = (payload.direction_1 or "").strip()
+    direction_2 = (payload.direction_2 or "").strip()
+    keep_brief = bool(payload.keep_brief) if payload.keep_brief is not None else True
+    prompt_model = (payload.prompt_model or DEFAULT_MODEL).strip() or DEFAULT_MODEL
+    base_preamble = (payload.base_preamble or DEFAULT_BASE_PREAMBLE).strip() or DEFAULT_BASE_PREAMBLE
+    base_closing = (payload.base_closing or DEFAULT_BASE_CLOSING).strip() or DEFAULT_BASE_CLOSING
+
+    generated_prompt = _build_fisheye_game_generated_prompt(
+        thought=thought,
+        fish_items=fish_items,
+        direction_1=direction_1,
+        direction_2=direction_2,
+        keep_brief=keep_brief,
+        base_preamble=base_preamble,
+        base_closing=base_closing,
+    )
+
+    try:
+        _increment_api_call_count()
+        image_prompt = _generate_text_once(generated_prompt, prompt_model)
+    except Exception as exc:
+        return {"ok": False, "message": f"Failed to generate image prompt via model: {exc}"}
+    image_model = (payload.image_model or DEFAULT_REPLICATE_MODEL).strip() or DEFAULT_REPLICATE_MODEL
+    image_seed = payload.image_seed
+    if isinstance(image_seed, int):
+        image_seed = max(1, min(999999, image_seed))
+    else:
+        image_seed = 2110
+
+    try:
+        _increment_api_call_count()
+        source_url = _replicate_generate_image(image_prompt, image_model, image_seed)
+        image_ref, local_image_url = _store_fisheye_image(source_url)
+    except Exception as exc:
+        return {"ok": False, "message": f"Failed to generate game image via Replicate: {exc}"}
+
+    options = [thought, decoy]
+    # Randomize display order once so all guessers see identical choice order for the round.
+    if ord(os.urandom(1)) % 2 == 1:
+        options = [decoy, thought]
+    correct_index = 0 if options[0] == thought else 1
+
+    with FISHEYE_GAME_LOCK:
+        rounds = _read_game_rounds()
+        existing = {str(r.get("code", "")).upper() for r in rounds}
+        code = _new_round_code(existing)
+        now_ts = int(time.time())
+        record = {
+            "code": code,
+            "created_at": now_ts,
+            "thought": thought,
+            "decoy_thought": decoy,
+            "thought_options": options,
+            "correct_thought_index": correct_index,
+            "fish": fish_items,
+            "direction_1": direction_1,
+            "direction_2": direction_2,
+            "keep_brief": keep_brief,
+            "base_preamble": base_preamble,
+            "base_closing": base_closing,
+            "prompt_model": prompt_model,
+            "generated_prompt": generated_prompt,
+            "image_prompt": image_prompt,
+            "image_model": image_model,
+            "image_ref": image_ref,
+            "image_url": local_image_url,
+            "guesses": [],
+        }
+        rounds.append(record)
+        if len(rounds) > 200:
+            rounds = rounds[-200:]
+        _write_game_rounds(rounds)
+
+    return {
+        "ok": True,
+        "round_code": code,
+        "image_url": local_image_url,
+        "join_url": f"/paragraph-adapter-game.html?round={code}",
+        "thought_options": options,
+        "fish_count": len(fish_items),
+        "prompt_model": prompt_model,
+        "generated_prompt": generated_prompt,
+        "image_prompt": image_prompt,
+    }
+
+
+@app.get("/api/fisheye-game/rounds/{round_code}")
+def get_fisheye_game_round(round_code: str):
+    code = (round_code or "").strip().upper()
+    if not code:
+        return {"ok": False, "message": "round_code is required"}
+
+    with FISHEYE_GAME_LOCK:
+        rounds = _read_game_rounds()
+        match = next((r for r in rounds if str(r.get("code", "")).upper() == code), None)
+
+    if not match:
+        return {"ok": False, "message": "Round not found"}
+
+    return {
+        "ok": True,
+        "round_code": code,
+        "created_at": match.get("created_at"),
+        "image_url": match.get("image_url"),
+        "fish_count": len(match.get("fish", []) or []),
+        "thought_options": list(match.get("thought_options", [])),
+        "guess_count": len(match.get("guesses", []) or []),
+    }
+
+
+@app.post("/api/fisheye-game/rounds/{round_code}/guess")
+def submit_fisheye_game_guess(round_code: str, payload: FisheyeGameGuessPayload):
+    code = (round_code or "").strip().upper()
+    if not code:
+        return {"ok": False, "message": "round_code is required"}
+
+    with FISHEYE_GAME_LOCK:
+        rounds = _read_game_rounds()
+        match = next((r for r in rounds if str(r.get("code", "")).upper() == code), None)
+        if not match:
+            return {"ok": False, "message": "Round not found"}
+
+        options = list(match.get("thought_options", []))
+        target_fish = list(match.get("fish", []))
+        if payload.thought_index < 0 or payload.thought_index >= len(options):
+            return {"ok": False, "message": "Invalid thought_index"}
+
+        guessed_fish = _normalize_game_fish(payload.fish or [])
+        if len(guessed_fish) != len(target_fish):
+            return {"ok": False, "message": f"Expected {len(target_fish)} fish guesses"}
+
+        thought_correct = payload.thought_index == int(match.get("correct_thought_index", 0))
+        avg_distance = _best_avg_distance(target_fish, guessed_fish)
+        position_score = max(0, min(100, round((1.0 - min(1.0, avg_distance / 0.85)) * 100)))
+        thought_score = 50 if thought_correct else 0
+        total_score = thought_score + round(position_score * 0.5)
+
+        guess_record = {
+            "created_at": int(time.time()),
+            "thought_index": int(payload.thought_index),
+            "thought_correct": thought_correct,
+            "fish_guess": guessed_fish,
+            "avg_distance": avg_distance,
+            "position_score": position_score,
+            "total_score": total_score,
+        }
+        guesses = list(match.get("guesses", []))
+        guesses.append(guess_record)
+        match["guesses"] = guesses[-50:]
+        _write_game_rounds(rounds)
+
+    return {
+        "ok": True,
+        "round_code": code,
+        "thought_correct": thought_correct,
+        "correct_thought_index": int(match.get("correct_thought_index", 0)),
+        "correct_thought": options[int(match.get("correct_thought_index", 0))] if options else "",
+        "avg_distance": avg_distance,
+        "position_score": position_score,
+        "total_score": total_score,
+        "target_fish": target_fish,
+        "guess_fish": guessed_fish,
+    }
+
+
+@app.post("/api/daydream/stream/create")
+def daydream_create_stream(payload: DaydreamCreatePayload):
+    # Daydream has route variance; this endpoint probes and stores working route hints.
+    prompt = (payload.prompt or "").strip()
+    if not prompt:
+        return {"ok": False, "message": "prompt is required"}
+
+    model_id = (payload.model_id or "stabilityai/sdxl-turbo").strip() or "stabilityai/sdxl-turbo"
+    request_payload = {
+        "pipeline": "streamdiffusion",
+        "params": {
+            "model_id": model_id,
+            "prompt": prompt,
+            # Keep stream startup lightweight for faster bring-up during testing.
+            "controlnets": [],
+        },
+    }
+
+    attempts: list[dict] = []
+    errors: list[str] = []
+    for path in ("/v1/streams", "/api/v1/streams"):
+        data, attempt = _daydream_attempt("POST", path, request_payload, timeout=120)
+        attempts.append(attempt)
+        if data is not None:
+            stream_id = _extract_daydream_stream_id(data)
+            return {
+                "ok": True,
+                "stream_id": stream_id,
+                "raw": data,
+                "debug": {
+                    "api_base": (os.getenv("DAYDREAM_API_BASE") or DAYDREAM_API_BASE),
+                    "attempts": attempts,
+                },
+            }
+        if "error" in attempt:
+            errors.append(str(attempt["error"]))
+
+    return {
+        "ok": False,
+        "message": " ; ".join(errors) or "Failed to create Daydream stream",
+        "debug": {
+            "api_base": (os.getenv("DAYDREAM_API_BASE") or DAYDREAM_API_BASE),
+            "attempts": attempts,
+        },
+    }
+
+
+@app.post("/api/daydream/stream/update")
+def daydream_update_stream(payload: DaydreamUpdatePayload):
+    # Reuses discovered Daydream route hints where possible to reduce failed attempts.
+    stream_id = (payload.stream_id or "").strip()
+    if not stream_id:
+        return {"ok": False, "message": "stream_id is required"}
+
+    params: dict[str, object] = {}
+    model_id = (payload.model_id or "").strip()
+    if model_id:
+        params["model_id"] = model_id
+    if payload.prompt is not None:
+        params["prompt"] = payload.prompt
+    if not params:
+        return {"ok": False, "message": "at least one of prompt or model_id is required"}
+    request_payload = {"pipeline": "streamdiffusion", "params": params}
+
+    attempts = [
+        ("POST", f"/v1/streams/{stream_id}/update"),
+        ("PATCH", f"/v1/streams/{stream_id}"),
+        ("POST", f"/v1/streams/{stream_id}"),
+        ("POST", f"/api/v1/streams/{stream_id}/update"),
+        ("PATCH", f"/api/v1/streams/{stream_id}"),
+    ]
+    hint = DAYDREAM_ROUTE_HINTS.get("update")
+    ordered_attempts: list[tuple[str, str]] = []
+    if hint:
+        hint_method, hint_tpl = hint
+        hint_path = hint_tpl.replace("{id}", stream_id)
+        ordered_attempts.append((hint_method, hint_path))
+    for item in attempts:
+        if item not in ordered_attempts:
+            ordered_attempts.append(item)
+
+    attempts_log: list[dict] = []
+    errors: list[str] = []
+    for method, path in ordered_attempts:
+        data, attempt = _daydream_attempt(method, path, request_payload, timeout=25)
+        attempts_log.append(attempt)
+        if data is not None:
+            DAYDREAM_ROUTE_HINTS["update"] = (method, _path_to_template(path, stream_id))
+            return {
+                "ok": True,
+                "stream_id": stream_id,
+                "raw": data,
+                "debug": {
+                    "api_base": (os.getenv("DAYDREAM_API_BASE") or DAYDREAM_API_BASE),
+                    "route_hint": DAYDREAM_ROUTE_HINTS.get("update"),
+                    "attempts": attempts_log,
+                },
+            }
+        if "error" in attempt:
+            errors.append(str(attempt["error"]))
+
+    return {
+        "ok": False,
+        "message": " ; ".join(errors) or "Failed to update Daydream stream",
+        "debug": {
+            "api_base": (os.getenv("DAYDREAM_API_BASE") or DAYDREAM_API_BASE),
+            "route_hint": DAYDREAM_ROUTE_HINTS.get("update"),
+            "attempts": attempts_log,
+        },
+    }
+
+
+@app.get("/api/daydream/stream/{stream_id}/status")
+def daydream_stream_status(stream_id: str):
+    # Poll endpoint used by UI to track stream state.
+    stream = (stream_id or "").strip()
+    if not stream:
+        return {"ok": False, "message": "stream_id is required"}
+
+    attempts_log: list[dict] = []
+    paths = (
+        f"/v1/streams/{stream}/status",
+        f"/api/v1/streams/{stream}/status",
+        f"/v1/streams/{stream}",
+        f"/api/v1/streams/{stream}",
+    )
+    hint = DAYDREAM_ROUTE_HINTS.get("status")
+    ordered_paths: list[str] = []
+    if hint:
+        _, hint_tpl = hint
+        ordered_paths.append(hint_tpl.replace("{id}", stream))
+    for path in paths:
+        if path not in ordered_paths:
+            ordered_paths.append(path)
+
+    errors: list[str] = []
+    for path in ordered_paths:
+        data, attempt = _daydream_attempt("GET", path, None, timeout=90)
+        attempts_log.append(attempt)
+        if data is not None:
+            DAYDREAM_ROUTE_HINTS["status"] = ("GET", _path_to_template(path, stream))
+            return {
+                "ok": True,
+                "stream_id": stream,
+                "raw": data,
+                "debug": {
+                    "api_base": (os.getenv("DAYDREAM_API_BASE") or DAYDREAM_API_BASE),
+                    "route_hint": DAYDREAM_ROUTE_HINTS.get("status"),
+                    "attempts": attempts_log,
+                },
+            }
+        if "error" in attempt:
+            errors.append(str(attempt["error"]))
+
+    return {
+        "ok": False,
+        "message": " ; ".join(errors) or "Failed to fetch Daydream stream status",
+        "debug": {
+            "api_base": (os.getenv("DAYDREAM_API_BASE") or DAYDREAM_API_BASE),
+            "route_hint": DAYDREAM_ROUTE_HINTS.get("status"),
+            "attempts": attempts_log,
+        },
+    }
+
+
+@app.post("/api/daydream/stream/stop")
+def daydream_stop_stream(payload: DaydreamStopPayload):
+    # Stop endpoint with fallback route probing for compatibility.
+    stream_id = (payload.stream_id or "").strip()
+    if not stream_id:
+        return {"ok": False, "message": "stream_id is required"}
+
+    attempts = [
+        ("DELETE", f"/v1/streams/{stream_id}"),
+        ("POST", f"/v1/streams/{stream_id}/stop"),
+    ]
+    hint = DAYDREAM_ROUTE_HINTS.get("stop")
+    ordered_attempts: list[tuple[str, str]] = []
+    if hint:
+        hint_method, hint_tpl = hint
+        hint_path = hint_tpl.replace("{id}", stream_id)
+        ordered_attempts.append((hint_method, hint_path))
+    for item in attempts:
+        if item not in ordered_attempts:
+            ordered_attempts.append(item)
+
+    attempts_log: list[dict] = []
+    errors: list[str] = []
+    for method, path in ordered_attempts:
+        data, attempt = _daydream_attempt(method, path, None, timeout=8)
+        attempts_log.append(attempt)
+        if data is not None:
+            DAYDREAM_ROUTE_HINTS["stop"] = (method, _path_to_template(path, stream_id))
+            return {
+                "ok": True,
+                "stream_id": stream_id,
+                "raw": data,
+                "debug": {
+                    "api_base": (os.getenv("DAYDREAM_API_BASE") or DAYDREAM_API_BASE),
+                    "route_hint": DAYDREAM_ROUTE_HINTS.get("stop"),
+                    "attempts": attempts_log,
+                },
+            }
+        if "error" in attempt:
+            errors.append(str(attempt["error"]))
+
+    return {
+        "ok": False,
+        "message": " ; ".join(errors) or "Failed to stop Daydream stream",
+        "debug": {
+            "api_base": (os.getenv("DAYDREAM_API_BASE") or DAYDREAM_API_BASE),
+            "route_hint": DAYDREAM_ROUTE_HINTS.get("stop"),
+            "attempts": attempts_log,
+        },
+    }
+
+
 @app.get("/api/fisheye-images/{image_ref}")
 async def get_fisheye_image(image_ref: str):
+    # Serves locally cached fisheye image files by short reference id.
     items = _read_json_list(FISHEYE_IMAGE_INDEX_PATH)
     match = next((x for x in items if str(x.get("ref", "")) == image_ref), None)
     if not match:
@@ -675,6 +1512,7 @@ async def get_fisheye_image(image_ref: str):
 
 @app.post("/api/save-keys")
 async def save_keys(payload: EnvKeysPayload):
+    # Saves only provided keys; blank fields are intentionally ignored.
     global OPENROUTER_API_KEY, GROQ_API_KEY, REPLICATE_API_TOKEN
 
     updates: dict[str, str] = {}

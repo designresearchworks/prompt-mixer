@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Daydream Test</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#0b0b13; --surface:#11111c; --surface2:#181828; --border:#2a2a45;
+  --text:#d6d6ee; --muted:#8c8cab; --accent:#60a5fa; --ok:#22c55e; --err:#ef4444;
+}
+html,body { min-height:100vh; background:var(--bg); color:var(--text); font-family:ui-sans-serif,system-ui; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 40px; }
+.top { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.title { font-size:20px; font-weight:700; }
+.back { color:var(--muted); text-decoration:none; border:1px solid var(--border); border-radius:8px; padding:7px 10px; font-size:12px; }
+.grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.panel { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px; }
+.panel h2 { font-size:11px; text-transform:uppercase; letter-spacing:1.1px; color:var(--muted); margin-bottom:10px; }
+.row { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+.row:last-child { margin-bottom:0; }
+label { width:110px; font-size:12px; color:var(--muted); flex:0 0 auto; }
+input, textarea { width:100%; border:1px solid var(--border); border-radius:8px; background:var(--surface2); color:var(--text); padding:8px 10px; font-size:12px; }
+textarea { min-height:88px; resize:vertical; }
+.actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+button { border:1px solid var(--border); border-radius:8px; background:var(--surface2); color:var(--text); padding:8px 12px; font-size:12px; cursor:pointer; }
+button.primary { border-color:#3b82f6; color:#dbeafe; }
+button:disabled { opacity:0.5; cursor:not-allowed; }
+.status { font-size:12px; color:var(--muted); margin-top:10px; }
+.status.ok { color:var(--ok); }
+.status.err { color:var(--err); }
+pre { background:#0a0d17; border:1px solid var(--border); border-radius:8px; padding:10px; font-size:11px; line-height:1.45; white-space:pre-wrap; word-break:break-word; max-height:380px; overflow:auto; }
+.wide { grid-column:1 / -1; }
+.inline { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:12px; }
+.preview-wrap {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #070a12;
+  min-height: 320px;
+}
+.preview-frame {
+  width: 100%;
+  height: 360px;
+  border: 0;
+  display: block;
+  background: #070a12;
+}
+.preview-meta {
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+.preview-links a {
+  color: #93c5fd;
+  text-decoration: none;
+  margin-right: 10px;
+}
+.preview-links a:hover { text-decoration: underline; }
+.video-wrap {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #070a12;
+}
+.local-video {
+  width: 100%;
+  height: 260px;
+  display: block;
+  object-fit: cover;
+  background: #070a12;
+}
+@media (max-width: 860px) { .grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="title">Daydream API Test Bench</div>
+    <a class="back" href="index.html">Back</a>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Request Controls</h2>
+      <div class="row">
+        <label for="model-id">Model ID</label>
+        <input id="model-id" value="stabilityai/sdxl-turbo" />
+      </div>
+      <div class="row">
+        <label for="stream-id">Stream ID</label>
+        <input id="stream-id" placeholder="filled after create" />
+      </div>
+      <div class="row" style="align-items:flex-start;">
+        <label for="prompt">Prompt</label>
+        <textarea id="prompt">Ancient, earthy, instinctual introspection.</textarea>
+      </div>
+      <div class="actions">
+        <button class="primary" id="create-btn">Create Stream</button>
+        <button id="update-btn">Update Stream</button>
+        <button id="status-btn">Get Status</button>
+        <button id="clear-btn">Clear Logs</button>
+      </div>
+      <div class="actions">
+        <label class="inline"><input type="checkbox" id="auto-poll"> Auto-poll status</label>
+        <label class="inline">Every <input type="number" id="poll-ms" value="3000" min="500" step="100" style="width:90px;"> ms</label>
+      </div>
+      <div class="actions">
+        <label class="inline"><input type="checkbox" id="direct-api-mode" checked> Direct Daydream API (browser)</label>
+      </div>
+      <div class="row">
+        <label for="direct-api-key">API Key</label>
+        <input id="direct-api-key" type="password" value="sk_gy1TYWYcqBGqJejKvUcRG3AfJEKnKLXarjFUdD89f1oLDZrNsGfBhfiEUGo2aGyK" placeholder="sk_... (used only in browser test page)" />
+      </div>
+      <div class="actions">
+        <label class="inline"><input type="checkbox" id="rapid-update"> Rapid prompt updates</label>
+        <label class="inline">Debounce <input type="number" id="rapid-ms" value="220" min="50" step="10" style="width:90px;"> ms</label>
+      </div>
+      <div id="status-line" class="status">Ready.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Last Response</h2>
+      <pre id="last-response">(none)</pre>
+    </div>
+
+    <div class="panel wide">
+      <h2>Live Preview</h2>
+      <div class="preview-wrap">
+        <iframe id="preview-frame" class="preview-frame" title="Daydream Live Preview"></iframe>
+        <div class="preview-meta">
+          <div id="preview-id">Playback ID: (none)</div>
+          <div id="preview-links" class="preview-links"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel wide">
+      <h2>Ingest (WHIP)</h2>
+      <div class="row">
+        <label for="whip-url">WHIP URL</label>
+        <input id="whip-url" placeholder="filled from create response whip_url" />
+      </div>
+      <div class="actions">
+        <button class="primary" id="start-ingest-btn">Start Ingest</button>
+        <button id="stop-ingest-btn" disabled>Stop Ingest</button>
+      </div>
+      <div class="video-wrap" style="margin-top:10px;">
+        <video id="local-video" class="local-video" autoplay playsinline muted></video>
+      </div>
+      <div id="ingest-status" class="status">Ingest idle.</div>
+    </div>
+
+    <div class="panel wide">
+      <h2>Attempt Trace</h2>
+      <pre id="attempt-log">(no attempts yet)</pre>
+    </div>
+  </div>
+</div>
+<script>
+var pollTimer = null;
+var lastPlaybackId = '';
+var lastWhipUrl = '';
+var ingestPc = null;
+var ingestStream = null;
+var rapidTimer = null;
+var rapidInFlight = false;
+var rapidPendingPrompt = '';
+var directRouteHints = { create: null, update: null, status: null };
+var rapidUpdateAbortController = null;
+var directStreamConfigs = {};
+
+function $(id) { return document.getElementById(id); }
+function setStatus(msg, kind) {
+  var el = $('status-line');
+  el.textContent = msg;
+  el.className = 'status' + (kind ? ' ' + kind : '');
+}
+function pp(v) {
+  try { return JSON.stringify(v, null, 2); } catch (_) { return String(v); }
+}
+function appendAttemptLog(title, data) {
+  var out = $('attempt-log');
+  var existing = out.textContent === '(no attempts yet)' ? '' : out.textContent + '\n\n';
+  out.textContent = existing + '[' + new Date().toLocaleTimeString() + '] ' + title + '\n' + pp(data);
+}
+
+function setIngestStatus(msg, kind) {
+  var el = $('ingest-status');
+  el.textContent = msg;
+  el.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+function setIngestButtons(active) {
+  $('start-ingest-btn').disabled = !!active;
+  $('stop-ingest-btn').disabled = !active;
+}
+
+function isDirectApiMode() {
+  return !!$('direct-api-mode').checked;
+}
+
+function getDirectApiKey() {
+  return ($('direct-api-key').value || '').trim();
+}
+
+function extractPlaybackId(data) {
+  if (!data || typeof data !== 'object') return '';
+  var raw = data.raw && typeof data.raw === 'object' ? data.raw : data;
+  var direct = raw.output_playback_id || raw.playback_id || '';
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  if (raw.stream && typeof raw.stream === 'object') {
+    var nested = raw.stream.output_playback_id || raw.stream.playback_id || '';
+    if (typeof nested === 'string' && nested.trim()) return nested.trim();
+  }
+  return '';
+}
+
+function extractWhipUrl(data) {
+  if (!data || typeof data !== 'object') return '';
+  var raw = data.raw && typeof data.raw === 'object' ? data.raw : data;
+  var direct = raw.whip_url || '';
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  if (raw.stream && typeof raw.stream === 'object') {
+    var nested = raw.stream.whip_url || '';
+    if (typeof nested === 'string' && nested.trim()) return nested.trim();
+  }
+  return '';
+}
+
+function updatePreviewLinks(playbackId) {
+  var linksEl = $('preview-links');
+  var idEl = $('preview-id');
+  var frame = $('preview-frame');
+  if (!playbackId) {
+    lastPlaybackId = '';
+    idEl.textContent = 'Playback ID: (none)';
+    linksEl.textContent = 'Create a stream to get playback.';
+    frame.removeAttribute('src');
+    return;
+  }
+
+  lastPlaybackId = playbackId;
+  var lvprUrl = 'https://lvpr.tv/?v=' + encodeURIComponent(playbackId);
+  var hlsUrl = 'https://livepeercdn.studio/hls/' + encodeURIComponent(playbackId) + '/index.m3u8';
+  idEl.textContent = 'Playback ID: ' + playbackId;
+  frame.src = lvprUrl;
+  linksEl.innerHTML =
+    '<a href=\"' + lvprUrl + '\" target=\"_blank\" rel=\"noopener\">Open Player</a>' +
+    '<a href=\"' + hlsUrl + '\" target=\"_blank\" rel=\"noopener\">Open HLS</a>';
+}
+
+function updatePreviewFromResponse(data) {
+  var playbackId = extractPlaybackId(data);
+  if (playbackId) {
+    updatePreviewLinks(playbackId);
+  }
+  var whipUrl = extractWhipUrl(data);
+  if (whipUrl) {
+    lastWhipUrl = whipUrl;
+    $('whip-url').value = whipUrl;
+  }
+}
+
+async function stopIngest() {
+  if (ingestPc) {
+    try { ingestPc.close(); } catch (_) {}
+    ingestPc = null;
+  }
+  if (ingestStream) {
+    ingestStream.getTracks().forEach(function(t) { try { t.stop(); } catch (_) {} });
+    ingestStream = null;
+  }
+  var video = $('local-video');
+  if (video) video.srcObject = null;
+  setIngestButtons(false);
+  setIngestStatus('Ingest stopped.', '');
+}
+
+async function startIngest() {
+  var whipUrl = ($('whip-url').value || '').trim();
+  if (!whipUrl) {
+    setIngestStatus('WHIP URL is required. Create stream first.', 'err');
+    return;
+  }
+  if (ingestPc) {
+    setIngestStatus('Ingest already active.', '');
+    return;
+  }
+
+  setIngestStatus('Requesting camera...', '');
+  try {
+    ingestStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    $('local-video').srcObject = ingestStream;
+
+    ingestPc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+
+    ingestStream.getTracks().forEach(function(track) {
+      ingestPc.addTrack(track, ingestStream);
+    });
+
+    var offer = await ingestPc.createOffer();
+    await ingestPc.setLocalDescription(offer);
+
+    setIngestStatus('Publishing to WHIP...', '');
+    var resp = await fetch(whipUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/sdp' },
+      body: offer.sdp
+    });
+    if (!resp.ok) {
+      var errBody = await resp.text().catch(function() { return ''; });
+      throw new Error('WHIP HTTP ' + resp.status + (errBody ? (': ' + errBody.slice(0, 300)) : ''));
+    }
+
+    var answerSdp = await resp.text();
+    await ingestPc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+    setIngestButtons(true);
+    setIngestStatus('Ingest active. Live preview should come online shortly.', 'ok');
+  } catch (err) {
+    appendAttemptLog('INGEST_ERROR', { message: (err && err.message) ? err.message : String(err) });
+    setIngestStatus('Ingest failed: ' + ((err && err.message) ? err.message : 'unknown error'), 'err');
+    await stopIngest();
+  }
+}
+
+async function callJson(url, options) {
+  var started = performance.now();
+  var res = await fetch(url, options || {});
+  var elapsed = Math.round(performance.now() - started);
+  var data = await res.json().catch(function() { return { ok: false, message: 'Non-JSON response' }; });
+  data._http = { status: res.status, elapsed_ms: elapsed, url: url };
+  return { res: res, data: data };
+}
+
+async function directDaydreamRequest(path, method, payload, timeoutMs, controller) {
+  var key = getDirectApiKey();
+  if (!key) throw new Error('Direct API mode requires API Key');
+  var fullUrl = 'https://api.daydream.live' + path;
+  var ownController = controller || new AbortController();
+  var timeout = setTimeout(function() { ownController.abort(); }, Math.max(500, timeoutMs || 12000));
+  try {
+    var res = await fetch(fullUrl, {
+      method: method,
+      headers: {
+        'Authorization': 'Bearer ' + key,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: payload ? JSON.stringify(payload) : undefined,
+      signal: ownController.signal
+    });
+    var text = await res.text();
+    var parsed = null;
+    try { parsed = JSON.parse(text); } catch (_) { parsed = { raw_text: text }; }
+    return { ok: res.ok, status: res.status, body: parsed, url: fullUrl };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function normalizeDirectCreateResponse(resp, elapsedMs, attempts) {
+  var body = resp && resp.body ? resp.body : {};
+  var streamId = body.stream_id || body.id || ((body.stream && body.stream.id) ? body.stream.id : '');
+  return {
+    ok: !!resp.ok,
+    stream_id: streamId || null,
+    raw: body,
+    debug: { api_base: 'https://api.daydream.live', attempts: attempts },
+    _http: { status: resp.status, elapsed_ms: elapsedMs, url: '/direct/daydream/create' }
+  };
+}
+
+function normalizeDirectGenericResponse(resp, elapsedMs, endpointName, attempts, streamId) {
+  return {
+    ok: !!resp.ok,
+    stream_id: streamId || null,
+    raw: resp && resp.body ? resp.body : {},
+    debug: { api_base: 'https://api.daydream.live', route_hint: directRouteHints[endpointName], attempts: attempts },
+    _http: { status: resp.status, elapsed_ms: elapsedMs, url: '/direct/daydream/' + endpointName }
+  };
+}
+
+function cloneObject(value) {
+  if (!value || typeof value !== 'object') return null;
+  try { return JSON.parse(JSON.stringify(value)); } catch (_) { return null; }
+}
+
+function extractDirectConfigBody(body) {
+  if (!body || typeof body !== 'object') return null;
+  var raw = (body.raw && typeof body.raw === 'object') ? body.raw : body;
+  if (!raw || typeof raw !== 'object') return null;
+  var pipeline = raw.pipeline || (raw.stream && raw.stream.pipeline) || 'streamdiffusion';
+  var params = raw.params || raw.pipeline_params || (raw.stream && (raw.stream.params || raw.stream.pipeline_params));
+  if (!params || typeof params !== 'object') return null;
+  return {
+    pipeline: String(pipeline || 'streamdiffusion'),
+    params: cloneObject(params)
+  };
+}
+
+function rememberDirectStreamConfig(streamId, body) {
+  if (!streamId) return;
+  var cfg = extractDirectConfigBody(body);
+  if (!cfg || !cfg.params) return;
+  directStreamConfigs[streamId] = cfg;
+}
+
+async function directCreateStream(payload) {
+  var started = performance.now();
+  var attempts = [];
+  var path = directRouteHints.create || '/v1/streams';
+  var paths = [path, '/v1/streams', '/api/v1/streams'];
+  var used = {};
+  for (var i = 0; i < paths.length; i++) {
+    var p = paths[i];
+    if (used[p]) continue;
+    used[p] = true;
+    try {
+      var resp = await directDaydreamRequest(p, 'POST', {
+        pipeline: 'streamdiffusion',
+        params: payload
+      }, 30000);
+      attempts.push({ method: 'POST', path: p, ok: resp.ok, status: resp.status });
+      if (resp.ok) {
+        directRouteHints.create = p;
+        return normalizeDirectCreateResponse(resp, Math.round(performance.now() - started), attempts);
+      }
+      attempts[attempts.length - 1].error = JSON.stringify(resp.body).slice(0, 260);
+    } catch (err) {
+      attempts.push({ method: 'POST', path: p, ok: false, error: (err && err.message) ? err.message : String(err) });
+    }
+  }
+  return {
+    ok: false,
+    message: 'Direct create failed',
+    debug: { api_base: 'https://api.daydream.live', attempts: attempts },
+    _http: { status: 0, elapsed_ms: Math.round(performance.now() - started), url: '/direct/daydream/create' }
+  };
+}
+
+async function directUpdateStream(streamId, promptText, modelId, controller) {
+  var started = performance.now();
+  var attempts = [];
+  var baseCfg = directStreamConfigs[streamId] || { pipeline: 'streamdiffusion', params: {} };
+  var baseParams = cloneObject(baseCfg.params) || {};
+  baseParams.prompt = promptText;
+  if (modelId && !baseParams.model_id) baseParams.model_id = modelId;
+  var pipeline = String(baseCfg.pipeline || 'streamdiffusion');
+
+  var parsedHint = null;
+  if (directRouteHints.update) {
+    var hintParts = directRouteHints.update.split('|');
+    if (hintParts.length === 3) {
+      parsedHint = { method: hintParts[0], tpl: hintParts[1], style: hintParts[2] };
+    }
+  }
+
+  var tries = [];
+  if (parsedHint) tries.push(parsedHint);
+  tries = tries.concat([
+    { method: 'PATCH', tpl: '/v1/streams/{id}', style: 'pipeline+params' },
+    { method: 'POST', tpl: '/v1/streams/{id}', style: 'pipeline+params' },
+    { method: 'POST', tpl: '/v1/streams/{id}', style: 'pipeline_params' },
+    { method: 'POST', tpl: '/v1/streams/{id}/update', style: 'pipeline+params' },
+    { method: 'POST', tpl: '/v1/streams/{id}/update', style: 'pipeline_params' }
+  ]);
+
+  var used = {};
+  for (var i = 0; i < tries.length; i++) {
+    var t = tries[i];
+    var key = t.method + ' ' + t.tpl + '|' + t.style;
+    if (used[key]) continue;
+    used[key] = true;
+    var path = t.tpl.replace('{id}', encodeURIComponent(streamId));
+    var payload = t.style === 'pipeline_params'
+      ? { pipeline_params: baseParams }
+      : { pipeline: pipeline, params: baseParams };
+    try {
+      var resp = await directDaydreamRequest(path, t.method, payload, 9000, controller);
+      attempts.push({ method: t.method, path: path, body_style: t.style, ok: resp.ok, status: resp.status });
+      if (resp.ok) {
+        directRouteHints.update = t.method + '|' + t.tpl + '|' + t.style;
+        rememberDirectStreamConfig(streamId, resp.body);
+        return normalizeDirectGenericResponse(resp, Math.round(performance.now() - started), 'update', attempts, streamId);
+      }
+      attempts[attempts.length - 1].error = JSON.stringify(resp.body).slice(0, 260);
+    } catch (err) {
+      attempts.push({ method: t.method, path: path, body_style: t.style, ok: false, error: (err && err.message) ? err.message : String(err) });
+      if (controller && controller.signal && controller.signal.aborted) break;
+    }
+  }
+  return {
+    ok: false,
+    stream_id: streamId,
+    message: 'Direct update failed',
+    debug: { api_base: 'https://api.daydream.live', route_hint: directRouteHints.update, attempts: attempts },
+    _http: { status: 0, elapsed_ms: Math.round(performance.now() - started), url: '/direct/daydream/update' }
+  };
+}
+
+async function directGetStatus(streamId) {
+  var started = performance.now();
+  var attempts = [];
+  var hint = directRouteHints.status || '/v1/streams/{id}';
+  var tries = [hint, '/v1/streams/{id}/status', '/api/v1/streams/{id}/status', '/v1/streams/{id}', '/api/v1/streams/{id}'];
+  var used = {};
+  for (var i = 0; i < tries.length; i++) {
+    var tpl = tries[i];
+    if (used[tpl]) continue;
+    used[tpl] = true;
+    var path = tpl.replace('{id}', encodeURIComponent(streamId));
+    try {
+      var resp = await directDaydreamRequest(path, 'GET', null, 12000);
+      attempts.push({ method: 'GET', path: path, ok: resp.ok, status: resp.status });
+      if (resp.ok) {
+        directRouteHints.status = tpl;
+        return normalizeDirectGenericResponse(resp, Math.round(performance.now() - started), 'status', attempts, streamId);
+      }
+      attempts[attempts.length - 1].error = JSON.stringify(resp.body).slice(0, 260);
+    } catch (err) {
+      attempts.push({ method: 'GET', path: path, ok: false, error: (err && err.message) ? err.message : String(err) });
+    }
+  }
+  return {
+    ok: false,
+    stream_id: streamId,
+    message: 'Direct status failed',
+    debug: { api_base: 'https://api.daydream.live', route_hint: directRouteHints.status, attempts: attempts },
+    _http: { status: 0, elapsed_ms: Math.round(performance.now() - started), url: '/direct/daydream/status' }
+  };
+}
+
+async function createStream() {
+  setStatus('Creating stream...', '');
+  var payload = { prompt: $('prompt').value || '', model_id: $('model-id').value || '' };
+  var data = null;
+  if (isDirectApiMode()) {
+    data = await directCreateStream(payload);
+  } else {
+    var r = await callJson('/api/daydream/stream/create', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    });
+    data = r.data;
+  }
+  $('last-response').textContent = pp(data);
+  if (data && data.stream_id) $('stream-id').value = data.stream_id;
+  if (data && data.stream_id && isDirectApiMode()) rememberDirectStreamConfig(data.stream_id, data);
+  updatePreviewFromResponse(data);
+  appendAttemptLog('CREATE', { mode: isDirectApiMode() ? 'direct' : 'backend', request: payload, response: data });
+  if (data && data.ok) setStatus('Create ok in ' + data._http.elapsed_ms + 'ms', 'ok');
+  else setStatus('Create failed: ' + ((data && data.message) || 'unknown'), 'err');
+}
+
+async function updateStream(promptOverride, opts) {
+  opts = opts || {};
+  var streamId = ($('stream-id').value || '').trim();
+  if (!streamId) { setStatus('stream_id required for update', 'err'); return; }
+  if (!opts.silent) setStatus('Updating stream...', '');
+  var promptText = (typeof promptOverride === 'string') ? promptOverride : ($('prompt').value || '');
+  var payload = { stream_id: streamId, prompt: promptText };
+  var data = null;
+  if (isDirectApiMode()) {
+    if (rapidUpdateAbortController) rapidUpdateAbortController.abort();
+    rapidUpdateAbortController = new AbortController();
+    data = await directUpdateStream(streamId, promptText, ($('model-id').value || '').trim(), rapidUpdateAbortController);
+  } else {
+    var r = await callJson('/api/daydream/stream/update', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    });
+    data = r.data;
+  }
+  $('last-response').textContent = pp(data);
+  if (data && data.stream_id && isDirectApiMode()) rememberDirectStreamConfig(data.stream_id, data);
+  updatePreviewFromResponse(data);
+  if (opts.log !== false) {
+    appendAttemptLog('UPDATE', { mode: isDirectApiMode() ? 'direct' : 'backend', request: payload, response: data });
+  }
+  if (data && data.ok) {
+    setStatus((opts.silent ? 'Rapid update ok in ' : 'Update ok in ') + data._http.elapsed_ms + 'ms', 'ok');
+  } else {
+    setStatus((opts.silent ? 'Rapid update failed: ' : 'Update failed: ') + ((data && data.message) || 'unknown'), 'err');
+  }
+  return { data: data };
+}
+
+async function getStatus() {
+  var streamId = ($('stream-id').value || '').trim();
+  if (!streamId) { setStatus('stream_id required for status', 'err'); return; }
+  setStatus('Loading status...', '');
+  var data = null;
+  if (isDirectApiMode()) {
+    data = await directGetStatus(streamId);
+  } else {
+    var url = '/api/daydream/stream/' + encodeURIComponent(streamId) + '/status';
+    var r = await callJson(url, { method: 'GET' });
+    data = r.data;
+  }
+  $('last-response').textContent = pp(data);
+  if (data && data.stream_id && isDirectApiMode()) rememberDirectStreamConfig(data.stream_id, data);
+  updatePreviewFromResponse(data);
+  appendAttemptLog('STATUS', { mode: isDirectApiMode() ? 'direct' : 'backend', stream_id: streamId, response: data });
+  if (data && data.ok) setStatus('Status ok in ' + data._http.elapsed_ms + 'ms', 'ok');
+  else setStatus('Status failed: ' + ((data && data.message) || 'unknown'), 'err');
+}
+
+function clearLogs() {
+  $('attempt-log').textContent = '(no attempts yet)';
+  $('last-response').textContent = '(none)';
+  updatePreviewLinks('');
+  setStatus('Cleared.', '');
+}
+
+function queueRapidUpdate() {
+  if (!$('rapid-update').checked) return;
+  var streamId = ($('stream-id').value || '').trim();
+  if (!streamId) return;
+  var nextPrompt = ($('prompt').value || '').trim();
+  if (!nextPrompt) return;
+  var delay = Math.max(50, parseInt($('rapid-ms').value || '220', 10) || 220);
+  if (rapidTimer) clearTimeout(rapidTimer);
+  rapidTimer = setTimeout(function() {
+    rapidTimer = null;
+    runRapidUpdate(nextPrompt);
+  }, delay);
+}
+
+async function runRapidUpdate(promptText) {
+  if (rapidInFlight) {
+    rapidPendingPrompt = promptText;
+    return;
+  }
+  rapidInFlight = true;
+  try {
+    await updateStream(promptText, { silent: true, log: false });
+  } finally {
+    rapidInFlight = false;
+    if (rapidPendingPrompt && rapidPendingPrompt !== promptText) {
+      var next = rapidPendingPrompt;
+      rapidPendingPrompt = '';
+      runRapidUpdate(next);
+    } else {
+      rapidPendingPrompt = '';
+    }
+  }
+}
+
+function refreshPoll() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  if (!$('auto-poll').checked) return;
+  var interval = Math.max(500, parseInt($('poll-ms').value || '3000', 10) || 3000);
+  pollTimer = setInterval(function() {
+    getStatus().catch(function(err) {
+      setStatus('Auto-poll error: ' + (err && err.message ? err.message : 'unknown'), 'err');
+    });
+  }, interval);
+}
+
+$('create-btn').addEventListener('click', function() { createStream().catch(function(e){ setStatus('Create error: ' + e.message, 'err'); }); });
+$('update-btn').addEventListener('click', function() { updateStream().catch(function(e){ setStatus('Update error: ' + e.message, 'err'); }); });
+$('status-btn').addEventListener('click', function() { getStatus().catch(function(e){ setStatus('Status error: ' + e.message, 'err'); }); });
+$('clear-btn').addEventListener('click', clearLogs);
+$('auto-poll').addEventListener('change', refreshPoll);
+$('poll-ms').addEventListener('change', refreshPoll);
+$('prompt').addEventListener('input', queueRapidUpdate);
+$('rapid-update').addEventListener('change', function() {
+  if (!$('rapid-update').checked && rapidTimer) {
+    clearTimeout(rapidTimer);
+    rapidTimer = null;
+    rapidPendingPrompt = '';
+  }
+});
+$('rapid-ms').addEventListener('change', queueRapidUpdate);
+$('start-ingest-btn').addEventListener('click', function() { startIngest(); });
+$('stop-ingest-btn').addEventListener('click', function() { stopIngest(); });
+window.addEventListener('beforeunload', function() { stopIngest(); });
+updatePreviewLinks('');
+</script>
+</body>
+</html>

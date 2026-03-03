@@ -4,6 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Paragraph Adapter (Feedback)</title>
+<!--
+  Feedback build:
+  - What: interactive fish-based concept mixer for text transformation.
+  - Why: let users steer model output through spatial/weighted concepts.
+  - How: browser-side simulation + SSE streaming from backend /api/generate.
+-->
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -96,6 +102,10 @@ html, body {
 /* ═══════════════════════════════
    PAGE LAYOUT — single column, full-width stacked
 ═══════════════════════════════ */
+/* Why this layout (so the UI does not flounder on small screens):
+   - Each prompt-building stage is visible simultaneously.
+   - Vertical flow works better than split panes on smaller displays.
+   - `100dvh` avoids mobile address-bar jump issues. */
 .page {
   min-height: 100vh;
   height: 100dvh;
@@ -110,6 +120,8 @@ html, body {
 /* ═══════════════════════════════
    SHARED ROW STYLE
 ═══════════════════════════════ */
+/* Rows are independent modules: each one can be collapsed/reordered responsively
+   without changing generation logic. */
 .row {
   padding: 16px 24px;
   border-bottom: 1px solid var(--border);
@@ -136,6 +148,8 @@ html, body {
 /* ═══════════════════════════════
    INPUTS
 ═══════════════════════════════ */
+/* Input fields share one visual language to reduce cognitive load while
+   users switch between thought, sensibilities, and prompt template editing. */
 textarea {
   width: 100%;
   background: var(--surface2);
@@ -517,7 +531,7 @@ textarea:focus { border-color: var(--accent); }
   animation: mergeSparkBurst 520ms ease-out forwards;
 }
 
-/* Deadzone overlay band in the center of the mixer */
+/* Deadzone overlay band in the center of the mixer (the no-fish-fight zone) */
 .deadzone-band {
   position: absolute;
   top: 0; bottom: 0;
@@ -769,7 +783,7 @@ textarea:focus { border-color: var(--accent); }
 }
 .mixer-empty-icon { font-size: 24px; opacity: 0.35; }
 
-/* Word chips */
+/* Word chips (small schools of weighted concepts) */
 .word-chip {
   position: absolute;
   display: flex;
@@ -874,7 +888,7 @@ textarea:focus { border-color: var(--accent); }
   background: #3b82f6;
   flex-shrink: 0;
 }
-/* Streaming state: flashing amber-red */
+/* Streaming state: flashing amber-red so users know something is on the hook */
 .live-dot.streaming {
   background: #f59e0b;
   animation: pulse-stream 0.8s ease-in-out infinite;
@@ -1226,6 +1240,9 @@ textarea:focus { border-color: var(--accent); }
 /* ═══════════════════════════════
    COLLAPSIBLE SECTIONS
 ═══════════════════════════════ */
+/* Collapsibles keep dense advanced controls available without overwhelming
+   first-time usage (especially prompt template and history-heavy sections).
+   Keeps advanced options in the tackle box until needed. */
 .collapse-btn {
   background: none;
   border: 1px solid var(--border2);
@@ -1256,6 +1273,8 @@ textarea:focus { border-color: var(--accent); }
 /* ═══════════════════════════════
    HISTORY TOOLTIP
 ═══════════════════════════════ */
+/* Tooltip is `position: fixed` so it follows cursor reliably even while the
+   page scroll container moves. Pointer events are disabled to avoid hover flicker. */
 .history-item {
   position: relative;
 }
@@ -1283,6 +1302,11 @@ textarea:focus { border-color: var(--accent); }
 /* ═══════════════════════════════
    MOBILE / TOUCH
 ═══════════════════════════════ */
+/* Responsive strategy:
+   - Keep generation-critical controls near top.
+   - Stack concept controls vertically for thumb reach.
+   - Increase spacing where needed without changing core behavior.
+   - Keep things shipshape as width gets tighter. */
 @media (max-width: 700px) {
   .row { padding: 12px 14px; }
   .mixer-section { padding: 12px 14px; }
@@ -1381,6 +1405,7 @@ textarea:focus { border-color: var(--accent); }
 </head>
 <body>
 <div class="page">
+  <!-- Main UI is organized as stacked sections; each section maps to one part of prompt construction. -->
 
   <!-- 1. SOURCE PARAGRAPH -->
   <div class="row row-source" id="row-source">
@@ -1423,6 +1448,10 @@ textarea:focus { border-color: var(--accent); }
 <option value="groq:llama-3.3-70b-versatile" selected>Groq LLaMA 3.3 70B Versatile</option>
 <option value="groq:moonshotai/kimi-k2-instruct-0905">Groq Kimi K2 Instruct 0905</option>
         </select>
+        <label title="Reduce LLM variance by using deterministic decoding settings" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:600;user-select:none;">
+          <input type="checkbox" id="llm-deterministic-toggle" style="width:12px;height:12px;cursor:pointer;">
+          Deterministic
+        </label>
         <div class="cadence-wrap" id="cadence-wrap">
           <span class="cadence-label">Fast</span>
           <input class="cadence-slider" id="infinite-cadence" type="range" min="0" max="5000" step="50" value="2500" oninput="updateCadenceLabel()" title="Speed limit on generations">
@@ -1679,18 +1708,34 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
 <div class="godmode-toast" id="godmode-toast">god mode enabled</div>
 
 <script>
+/*
+  =====================================================================
+  JAVASCRIPT ARCHITECTURE OVERVIEW
+  =====================================================================
+  What:
+  - Manages fish-concept state, builds prompts, streams model output, and renders history.
+  Why:
+  - Keep interaction-heavy logic in one place with minimal backend coupling.
+  How:
+  - Global state + deterministic render loops + debounced generation scheduler.
+  (Yes, the fishy phrasing is deliberate: this is the PthinkTank humor current.)
+*/
 /* ═══════════════════════════════
    DATA
 ═══════════════════════════════ */
+// Core runtime state (UI modes, stream lifecycle, physics loops, and timers).
+// Organized as one shoal so event handlers and render loops read from the same source of truth.
 var words = [];
 var outputHistory  = [];
 var currentOutput  = '';
+// Feedback/infinite generation mode flags (the main control reef).
 var feedbackModeEnabled = false;
 var infiniteFeedbackEnabled = false;
 var infiniteCadenceValue = 2500;
 var isStreaming    = false;
 var pendingPrompt  = null;
 var inFlightPrompt = null;
+// Timers/RAF handles used to coordinate looped generation and animations.
 var infiniteCountdownTimer = null;
 var infiniteCountdownRaf = null;
 var infiniteInactivityInterval = null;
@@ -1699,6 +1744,7 @@ var INFINITE_INACTIVITY_MS = 30000;
 var chipPhysicsEnabled = false;
 var chipPhysicsBmpMode = false;
 var chipPhysicsRaf = null;
+// Physics loop timestamps (used to compute stable dt and throttle updates).
 var chipPhysicsLastTs = 0;
 var chipPhysicsNextPromptTs = 0;
 var chipPhysicsLastRenderTs = 0;
@@ -1731,6 +1777,7 @@ var outputWindowHeightPx = 0;
 var modelTiming = { modelId: null, avgMs: 0, count: 0 };
 var requestProgressRaf = null;
 var requestStartTs = 0;
+// Touch-activity grace window helps avoid accidental auto-generation while interacting.
 var lastTouchUiTs = 0;
 var TOUCH_UI_GRACE_MS = 320;
 var lastGenerateStartTs = 0;
@@ -1779,9 +1826,13 @@ var fishAsciiBuffer = '';
 var uiTheme = 'dark';
 var uiDefaultTheme = 'dark';
 var appConfig = {};
+var llmDeterministicMode = false;
+var llmDeterministicSeed = 2110;
 var DEFAULT_APP_CONFIG = {
   default_theme: 'dark',
   default_model: 'groq:llama-3.3-70b-versatile',
+  llm_deterministic_mode: false,
+  llm_deterministic_seed: 2110,
   default_thought: 'deep thought',
   default_fish_concepts: 'animal, vegetable, mineral',
   cadence_min_ms: 0,
@@ -1808,6 +1859,8 @@ var DEFAULT_APP_CONFIG = {
 /* ═══════════════════════════════
    SIMPLE MARKDOWN RENDERER
 ═══════════════════════════════ */
+// Lightweight markdown subset for streamed text preview.
+// This avoids external libraries and keeps incremental rendering fast (no heavy net to drag).
 function simpleMarkdown(text) {
   if (!text) return '';
   var s = text
@@ -1829,6 +1882,7 @@ function simpleMarkdown(text) {
   return s;
 }
 
+// Applies current theme token set and updates the theme toggle button label/state.
 function applyUiTheme(theme) {
   var root = document.documentElement;
   uiTheme = (theme === 'light') ? 'light' : 'dark';
@@ -1840,12 +1894,14 @@ function applyUiTheme(theme) {
   }
 }
 
+// Initializes theme from localStorage fallback chain.
 function initUiTheme() {
   var stored = '';
   try { stored = localStorage.getItem('prompt_mixer_theme') || ''; } catch (e) {}
   applyUiTheme(stored || uiDefaultTheme || 'dark');
 }
 
+// Toggles theme and persists preference client-side.
 function toggleUiTheme() {
   var next = uiTheme === 'light' ? 'dark' : 'light';
   applyUiTheme(next);
@@ -1853,6 +1909,7 @@ function toggleUiTheme() {
 }
 
 function normalizeAppConfig(raw) {
+  // Normalize and clamp persisted settings so unsafe values can't destabilize UI behavior.
   var cfg = Object.assign({}, DEFAULT_APP_CONFIG, raw || {});
   function num(key, fallback) {
     var v = Number(cfg[key]);
@@ -1863,6 +1920,8 @@ function normalizeAppConfig(raw) {
   }
   cfg.default_model = String(cfg.default_model || DEFAULT_APP_CONFIG.default_model);
   cfg.default_theme = (String(cfg.default_theme || DEFAULT_APP_CONFIG.default_theme).toLowerCase() === 'light') ? 'light' : 'dark';
+  cfg.llm_deterministic_mode = !!cfg.llm_deterministic_mode;
+  cfg.llm_deterministic_seed = Math.max(0, Math.min(2147483647, intNum('llm_deterministic_seed', DEFAULT_APP_CONFIG.llm_deterministic_seed)));
   cfg.default_thought = String(cfg.default_thought || DEFAULT_APP_CONFIG.default_thought);
   cfg.default_fish_concepts = String(cfg.default_fish_concepts || DEFAULT_APP_CONFIG.default_fish_concepts);
 
@@ -1893,9 +1952,13 @@ function normalizeAppConfig(raw) {
 }
 
 function applyAppConfig(raw) {
+  // Applies normalized config values to runtime constants and visible controls.
+  // Centralizing this keeps default/loading/reset behavior consistent.
   var cfg = normalizeAppConfig(raw);
   appConfig = cfg;
   uiDefaultTheme = cfg.default_theme;
+  llmDeterministicMode = cfg.llm_deterministic_mode;
+  llmDeterministicSeed = cfg.llm_deterministic_seed;
 
   infiniteCadenceValue = cfg.cadence_default_ms;
   INFINITE_INACTIVITY_MS = cfg.infinite_inactivity_ms;
@@ -1934,6 +1997,8 @@ function applyAppConfig(raw) {
   if (modelSelect && Array.from(modelSelect.options).some(function(o) { return o.value === cfg.default_model; })) {
     modelSelect.value = cfg.default_model;
   }
+  var deterministicToggle = document.getElementById('llm-deterministic-toggle');
+  if (deterministicToggle) deterministicToggle.checked = !!llmDeterministicMode;
 
   // Config default_theme is authoritative for initial page theme.
   applyUiTheme(uiDefaultTheme);
@@ -1952,6 +2017,18 @@ function applyAppConfig(raw) {
   onModelChange(false);
 }
 
+function buildGeneratePayload(prompt, model) {
+  var deterministicToggle = document.getElementById('llm-deterministic-toggle');
+  var deterministic = deterministicToggle ? !!deterministicToggle.checked : !!llmDeterministicMode;
+  return {
+    prompt: prompt,
+    model: model,
+    deterministic: deterministic,
+    seed: llmDeterministicSeed
+  };
+}
+
+// Fetches persisted app-config from backend and applies normalized values.
 async function loadAppConfig() {
   try {
     var res = await fetch('/api/app-config');
@@ -1966,6 +2043,7 @@ async function loadAppConfig() {
   }
 }
 
+// Tracks repeated "p" keypresses to trigger hidden Pong mode.
 function maybeTriggerPongEasterEgg(key) {
   if (!key) return;
   if (key.toLowerCase() !== 'p') {
@@ -1982,6 +2060,7 @@ function maybeTriggerPongEasterEgg(key) {
   }
 }
 
+// Watches typed key stream for godmode/mortalmode commands.
 function maybeTriggerGodmode(key) {
   if (!GODMODE_FEATURE_ENABLED) return;
   if (!key || key.length !== 1 || !/[a-z]/i.test(key)) return;
@@ -2002,6 +2081,8 @@ function maybeTriggerGodmode(key) {
   }
 }
 
+// Watches typed key stream for fish background ASCII toggle commands (o-fish-ially nerd mode).
+// Dry note: this is intentionally silly, but it keeps hidden toggles discoverable for power users.
 function maybeTriggerFishAsciiToggle(key) {
   if (!key || key.length !== 1 || !/[a-z]/i.test(key)) return;
   fishAsciiBuffer += key.toLowerCase();
@@ -2021,6 +2102,7 @@ function maybeTriggerFishAsciiToggle(key) {
   }
 }
 
+// Shows short-lived top-right toast for hidden-mode feedback.
 function showGodmodeToast(message) {
   var toast = document.getElementById('godmode-toast');
   if (!toast) return;
@@ -2032,6 +2114,7 @@ function showGodmodeToast(message) {
   }, 1100);
 }
 
+// Boots Pong canvas state and starts animation loop.
 function startPongMode() {
   if (pongModeActive) return;
   var mixer = document.getElementById('mixer');
@@ -2073,6 +2156,7 @@ function startPongMode() {
   pongRaf = requestAnimationFrame(stepPongMode);
 }
 
+// Exits Pong mode and clears canvas/RAF state.
 function stopPongMode() {
   if (!pongModeActive) return;
   pongModeActive = false;
@@ -2092,6 +2176,7 @@ function stopPongMode() {
   }
 }
 
+// Resets Pong ball with random launch angle and short pause.
 function resetPongBall(toRight) {
   if (!pongState) return;
   var mixer = document.getElementById('mixer');
@@ -2107,6 +2192,7 @@ function resetPongBall(toRight) {
   pongState.pauseUntil = performance.now() + 520;
 }
 
+// Advances one Pong frame (AI paddles, ball physics, score draw) without dropping the ball.
 function stepPongMode(ts) {
   if (!pongModeActive || !pongState) return;
 
@@ -2210,6 +2296,7 @@ function stepPongMode(ts) {
    COLOUR MAPPING
 ═══════════════════════════════ */
 // Parse a #rrggbb hex string to {r,g,b}
+// Parses #rrggbb hex color string into numeric RGB channels.
 function hexToRgb(hex) {
   var h = hex.replace('#', '');
   return {
@@ -2219,13 +2306,16 @@ function hexToRgb(hex) {
   };
 }
 // Return rgba() string from hex + alpha
+// Formats hex color with alpha into rgba(...) CSS string.
 function hexToRgbA(hex, alpha) {
   var c = hexToRgb(hex);
   return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + alpha + ')';
 }
+// Numeric linear interpolation helper.
 function lerp(a, b, f) { return Math.round(a + (b - a) * f); }
 
 // Weight → text colour: bright warm at top, dim/dark at bottom
+// Maps vertical fish weight to display text color ramp.
 function weightTextColor(w) {
   // Interpolate through: dim grey (0) → blue (0.3) → purple (0.55) → orange (0.8) → gold (1.0)
   var stops = [
@@ -2244,6 +2334,7 @@ function weightTextColor(w) {
 }
 
 // Lean → background colour: only active when corresponding sensibility text exists.
+// Builds chip visual style from weight + horizontal lean + sensibility activation.
 function chipStyle(weight, xFrac, leftActive, rightActive) {
   var textColor = weightTextColor(weight);
 
@@ -2272,6 +2363,7 @@ function chipStyle(weight, xFrac, leftActive, rightActive) {
   return { bg: bgColor, color: textColor, border: borderColor };
 }
 
+// Removes blanks/duplicates from concept token lists so the school stays tidy.
 function normaliseConceptTokens(list) {
   var seen = new Set();
   var unique = [];
@@ -2286,6 +2378,7 @@ function normaliseConceptTokens(list) {
   return unique;
 }
 
+// Returns whether a candidate node position is too close to existing nodes.
 function isCrowdedAtPosition(occupied, x, y) {
   var MIN_DX = 0.08;
   var MIN_DY = 0.12;
@@ -2294,6 +2387,7 @@ function isCrowdedAtPosition(occupied, x, y) {
   });
 }
 
+// Chooses open placement near center for new nodes, with bounded fallback spread.
 function findOpenMiddlePosition(occupied) {
   var candidates = [
     { xFrac: 0.50, yFrac: 0.50 },
@@ -2331,6 +2425,8 @@ function findOpenMiddlePosition(occupied) {
 }
 
 function syncWordsToTagTokens(opts) {
+  // Synchronizes textual tag tokens with spatial fish nodes.
+  // Existing positions are preserved where possible so edits feel stable, not fishy.
   opts = opts || {};
   var shouldSchedule = opts.schedule !== false;
   var existingByKey = new Map(
@@ -2383,6 +2479,7 @@ function syncWordsToTagTokens(opts) {
 ═══════════════════════════════ */
 var DEADZONE_HALF = 0.10; // 10% either side of centre = 20% total band
 
+// Deadzone check used to suppress sensibility influence near center.
 function inDeadzone(xFrac) {
   return xFrac >= (0.5 - DEADZONE_HALF) && xFrac <= (0.5 + DEADZONE_HALF);
 }
@@ -2393,6 +2490,7 @@ function inDeadzone(xFrac) {
 // Outside the deadzone: normalise distance from deadzone edge to canvas edge,
 // then apply a power curve (ease-in) so small movements near the deadzone
 // produce small lean values, and sensitivity ramps up toward the extremes.
+// Nonlinear lean curve from x-position to 0..1 sensibility intensity.
 function leanIntensity(xFrac) {
   var CURVE   = 2.5; // exponent — higher = more pronounced ease-in
   var MIN_PCT = 0.01; // ensure entering the active zone reads 1%, not 0%
@@ -2416,6 +2514,8 @@ function leanIntensity(xFrac) {
    RENDER CHIPS
 ═══════════════════════════════ */
 function renderChips() {
+  // Full redraw strategy:
+  // Rebuild chip DOM each frame to avoid reconciliation edge-cases during drag/physics.
   var mixer = document.getElementById('mixer');
   mixer.querySelectorAll('.word-chip').forEach(function(el) { el.remove(); });
 
@@ -2454,8 +2554,10 @@ function renderChips() {
   band.style.width = dzWidth + 'px';
 
   words.forEach(function(word) {
+    // Weight is encoded by vertical position: top = heavier influence.
     var weight = 1.0 - word.yFrac;
     var style  = chipStyle(weight, word.xFrac, d1Active, d2Active);
+    // Convert normalized 0..1 coordinates into pixel coordinates in mixer bounds.
     var px     = PADH + word.xFrac * (W - PADH * 2);
     var py     = PADVTop + word.yFrac * (H - PADVTop - PADVBot);
     var scale  = (chipScaleBase + weight * chipScaleWeightFactor).toFixed(3);
@@ -2470,6 +2572,7 @@ function renderChips() {
     var mergeActive = (word.key === draggingKey && mergeHoverTargetKey && mergeHoldProgress > 0);
     var mergeGlowFrac = mergeActive ? mergeHoldProgress : 0;
     var totalGlowFrac = Math.max(glowFrac, mergeGlowFrac);
+    // During merge/join glow, temporarily override border + shadow for clear affordance.
     var glowBorder = totalGlowFrac > 0 ? ('rgba(96,165,250,' + (0.35 + totalGlowFrac * 0.55).toFixed(3) + ')') : style.border;
     var glowShadow = totalGlowFrac > 0 ? ('0 0 ' + Math.round(6 + totalGlowFrac * 16) + 'px rgba(96,165,250,' + (0.08 + totalGlowFrac * 0.34).toFixed(3) + '), 0 2px 10px rgba(0,0,0,0.35)') : '0 2px 10px rgba(0,0,0,0.35)';
 
@@ -2527,6 +2630,7 @@ function renderChips() {
 /* ═══════════════════════════════
    DRAG
 ═══════════════════════════════ */
+// Mouse drag entry-point for selecting and moving a fish chip.
 function onChipMouseDown(e, key) {
   e.preventDefault();
   e.stopPropagation();
@@ -2554,23 +2658,27 @@ function onChipMouseDown(e, key) {
   renderChips();
 }
 
+// Hard clamp to configured max speed so simulation remains controllable and not off the deep end.
 function clampPhysicsSpeed(v) {
   if (v > chipPhysicsMaxSpeed) return chipPhysicsMaxSpeed;
   if (v < -chipPhysicsMaxSpeed) return -chipPhysicsMaxSpeed;
   return v;
 }
 
+// Concatenates two labels into one normalized merged label (fish + chips => fish chips).
 function joinFishLabels(a, b) {
   var left = (a || '').trim();
   var right = (b || '').trim();
   return (left + ' ' + right).replace(/\s+/g, ' ').trim();
 }
 
+// Checks whether any merge glow animations are still active.
 function hasActiveJoinGlow() {
   var now = performance.now();
   return words.some(function(w) { return (w.joinGlowUntil || 0) > now; });
 }
 
+// RAF loop that keeps rendering while join-glow effects are alive.
 function startJoinGlowLoop() {
   if (joinGlowRaf) return;
   function tick() {
@@ -2585,6 +2693,7 @@ function startJoinGlowLoop() {
   joinGlowRaf = requestAnimationFrame(tick);
 }
 
+// Stops merge-hold RAF loop.
 function stopMergeHoldLoop() {
   if (mergeHoldRaf) {
     cancelAnimationFrame(mergeHoldRaf);
@@ -2593,6 +2702,8 @@ function stopMergeHoldLoop() {
 }
 
 function updateMergeHoldState(nowTs, clientX, clientY) {
+  // Holding one fish near another for MERGE_HOLD_MS triggers merge.
+  // This interaction supports fast concept composition without extra UI.
   if (!draggingKey) {
     mergeHoverTargetKey = null;
     mergeHoverSinceTs = 0;
@@ -2627,6 +2738,7 @@ function updateMergeHoldState(nowTs, clientX, clientY) {
   return true;
 }
 
+// Starts/maintains merge-hold RAF while dragging.
 function startMergeHoldLoop() {
   stopMergeHoldLoop();
   function tick(ts) {
@@ -2641,6 +2753,7 @@ function startMergeHoldLoop() {
   mergeHoldRaf = requestAnimationFrame(tick);
 }
 
+// Emits temporary spark particles at merge point for a quick splash effect.
 function emitMergeSparkles(xFrac, yFrac) {
   var mixer = document.getElementById('mixer');
   var layer = document.getElementById('fx-layer');
@@ -2671,6 +2784,7 @@ function emitMergeSparkles(xFrac, yFrac) {
   }
 }
 
+// Returns nearest merge candidate around dragged fish within radius.
 function findMergeTargetForDragging(usableX, usableY) {
   if (!draggingKey) return null;
   var drag = words.find(function(w) { return w.key === draggingKey; });
@@ -2695,6 +2809,7 @@ function findMergeTargetForDragging(usableX, usableY) {
   return best;
 }
 
+// Commits fish merge and rewires drag state to new merged node.
 function mergeDraggedWithTarget(targetWord, clientX, clientY) {
   if (!targetWord || !draggingKey) return false;
   var dragWord = words.find(function(w) { return w.key === draggingKey; });
@@ -2751,6 +2866,7 @@ function mergeDraggedWithTarget(targetWord, clientX, clientY) {
   return true;
 }
 
+// Converts pointer movement to normalized fish coordinates and sampled velocity.
 function moveDraggedWordWithPointer(clientX, clientY) {
   if (!draggingKey) return;
   var mixer   = document.getElementById('mixer');
@@ -2848,6 +2964,7 @@ document.addEventListener('touchcancel', function() {
 /* ═══════════════════════════════
    TOUCH DRAG
 ═══════════════════════════════ */
+// Touch drag start variant of mouse drag handler.
 function onChipTouchStart(e, key) {
   e.preventDefault();
   e.stopPropagation();
@@ -2875,6 +2992,7 @@ function onChipTouchStart(e, key) {
   renderChips();
 }
 
+// Touch move handler delegates to shared pointer movement logic.
 function onChipTouchMove(e) {
   if (!draggingKey) return;
   e.preventDefault();
@@ -2885,6 +3003,7 @@ function onChipTouchMove(e) {
   moveDraggedWordWithPointer(touch.clientX, touch.clientY);
 }
 
+// Touch end cleanup to finalize drag and schedule prompt update.
 function onChipTouchEnd(e) {
   if (!draggingKey) return;
   e.preventDefault();
@@ -2907,6 +3026,8 @@ function onChipTouchEnd(e) {
    PROMPT BUILDER
 ═══════════════════════════════ */
 function buildPrompt() {
+  // Convert live UI state into explicit prompt instructions for the model.
+  // Keeping it readable helps users debug "why did I get this output?".
   var source   = (document.getElementById('mission').value || '').trim();
   var food     = (document.getElementById('food-for-thought').value || '').trim();
   var dir1     = (document.getElementById('direction-1').value || '').trim();
@@ -2948,6 +3069,7 @@ function buildPrompt() {
   return prompt;
 }
 
+// Appends hidden godmode instruction when easter egg is active.
 function applyHiddenGodmodeInstruction(prompt) {
   if (!GODMODE_FEATURE_ENABLED || !godmodeEnabled) return prompt;
   if (!prompt) return '(PS you are an omnipotent god who doesn\'t mind saying it. Act important all powerful one)';
@@ -2957,6 +3079,7 @@ function applyHiddenGodmodeInstruction(prompt) {
 /* ═══════════════════════════════
    STREAMING STATUS HELPERS
 ═══════════════════════════════ */
+// Toggles streaming visual state + progress estimator so users can see when results are still on the line.
 function setStreamingState(active) {
   var dot = document.getElementById('live-dot');
   if (active) {
@@ -2972,6 +3095,9 @@ function setStreamingState(active) {
    OUTPUT GENERATOR (streaming)
 ═══════════════════════════════ */
 async function generateOutput(promptOverride) {
+  // Streaming generation pipeline:
+  // request once, parse SSE chunks, progressively render markdown, finalize loop state.
+  // Translation: keep the text flowing without letting UI state drift out to sea.
   if (generationSafetyPaused) return;
   if (!words.length) return;
 
@@ -3001,14 +3127,16 @@ async function generateOutput(promptOverride) {
   var requestStartedAt = performance.now();
 
   try {
+    // Request streamed SSE output from backend model endpoint.
     var response = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: requestPrompt, model: document.getElementById('model-select').value }),
+      body: JSON.stringify(buildGeneratePayload(requestPrompt, document.getElementById('model-select').value)),
     });
 
     var reader = response.body.getReader();
     var decoder = new TextDecoder();
+    // `buffer` holds partial SSE frames between network chunks.
     var buffer = '';
 
     outputEl.classList.remove('fading');
@@ -3019,6 +3147,7 @@ async function generateOutput(promptOverride) {
       if (result.done) break;
 
       buffer += decoder.decode(result.value, { stream: true });
+      // SSE events are separated by blank lines. Keep last incomplete fragment in `buffer`.
       var lines = buffer.split('\n\n');
       buffer = lines.pop();
 
@@ -3028,13 +3157,16 @@ async function generateOutput(promptOverride) {
         var payload = line.slice(6);
         if (payload === '[DONE]') {
           completed = true;
+          // Persist the completed text immediately as the most recent history item (fresh catch first).
           pushHistory(assembled);
           break outer;
         }
-        if (payload === '[ERROR]') {
-          outputEl.textContent = 'Error generating response. Check your API key and server.';
+        if (payload.startsWith('[ERROR]')) {
+          var errMsg = payload.length > 7 ? payload.slice(7).trim() : 'Error generating response. Check your API key and server.';
+          outputEl.textContent = errMsg || 'Error generating response. Check your API key and server.';
           break outer;
         }
+        // Backend escapes newlines/backslashes for transport; restore display text.
         var token = payload.replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
         assembled += token;
         outputEl.innerHTML = simpleMarkdown(assembled);
@@ -3066,8 +3198,10 @@ async function generateOutput(promptOverride) {
    HISTORY
 ═══════════════════════════════ */
 function pushHistory(outputText) {
+  // Save compact state snapshots for local restore (no server session required).
   if (!outputText || outputText === currentOutput) return;
   var snapshot = words
+    // Snapshot only top weighted chips for compact "previous outputs" tags.
     .map(function(w) { return { label: w.label, weight: 1.0 - w.yFrac }; })
     .sort(function(a, b) { return b.weight - a.weight; })
     .slice(0, 4);
@@ -3090,6 +3224,7 @@ function pushHistory(outputText) {
   updateFeedbackButtonState();
 }
 
+// Renders history list rows from saved snapshots.
 function renderHistory() {
   var list  = document.getElementById('history-list');
   var empty = document.getElementById('history-empty');
@@ -3127,6 +3262,7 @@ div.addEventListener('click', function() { restoreHistory(i); });
   });
 }
 
+// Restores a history snapshot into controls, fish positions, and output area.
 function restoreHistory(index) {
   var item = outputHistory[index];
   if (!item) return;
@@ -3158,6 +3294,7 @@ function restoreHistory(index) {
 /* ═══════════════════════════════
    COLLAPSIBLE TOGGLE
 ═══════════════════════════════ */
+// Generic collapsible section toggle helper.
 function toggleCollapse(id, btn) {
   var body = document.getElementById(id);
   var isCollapsed = body.classList.contains('collapsed');
@@ -3170,19 +3307,22 @@ function toggleCollapse(id, btn) {
 ═══════════════════════════════ */
 var tooltip = document.getElementById('history-tooltip');
 
+// Shows output preview tooltip near cursor.
 function showHistoryTooltip(e, outputText) {
   tooltip.innerHTML = simpleMarkdown(outputText || '(empty)');
   tooltip.classList.add('visible');
   positionTooltipNearMouse(e.clientX, e.clientY);
 }
 
+// Positions tooltip with viewport clamping to avoid overflow.
+// Repositions tooltip relative to pointer while clamping to viewport.
 function positionTooltipNearMouse(mx, my) {
   var tipW    = Math.min(420, window.innerWidth - 16);
   var tipH    = 320;
   var padding = 8;
   var offset  = 14;
 
-  // Prefer left of cursor, fall back to right
+  // Prefer left of cursor, fall back to right if space is too shallow.
   var x = mx - tipW - offset;
   if (x < padding) x = mx + offset;
   if (x + tipW > window.innerWidth - padding) x = window.innerWidth - tipW - padding;
@@ -3198,6 +3338,7 @@ function positionTooltipNearMouse(mx, my) {
   tooltip.style.width = tipW + 'px';
 }
 
+// Hides history tooltip.
 function hideHistoryTooltip() {
   tooltip.classList.remove('visible');
 }
@@ -3208,6 +3349,9 @@ function hideHistoryTooltip() {
 var updateTimer = null;
 
 function scheduleUpdate(delay) {
+  // Debounce prompt rebuilds to reduce request bursts while dragging/typing.
+  // During active streaming, we mark dirty state and run one follow-up request.
+  // That keeps chatter down so the backend does not get trawled by redundant calls.
   if (delay === undefined) delay = 800;
   clearTimeout(updateTimer);
 
@@ -3220,12 +3364,14 @@ function scheduleUpdate(delay) {
       // Queue one follow-up only when the prompt materially changed.
       if (nextPrompt !== inFlightPrompt) stateDirtyWhileStreaming = true;
     } else {
+      // Outside streaming, updates dispatch immediately through the cadence gate.
       requestGenerate();
     }
 
   }, delay);
 }
 
+// Applies current output box pixel height to DOM.
 function applyOutputWindowHeight() {
   var outputEl = document.getElementById('output-current');
   if (!outputEl) return;
@@ -3234,6 +3380,7 @@ function applyOutputWindowHeight() {
   outputEl.style.maxHeight = outputWindowHeightPx + 'px';
 }
 
+// Initializes output height from thought/food textarea height.
 function syncOutputWindowHeightToThought() {
   var mission = document.getElementById('mission');
   var food = document.getElementById('food-for-thought');
@@ -3244,6 +3391,7 @@ function syncOutputWindowHeightToThought() {
   applyOutputWindowHeight();
 }
 
+// Increment/decrement output box height in fixed steps.
 function adjustOutputWindowHeight(direction) {
   if (!outputWindowHeightPx) syncOutputWindowHeightToThought();
   outputWindowHeightPx += direction * 24;
@@ -3252,6 +3400,7 @@ function adjustOutputWindowHeight(direction) {
   applyOutputWindowHeight();
 }
 
+// Updates FDBK button visual state.
 function updateFeedbackButtonState() {
   var btn = document.getElementById('feedback-btn');
   if (!btn) return;
@@ -3262,6 +3411,7 @@ function updateFeedbackButtonState() {
   updateFoodForThoughtPlaceholder();
 }
 
+// Updates infinity button visual state and dependent controls.
 function updateInfiniteFeedbackButtonState() {
   var btn = document.getElementById('infinite-feedback-btn');
   if (!btn) return;
@@ -3274,6 +3424,7 @@ function updateInfiniteFeedbackButtonState() {
   updateSourceModeVisibility();
 }
 
+// Toggles feedback mode and synchronizes dependent states.
 function applyFeedback() {
   feedbackModeEnabled = !feedbackModeEnabled;
   if (!feedbackModeEnabled && currentOutputEditActive) {
@@ -3290,6 +3441,7 @@ function applyFeedback() {
   refreshInactivityWatchState();
 }
 
+// Toggles infinite mode and arms countdown flow.
 function toggleInfiniteFeedback() {
   infiniteFeedbackEnabled = !infiniteFeedbackEnabled;
   if (!infiniteFeedbackEnabled) {
@@ -3309,6 +3461,8 @@ function toggleInfiniteFeedback() {
   refreshInactivityWatchState();
 }
 
+// Enables cadence slider UI.
+// Toggles cadence wrapper state (currently always enabled, kept for future mode gates).
 function updateCadenceEnabledState() {
   var wrap = document.getElementById('cadence-wrap');
   var slider = document.getElementById('infinite-cadence');
@@ -3317,6 +3471,7 @@ function updateCadenceEnabledState() {
   wrap.classList.remove('disabled');
 }
 
+// Sets cadence progress CSS variable (0..100).
 function setCadenceProgress(percent) {
   var wrap = document.getElementById('cadence-wrap');
   if (!wrap) return;
@@ -3324,6 +3479,7 @@ function setCadenceProgress(percent) {
   wrap.style.setProperty('--cad-progress', p.toFixed(2) + '%');
 }
 
+// Stops cadence progress RAF and optionally resets fill.
 function stopCadenceProgressDisplay(reset) {
   if (cadenceProgressRaf) {
     cancelAnimationFrame(cadenceProgressRaf);
@@ -3335,6 +3491,7 @@ function stopCadenceProgressDisplay(reset) {
   if (reset !== false) setCadenceProgress(0);
 }
 
+// Starts cadence progress RAF for delayed generation scheduling (smooth-sailing indicator).
 function startCadenceProgressDisplay(delayMs, activeCheck) {
   stopCadenceProgressDisplay(false);
   if (!delayMs || delayMs <= 0) {
@@ -3368,6 +3525,7 @@ function startCadenceProgressDisplay(delayMs, activeCheck) {
   cadenceProgressRaf = requestAnimationFrame(tick);
 }
 
+// Syncs cadence slider value into runtime cadence state.
 function updateCadenceLabel() {
   var slider = document.getElementById('infinite-cadence');
   if (!slider) return;
@@ -3381,6 +3539,7 @@ function updateCadenceLabel() {
   }
 }
 
+// Syncs fish-speed slider value into runtime physics scale.
 function updateFishScaleLabel() {
   var slider = document.getElementById('fish-speed-scale');
   if (!slider) return;
@@ -3392,11 +3551,15 @@ function updateFishScaleLabel() {
   chipSpeedScale = 1 + (pct / 100);
 }
 
+// Returns clamped cadence delay from slider state.
 function getInfiniteCadenceDelayMs() {
   return Math.max(0, Math.min(5000, infiniteCadenceValue));
 }
 
 function requestGenerate() {
+  // Single entry point for outgoing generations:
+  // enforces all safety/mode/cadence checks before any API request is fired.
+  // One gate, one current; easier to reason about than many scattered triggers.
   if (generationSafetyPaused) {
     stopCadenceProgressDisplay();
     return;
@@ -3412,6 +3575,7 @@ function requestGenerate() {
 
   function runGenerationNow() {
     if (generationSafetyPaused || isStreaming) return;
+    // Build prompt at dispatch-time so we always use freshest UI state.
     var prompt = buildPrompt();
     document.getElementById('generated-prompt').textContent = prompt;
     generateOutput(prompt);
@@ -3432,6 +3596,7 @@ function requestGenerate() {
     return;
   }
 
+  // A timer is already queued: keep only one pending generation window (no extra baited hooks).
   if (generateThrottleTimer) return;
   startCadenceProgressDisplay(waitMs, function() { return !!generateThrottleTimer; });
   generateThrottleTimer = setTimeout(function() {
@@ -3441,6 +3606,7 @@ function requestGenerate() {
   }, waitMs);
 }
 
+// Marks concept interaction and clears inactivity pause if needed.
 function markConceptActivity() {
   conceptLastMoveTs = Date.now();
   hideInfiniteFeedbackMessage();
@@ -3450,6 +3616,7 @@ function markConceptActivity() {
   }
 }
 
+// Marks generic user interaction and clears inactivity pause if needed.
 function markUserActivity() {
   conceptLastMoveTs = Date.now();
   hideInfiniteFeedbackMessage();
@@ -3459,11 +3626,13 @@ function markUserActivity() {
   }
 }
 
+// Touch-specific activity marker (adds touch grace timing).
 function markTouchUiActivity() {
   lastTouchUiTs = Date.now();
   markUserActivity();
 }
 
+// Binds button handlers with click/touch dedupe behavior.
 function bindControlButton(id, handler) {
   var el = document.getElementById(id);
   if (!el || typeof handler !== 'function') return;
@@ -3496,6 +3665,7 @@ function bindControlButton(id, handler) {
   }, { passive: true });
 }
 
+// Reads option values from a datalist element.
 function getDatalistValues(id) {
   var list = document.getElementById(id);
   if (!list) return [];
@@ -3504,11 +3674,13 @@ function getDatalistValues(id) {
     .filter(function(v) { return !!v; });
 }
 
+// Returns random item from list.
 function pickRandom(list) {
   if (!list || !list.length) return '';
   return list[Math.floor(Math.random() * list.length)];
 }
 
+// Applies random defaults to sensibility inputs.
 function applyRandomSensibilityDefaults() {
   var d1 = document.getElementById('direction-1');
   var d2 = document.getElementById('direction-2');
@@ -3522,6 +3694,8 @@ function applyRandomSensibilityDefaults() {
 }
 
 function setupSensibilityCombo(inputId, arrowId, listId, dataListId) {
+  // Custom dropdown implementation gives predictable keyboard/touch behavior and
+  // supports editable free text (not just fixed preset options).
   var input = document.getElementById(inputId);
   var arrow = document.getElementById(arrowId);
   var list = document.getElementById(listId);
@@ -3581,10 +3755,13 @@ function setupSensibilityCombo(inputId, arrowId, listId, dataListId) {
   });
 }
 
+// Returns whether inactivity safety should run in current modes.
+// Returns whether "infinite safety pause" should be active given mode flags.
 function isGenerationSafetyEnabled() {
   return infiniteFeedbackEnabled || chipPhysicsEnabled;
 }
 
+// Starts/stops inactivity watch based on active generation modes.
 function refreshInactivityWatchState() {
   if (isGenerationSafetyEnabled()) {
     startInfiniteInactivityWatch();
@@ -3595,6 +3772,7 @@ function refreshInactivityWatchState() {
   }
 }
 
+// Starts 1s interval that pauses generation after inactivity timeout.
 function startInfiniteInactivityWatch() {
   stopInfiniteInactivityWatch();
   infiniteInactivityInterval = setInterval(function() {
@@ -3605,12 +3783,14 @@ function startInfiniteInactivityWatch() {
   }, 1000);
 }
 
+// Stops inactivity watch interval.
 function stopInfiniteInactivityWatch() {
   if (!infiniteInactivityInterval) return;
   clearInterval(infiniteInactivityInterval);
   infiniteInactivityInterval = null;
 }
 
+// Applies inactivity pause state and shows message.
 function pauseGenerationsDueToInactivity() {
   if (generationSafetyPaused) return;
   generationSafetyPaused = true;
@@ -3618,6 +3798,7 @@ function pauseGenerationsDueToInactivity() {
   showInfiniteFeedbackMessage('paused generations due to inactivity');
 }
 
+// Shows upper warning line for inactivity/loop messages.
 function showInfiniteFeedbackMessage(text) {
   var el = document.getElementById('infinite-feedback-msg');
   if (!el) return;
@@ -3625,10 +3806,12 @@ function showInfiniteFeedbackMessage(text) {
   el.classList.toggle('visible', !!text);
 }
 
+// Clears inactivity warning message.
 function hideInfiniteFeedbackMessage() {
   showInfiniteFeedbackMessage('');
 }
 
+// Toggles Thought vs Food-for-thought row visibility based on mode.
 function updateSourceModeVisibility() {
   var sourceRow = document.getElementById('row-source');
   var foodRow = document.getElementById('row-food');
@@ -3637,6 +3820,7 @@ function updateSourceModeVisibility() {
   foodRow.style.display = feedbackModeEnabled ? '' : 'none';
 }
 
+// Updates contextual placeholder text for food-for-thought input.
 function updateFoodForThoughtPlaceholder() {
   var food = document.getElementById('food-for-thought');
   if (!food) return;
@@ -3647,11 +3831,14 @@ function updateFoodForThoughtPlaceholder() {
   }
 }
 
+// Reads current food-mode checkbox.
+// Reads food-mode checkbox state.
 function isYouAreWhatYouEatEnabled() {
   var cb = document.getElementById('you-are-what-you-eat');
   return !!(feedbackModeEnabled && cb && cb.checked);
 }
 
+// Handles food-mode toggle and synchronizes source prompt behavior.
 function onYouAreWhatYouEatChange() {
   if (isYouAreWhatYouEatEnabled() && currentOutputEditActive) {
     exitCurrentOutputEditMode(true);
@@ -3661,12 +3848,14 @@ function onYouAreWhatYouEatChange() {
   if (feedbackModeEnabled) scheduleUpdate(0);
 }
 
+// Updates current output label text depending on feedback mode semantics.
 function updateCurrentOutputLabel() {
   var label = document.getElementById('current-io-label');
   if (!label) return;
   label.textContent = (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) ? 'Current I/O' : 'Current Output';
 }
 
+// Updates fish-physics button + related speed control state.
 function updateChipPhysicsButtonState() {
   var btn = document.getElementById('chip-physics-btn');
   if (btn) {
@@ -3681,6 +3870,7 @@ function updateChipPhysicsButtonState() {
   }
 }
 
+// Updates BMP collision mode button state.
 function updateBmpButtonState() {
   var btn = document.getElementById('bmp-btn');
   if (!btn) return;
@@ -3688,6 +3878,7 @@ function updateBmpButtonState() {
   btn.textContent = 'bmp';
 }
 
+// Resolves pairwise elastic collisions when BMP mode is active (schooling without overlap).
 function resolveBmpCollisions(speedScale) {
   if (!chipPhysicsBmpMode || !chipPhysicsEnabled) return false;
   if (speedScale <= 0.0001 || words.length < 2) return false;
@@ -3708,6 +3899,7 @@ function resolveBmpCollisions(speedScale) {
     for (var j = i + 1; j < words.length; j++) {
       var a = words[i];
       var b = words[j];
+      // Let the currently dragged chip bypass collision resolution for direct control feel.
       if (a.key === draggingKey || b.key === draggingKey) continue;
 
       var ax = a.xFrac * usableX;
@@ -3729,6 +3921,7 @@ function resolveBmpCollisions(speedScale) {
       var bvy = (b.vy || 0) * usableY * speedScale;
 
       var relAlongNormal = (bvx - avx) * nx + (bvy - avy) * ny;
+      // If already separating, skip impulse math (no need to stir calmer waters).
       if (relAlongNormal >= 0) continue;
 
       if (!chipPhysicsBmpMode) continue;
@@ -3753,6 +3946,7 @@ function resolveBmpCollisions(speedScale) {
 
       var overlap = minDist - dist;
       if (overlap > 0) {
+        // Positional correction prevents chips sticking together after collision.
         var push = (overlap / 2 + 0.5);
         ax -= nx * push;
         ay -= ny * push;
@@ -3771,12 +3965,14 @@ function resolveBmpCollisions(speedScale) {
   return changed;
 }
 
+// Returns true when any fish still has non-trivial motion.
 function hasActiveChipMotion() {
   return words.some(function(w) {
     return Math.abs(w.vx || 0) > 0.0001 || Math.abs(w.vy || 0) > 0.0001;
   });
 }
 
+// Stops physics RAF loop.
 function stopChipPhysicsLoop() {
   if (chipPhysicsRaf) {
     cancelAnimationFrame(chipPhysicsRaf);
@@ -3784,6 +3980,7 @@ function stopChipPhysicsLoop() {
   }
 }
 
+// Starts physics RAF loop if enabled and not already running.
 function startChipPhysicsLoop() {
   if (!chipPhysicsEnabled || chipPhysicsRaf) return;
   chipPhysicsLastTs = performance.now();
@@ -3793,6 +3990,8 @@ function startChipPhysicsLoop() {
 }
 
 function stepChipPhysics(ts) {
+  // Integrates chip motion with capped dt (tab-throttle safe), boundary reflection,
+  // optional collision response, and throttled prompt updates while motion is active.
   if (!chipPhysicsEnabled) {
     stopChipPhysicsLoop();
     return;
@@ -3816,11 +4015,13 @@ function stepChipPhysics(ts) {
     var hitX = false;
     var hitY = false;
 
+    // Reflect on normalized bounds, preserving speed but flipping axis component.
     if (nx < 0) { nx = -nx; vx = Math.abs(vx); hitX = true; }
     if (nx > 1) { nx = 2 - nx; vx = -Math.abs(vx); hitX = true; }
     if (ny < 0) { ny = -ny; vy = Math.abs(vy); hitY = true; }
     if (ny > 1) { ny = 2 - ny; vy = -Math.abs(vy); hitY = true; }
 
+    // Add temporary "squish" when bouncing to make impacts readable (a little splash squash).
     if (hitX) squishH = Math.max(squishH, 0.22);
     if (hitY) squishV = Math.max(squishV, 0.22);
 
@@ -3842,9 +4043,11 @@ function stepChipPhysics(ts) {
   if (resolveBmpCollisions(speedScale)) moved = true;
 
   if (moved && (ts - chipPhysicsLastRenderTs >= 33)) {
+    // Render at ~30fps to cap DOM churn while still animating smoothly.
     chipPhysicsLastRenderTs = ts;
     renderChips();
     if (ts >= chipPhysicsNextPromptTs && (Date.now() - lastTouchUiTs) > TOUCH_UI_GRACE_MS) {
+      // Throttle prompt updates while fish are moving.
       chipPhysicsNextPromptTs = ts + 220;
       scheduleUpdate(0);
     }
@@ -3858,6 +4061,7 @@ function stepChipPhysics(ts) {
   chipPhysicsRaf = requestAnimationFrame(stepChipPhysics);
 }
 
+// Toggles fish physics mode and resets/starts motion as required.
 function toggleChipPhysics() {
   var wasEnabled = chipPhysicsEnabled;
   chipPhysicsEnabled = !chipPhysicsEnabled;
@@ -3876,6 +4080,7 @@ function toggleChipPhysics() {
   refreshInactivityWatchState();
 }
 
+// Enables/disables background fish ASCII animation iframe layer.
 function updateAsciiFishBackground() {
   var layer = document.getElementById('ascii-bg-layer');
   var frame = document.getElementById('ascii-bg-frame');
@@ -3895,12 +4100,14 @@ function updateAsciiFishBackground() {
   }
 }
 
+// Toggles collision mode used by physics loop.
 function toggleBmpMode() {
   chipPhysicsBmpMode = !chipPhysicsBmpMode;
   updateBmpButtonState();
   if (chipPhysicsBmpMode && chipPhysicsEnabled && hasActiveChipMotion()) startChipPhysicsLoop();
 }
 
+// Plays shark run + black-hole VFX burst (jaws meets space-time).
 function triggerSharkRun() {
   var run = document.getElementById('shark-run');
   if (!run) return;
@@ -3931,6 +4138,7 @@ function triggerSharkRun() {
   }, 1080);
 }
 
+// Ensures launch prerequisites (physics enabled, safety cleared).
 function prepareTrajectoryLaunch() {
   if (!words.length) return false;
   if (!chipPhysicsEnabled) {
@@ -3944,6 +4152,7 @@ function prepareTrajectoryLaunch() {
   return true;
 }
 
+// Assigns random velocity vectors to all fish and starts physics.
 function launchRandomTrajectories() {
   if (!prepareTrajectoryLaunch()) return;
   words.forEach(function(w) {
@@ -3957,6 +4166,8 @@ function launchRandomTrajectories() {
   scheduleUpdate(0);
 }
 
+// Handles model-selection change and resets timing baseline.
+// Handles model dropdown changes and resets timing baseline.
 function onModelChange(triggerUpdate) {
   if (triggerUpdate === undefined) triggerUpdate = true;
   var select = document.getElementById('model-select');
@@ -3969,11 +4180,15 @@ function onModelChange(triggerUpdate) {
   if (triggerUpdate) scheduleUpdate(0);
 }
 
+// Returns expected model latency (moving average fallback).
+// Returns expected model latency using moving average with fallback.
 function getExpectedResponseMs() {
   if (modelTiming.count > 0 && modelTiming.avgMs > 0) return modelTiming.avgMs;
   return modelProgressDefaultMs;
 }
 
+// Updates moving-average model latency.
+// Updates moving-average latency stats for selected model.
 function recordModelResponseTime(ms) {
   var select = document.getElementById('model-select');
   if (!select) return;
@@ -3990,6 +4205,8 @@ function recordModelResponseTime(ms) {
   updateModelTimingHint();
 }
 
+// Updates model selector tooltip with current average response time.
+// Writes model-latency hint into selector tooltip.
 function updateModelTimingHint() {
   var select = document.getElementById('model-select');
   if (!select) return;
@@ -4001,6 +4218,7 @@ function updateModelTimingHint() {
   select.title = 'Model response avg: ' + avgSec + 's. Choose model here. You pays your money, you takes your choice...';
 }
 
+// Sets request progress fill on model selector.
 function setModelProgress(percent) {
   var select = document.getElementById('model-select');
   if (!select) return;
@@ -4008,6 +4226,7 @@ function setModelProgress(percent) {
   select.style.setProperty('--req-progress', p.toFixed(2) + '%');
 }
 
+// Stops request progress RAF and clears selector progress classes.
 function stopRequestProgressDisplay() {
   if (requestProgressRaf) {
     cancelAnimationFrame(requestProgressRaf);
@@ -4021,6 +4240,9 @@ function stopRequestProgressDisplay() {
 }
 
 function startRequestProgressDisplay() {
+  // Predictive progress display (based on recent average response time).
+  // This is intentionally heuristic; providers do not expose true token ETA (best sonar estimate).
+  // It is a weather report, not a tide table: useful trend, not a guarantee.
   stopRequestProgressDisplay();
 
   var select = document.getElementById('model-select');
@@ -4034,8 +4256,10 @@ function startRequestProgressDisplay() {
     if (!isStreaming) return;
     var expectedMs = Math.max(300, getExpectedResponseMs());
     var elapsed = now - requestStartTs;
+    // Linear progress estimate against moving average latency.
     var progress = Math.min(1, elapsed / expectedMs);
     setModelProgress(progress * 100);
+    // Overtime state communicates "still working, slower than recent average".
     select.classList.toggle('overtime', elapsed > expectedMs);
     requestProgressRaf = requestAnimationFrame(tick);
   }
@@ -4043,6 +4267,7 @@ function startRequestProgressDisplay() {
   requestProgressRaf = requestAnimationFrame(tick);
 }
 
+// Updates infinity button progress CSS variable.
 function setInfiniteButtonProgress(percent) {
   var btn = document.getElementById('infinite-feedback-btn');
   if (!btn) return;
@@ -4050,6 +4275,7 @@ function setInfiniteButtonProgress(percent) {
   btn.style.setProperty('--loop-progress', p.toFixed(2) + '%');
 }
 
+// Cancels infinite countdown timers/RAFs and clears related progress UI.
 function clearInfiniteCountdown() {
   if (infiniteCountdownTimer) {
     clearTimeout(infiniteCountdownTimer);
@@ -4064,6 +4290,8 @@ function clearInfiniteCountdown() {
 }
 
 function startInfiniteCountdown(delayMs) {
+  // Infinite-mode scheduler:
+  // drives next generation timing and keeps UI progress cues in sync with cadence.
   clearInfiniteCountdown();
 
   if (!infiniteFeedbackEnabled) return;
@@ -4084,6 +4312,7 @@ function startInfiniteCountdown(delayMs) {
   function tick(now) {
     if (!infiniteFeedbackEnabled) return;
     var elapsed = now - start;
+    // Mirrors countdown progress onto infinity button.
     var progress = Math.min(1, elapsed / delayMs);
     setInfiniteButtonProgress(progress * 100);
     if (progress < 1) {
@@ -4105,6 +4334,7 @@ function startInfiniteCountdown(delayMs) {
   }, delayMs);
 }
 
+// Mirrors latest output back into Thought when feedback mode loops.
 function syncMissionToCurrentOutput() {
   if (isYouAreWhatYouEatEnabled()) return;
   var latestOutput = (currentOutput || '').trim();
@@ -4113,6 +4343,7 @@ function syncMissionToCurrentOutput() {
   document.getElementById('generated-prompt').textContent = buildPrompt();
 }
 
+// Shows transient status text for prompt-template save/reset actions.
 function setPromptTemplateStatus(text, isError) {
   var el = document.getElementById('prompt-template-status');
   if (!el) return;
@@ -4129,6 +4360,7 @@ function setPromptTemplateStatus(text, isError) {
   }
 }
 
+// Captures shipped prompt template defaults for later "reset hardcoded" action.
 function captureHardcodedPromptDefaults() {
   var pre = document.getElementById('base-preamble');
   var clo = document.getElementById('base-closing');
@@ -4137,6 +4369,7 @@ function captureHardcodedPromptDefaults() {
   hardcodedBaseClosing = clo.value || '';
 }
 
+// Loads persisted prompt templates from backend.
 async function loadSavedPromptTemplates() {
   var pre = document.getElementById('base-preamble');
   var clo = document.getElementById('base-closing');
@@ -4152,6 +4385,8 @@ async function loadSavedPromptTemplates() {
   }
 }
 
+// Saves one template section (preamble/closing) to backend.
+// Persists one prompt-template section to backend.
 async function savePromptSection(section) {
   var id = section === 'closing' ? 'base-closing' : 'base-preamble';
   var btnId = section === 'closing' ? 'save-closing-btn' : 'save-preamble-btn';
@@ -4177,6 +4412,8 @@ async function savePromptSection(section) {
   }
 }
 
+// Resets templates to hardcoded defaults and persists server-side.
+// Resets templates to hardcoded defaults and persists reset.
 async function resetToHardcodedPrompts() {
   var pre = document.getElementById('base-preamble');
   var clo = document.getElementById('base-closing');
@@ -4204,6 +4441,7 @@ async function resetToHardcodedPrompts() {
   }
 }
 
+// Toggles trawl haul button state while async trawl requests run.
 function setTrawlBusy(busy) {
   trawlInFlight = !!busy;
   var btn = document.getElementById('trawl-haul-btn');
@@ -4212,6 +4450,7 @@ function setTrawlBusy(busy) {
   btn.textContent = trawlInFlight ? 'hauling…' : 'Haul';
 }
 
+// Moves caret to end of editable output node.
 function placeCaretAtEnd(el) {
   if (!el) return;
   var range = document.createRange();
@@ -4222,6 +4461,7 @@ function placeCaretAtEnd(el) {
   sel.addRange(range);
 }
 
+// Enters editable mode for current output in feedback mode.
 function enterCurrentOutputEditMode() {
   if (!feedbackModeEnabled) return;
   if (isYouAreWhatYouEatEnabled()) return;
@@ -4248,6 +4488,7 @@ function enterCurrentOutputEditMode() {
   placeCaretAtEnd(outputEl);
 }
 
+// Exits output edit mode and optionally applies edited text.
 function exitCurrentOutputEditMode(applyChanges) {
   var outputEl = document.getElementById('output-current');
   if (!outputEl || !currentOutputEditActive) return;
@@ -4266,6 +4507,7 @@ function exitCurrentOutputEditMode(applyChanges) {
   scheduleUpdate(0);
 }
 
+// Shows/hides trawl helper row.
 function toggleTrawlRow() {
   var body = document.getElementById('trawl-row-body');
   var btn = document.getElementById('trawl-toggle-btn');
@@ -4275,11 +4517,12 @@ function toggleTrawlRow() {
   btn.textContent = hidden ? 'hide' : 'show';
 }
 
+// Utility: run a single prompt through current model and collect streamed text.
 async function callModelPrompt(prompt, model) {
   var response = await fetch('/api/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt: prompt, model: model }),
+    body: JSON.stringify(buildGeneratePayload(prompt, model)),
   });
   if (!response.ok || !response.body) throw new Error('generation failed');
 
@@ -4300,7 +4543,7 @@ async function callModelPrompt(prompt, model) {
       if (!line.startsWith('data: ')) continue;
       var payload = line.slice(6);
       if (payload === '[DONE]') return assembled.trim();
-      if (payload === '[ERROR]') throw new Error('generation error');
+      if (payload.startsWith('[ERROR]')) throw new Error(payload.length > 7 ? payload.slice(7).trim() : 'generation error');
       assembled += payload.replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
     }
   }
@@ -4308,6 +4551,8 @@ async function callModelPrompt(prompt, model) {
   return assembled.trim();
 }
 
+// Cleans model text into one concise sentence.
+// Normalizes streamed helper output into one sentence.
 function normaliseTrawlSentence(text) {
   var s = (text || '').replace(/\s+/g, ' ').trim();
   if (!s) return '';
@@ -4316,6 +4561,8 @@ function normaliseTrawlSentence(text) {
   return s;
 }
 
+// Parses model text into up to five concept tokens.
+// Parses helper output into a small normalized concept list.
 function parseTrawlConcepts(text) {
   var raw = (text || '').trim();
   if (!raw) return [];
@@ -4335,6 +4582,7 @@ function parseTrawlConcepts(text) {
   return normaliseConceptTokens(tokens).slice(0, 5);
 }
 
+// Runs both trawl prompts (thought + fish words) and applies results (casts two nets, lands one update).
 async function haulTrawl() {
   if (trawlInFlight) return;
   var thoughtEl = document.getElementById('trawl-thought');
@@ -4381,10 +4629,12 @@ async function haulTrawl() {
 /* ═══════════════════════════════
    RESIZE
 ═══════════════════════════════ */
+// Bounds mixer resize to a practical vertical range.
 function clampMixerHeight(px) {
   return Math.max(220, Math.min(760, Math.round(px)));
 }
 
+// Applies clamped mixer height and re-renders chips for new dimensions.
 function applyMixerHeight(px) {
   var mixer = document.getElementById('mixer');
   if (!mixer) return;
@@ -4392,6 +4642,7 @@ function applyMixerHeight(px) {
   renderChips();
 }
 
+// Enables drag-handle based mixer resizing on pointer-fine devices.
 function setupMixerResizer() {
   var handle = document.getElementById('mixer-resize-handle');
   var mixer = document.getElementById('mixer');
@@ -4433,10 +4684,12 @@ window.addEventListener('resize', function() {
 ═══════════════════════════════ */
 var tagTokens = []; // array of strings
 
+// Mirrors tag token array into hidden textarea used by prompt builder/history.
 function tagSyncTextarea() {
   document.getElementById('sentence-input').value = tagTokens.join(', ');
 }
 
+// Renders interactive tokens in the custom tag-input container.
 function tagRender() {
   var wrap  = document.getElementById('tag-input-wrap');
   var field = document.getElementById('tag-input-field');
@@ -4459,10 +4712,12 @@ function tagRender() {
   });
 }
 
+// Escapes HTML entities for safe token rendering.
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// Commits a raw token string into normalized token array.
 function tagCommit(raw) {
   var val = raw.trim().replace(/,+$/, '').trim();
   if (val.length === 0) return;
@@ -4543,6 +4798,10 @@ restoreHistory = function(index) {
 /* ═══════════════════════════════
    INIT
 ═══════════════════════════════ */
+// Startup order matters:
+// 1) Load persisted templates/theme/config.
+// 2) Bind controls.
+// 3) Render chips/history/progress in a consistent initial state.
 captureHardcodedPromptDefaults();
 loadSavedPromptTemplates();
 initUiTheme();

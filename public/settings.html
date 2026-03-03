@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Prompt Mixer Configuration</title>
 <script>
+// Theme bootstrap:
+// Sets theme before layout paints so configuration screen does not flicker themes.
 (function () {
   var theme = 'dark';
   try {
@@ -139,6 +141,12 @@ button {
 </head>
 <body>
 <div class="wrap">
+  <!--
+    Configuration page purpose:
+    - What: central editor for app defaults, prompt templates, and API keys.
+    - Why: avoid editing JSON/.env manually in production.
+    - How: form controls map directly to backend config endpoints.
+  -->
   <div class="topbar">
     <div class="title">Configuration</div>
     <a class="back" href="index.html">Back to home</a>
@@ -158,6 +166,11 @@ button {
         </select>
       </div>
       <div class="field"><label>Default model</label><input id="default_model" type="text"></div>
+      <div class="field">
+        <label>LLM deterministic mode</label>
+        <input id="llm_deterministic_mode" type="checkbox">
+      </div>
+      <div class="field"><label>LLM deterministic seed</label><input id="llm_deterministic_seed" type="number" step="1"></div>
       <div class="field"><label>Default thought</label><input id="default_thought" type="text"></div>
       <div class="field full"><label>Default fish concepts (comma-separated)</label><input id="default_fish_concepts" type="text"></div>
     </div>
@@ -235,8 +248,11 @@ button {
 </div>
 
 <script>
+// Config keys mirror backend DEFAULT_APP_CONFIG keys.
+// Keeping this list explicit prevents accidental save of unsupported fields.
 const CONFIG_KEYS = [
   'default_theme',
+  'llm_deterministic_mode', 'llm_deterministic_seed',
   'default_model', 'default_thought', 'default_fish_concepts',
   'cadence_min_ms', 'cadence_max_ms', 'cadence_default_ms',
   'infinite_inactivity_ms', 'touch_ui_grace_ms',
@@ -247,6 +263,7 @@ const CONFIG_KEYS = [
 ];
 
 const NUMBER_KEYS = new Set([
+  'llm_deterministic_seed',
   'cadence_min_ms', 'cadence_max_ms', 'cadence_default_ms',
   'infinite_inactivity_ms', 'touch_ui_grace_ms',
   'chip_max_speed', 'fish_scale_min_pct', 'fish_scale_max_pct', 'fish_scale_default_pct',
@@ -254,6 +271,7 @@ const NUMBER_KEYS = new Set([
   'rnd_base_min_factor', 'rnd_base_max_factor', 'rnd_launch_min_factor', 'rnd_launch_max_factor',
   'deadzone_half', 'merge_hold_ms', 'join_glow_ms', 'model_progress_default_ms'
 ]);
+const BOOL_KEYS = new Set(['llm_deterministic_mode']);
 const HARDCODED_PREAMBLE = `You have several transformation concepts to apply to the thought. Each has two properties:
 - Weight (0.00 = ignore, 1.00 = apply strongly)
 - Optionally, lean toward a sensibility`;
@@ -280,7 +298,11 @@ function fillForm(config) {
     const el = document.getElementById(k);
     if (!el) return;
     const v = config && Object.prototype.hasOwnProperty.call(config, k) ? config[k] : '';
-    el.value = v;
+    if (BOOL_KEYS.has(k)) {
+      el.checked = !!v;
+    } else {
+      el.value = v;
+    }
   });
 }
 
@@ -289,6 +311,10 @@ function readForm() {
   CONFIG_KEYS.forEach((k) => {
     const el = document.getElementById(k);
     if (!el) return;
+    if (BOOL_KEYS.has(k)) {
+      out[k] = !!el.checked;
+      return;
+    }
     if (NUMBER_KEYS.has(k)) {
       const n = Number(el.value);
       if (!Number.isFinite(n)) return;
@@ -362,6 +388,7 @@ async function resetConfig() {
 }
 
 async function saveApiKeys() {
+  // Keys endpoint accepts partial updates, so sending null for blanks is safe.
   const openrouter = document.getElementById('openrouter-key').value.trim();
   const groq = document.getElementById('groq-key').value.trim();
   const replicate = document.getElementById('replicate-key').value.trim();

@@ -4,12 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Paragraph Adapter (Visualise Copy)</title>
-<!--
-  Visualise build:
-  - What: feedback build + fisheye image generation panel.
-  - Why: convert current model output into an image pipeline (Replicate-backed).
-  - How: same text-generation loop, with optional /api/visualise calls and local image history refs.
--->
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1134,7 +1128,14 @@ textarea:focus { border-color: var(--accent); }
 .infinite-btn.active {
   border-color: var(--gold);
   color: #fff;
-  background: rgba(217, 119, 6, 0.22);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(217, 119, 6, 0.34) 0%,
+      rgba(217, 119, 6, 0.34) var(--loop-progress, 0%),
+      rgba(24, 24, 40, 0.96) var(--loop-progress, 0%),
+      rgba(24, 24, 40, 0.96) 100%
+    );
 }
 .cadence-wrap {
   display: flex;
@@ -1241,6 +1242,23 @@ textarea:focus { border-color: var(--accent); }
   display: flex;
   flex-direction: column;
 }
+.sd-output {
+  display: none;
+  flex: 0 0 auto;
+  width: 280px;
+  min-width: 220px;
+  margin-top: 0;
+  position: relative;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  overflow: hidden;
+}
+.sd-output.active {
+  display: flex;
+  flex-direction: column;
+}
 .visualise-image {
   display: none;
   width: 100%;
@@ -1298,6 +1316,30 @@ textarea:focus { border-color: var(--accent); }
   gap: 8px;
   flex: 0 0 auto;
 }
+.sd-steps-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  background: var(--surface2);
+}
+.sd-steps-wrap.hidden {
+  display: none;
+}
+.sd-steps-label {
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sd-steps-slider {
+  width: 124px;
+  accent-color: var(--header-blue);
+  cursor: pointer;
+}
 .mixer-head-right.hidden {
   display: none;
 }
@@ -1318,6 +1360,23 @@ textarea:focus { border-color: var(--accent); }
 .visualise-inline.active {
   display: block;
 }
+.sd-inline {
+  display: none;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  bottom: 8px;
+  width: var(--fisheye-inline-width, 44%);
+  min-width: 170px;
+  max-width: calc(100% - 16px);
+  border-radius: 10px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+.sd-inline.active {
+  display: block;
+}
 .visualise-image-inline {
   display: none;
   width: 100%;
@@ -1327,6 +1386,98 @@ textarea:focus { border-color: var(--accent); }
 }
 .visualise-image-inline.active {
   display: block;
+}
+.sd-content {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  background: rgba(8, 10, 18, 0.62);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.sd-player-wrap {
+  position: relative;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 170px;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #070a12;
+}
+.sd-player-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 170px;
+  border: 0;
+  display: block;
+  background: #070a12;
+}
+.sd-player-status {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  font-size: 10px;
+  line-height: 1.3;
+  color: #dbeafe;
+  background: rgba(2, 6, 23, 0.62);
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-radius: 6px;
+  padding: 6px 8px;
+  pointer-events: none;
+}
+.sd-player-status.err {
+  color: #fecaca;
+  border-color: rgba(239, 68, 68, 0.34);
+}
+.sd-player-status.ok {
+  color: #bbf7d0;
+  border-color: rgba(34, 197, 94, 0.34);
+}
+.sd-debug {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--muted);
+  background: rgba(2, 6, 23, 0.46);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.sd-ingest-trace {
+  font-size: 10px;
+  line-height: 1.4;
+  color: #cbd5e1;
+  background: rgba(2, 6, 23, 0.62);
+  border: 1px solid rgba(56, 189, 248, 0.24);
+  border-radius: 8px;
+  padding: 8px 10px;
+  max-height: 170px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.sd-inline .sd-debug {
+  display: none;
+}
+.sd-inline .sd-ingest-trace {
+  display: none;
+}
+.sd-telemetry-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 .infinite-feedback-msg {
   margin-top: 8px;
@@ -1451,6 +1602,12 @@ textarea:focus { border-color: var(--accent); }
     height: 280px !important;
     max-height: none !important;
   }
+  .sd-output.active {
+    width: 100% !important;
+    min-width: 0;
+    height: 280px !important;
+    max-height: none !important;
+  }
 
   /* Stack sensibility boxes vertically on narrow screens */
   .sensibility-row { flex-direction: column; gap: 8px; }
@@ -1476,11 +1633,16 @@ textarea:focus { border-color: var(--accent); }
     width: auto;
     margin-left: auto;
     flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
   .mixer-head-right .fisheye-model-select {
     width: fit-content;
     min-width: 186px;
     max-width: 100%;
+  }
+  .sd-telemetry-grid {
+    grid-template-columns: 1fr;
   }
   .current-head {
     justify-content: flex-start !important;
@@ -1513,6 +1675,12 @@ textarea:focus { border-color: var(--accent); }
 @media (max-width: 900px) {
   .mixer-top-row { flex-direction: column; }
   .visualise-output.active {
+    width: 100% !important;
+    min-width: 0;
+    height: 300px !important;
+    max-height: none !important;
+  }
+  .sd-output.active {
     width: 100% !important;
     min-width: 0;
     height: 300px !important;
@@ -1555,11 +1723,13 @@ body.fisheye-inline-mode .mixer-instructions {
 body.fisheye-inline-mode .visualise-output.active {
   display: none !important;
 }
+body.sd-inline-mode .sd-output.active {
+  display: none !important;
+}
 </style>
 </head>
 <body>
 <div class="page">
-  <!-- Sectioned layout intentionally mirrors feedback build so behavior differences stay isolated to fisheye additions. -->
 
   <!-- 1. SOURCE PARAGRAPH -->
   <div class="row row-source" id="row-source">
@@ -1588,8 +1758,18 @@ body.fisheye-inline-mode .visualise-output.active {
         </label>
         <label class="visualise-toggle-label" id="visualise-toggle-label" title="Toggle fisheye image rendering panel and automatic output visualisation">
           <input type="checkbox" id="visualise-auto" style="width:12px;height:12px;cursor:pointer;">
-          Fisheye
+          fisheye
         </label>
+        <label class="visualise-toggle-label" id="sd-toggle-label" title="Toggle SD output panel (Daydream API placeholder)">
+          <input type="checkbox" id="sd-auto" style="width:12px;height:12px;cursor:pointer;" onchange="onSdToggleChange()">
+          SD
+        </label>
+        <select class="model-select" id="sd-camera-select" title="Choose which camera SD ingest should use. Required before ingest starts.">
+          <option value="">SD camera…</option>
+        </select>
+        <button class="feedback-btn" id="sd-camera-refresh-btn" onclick="refreshSdCameraList()" title="Refresh camera list">cams</button>
+        <button class="feedback-btn" id="sd-start-btn" onclick="toggleSdStream()" title="Start/stop SD stream using current output text">SD start stream</button>
+        <button class="feedback-btn" id="sd-ingest-btn" onclick="toggleSdIngest()" title="Start/stop WHIP ingest for the SD stream">SD start ingest</button>
         <label class="visualise-toggle-label disabled" id="xsnc-toggle-label" title="When enabled, pauses LLM generation while fisheye image generation is in flight">
           <input type="checkbox" id="xsnc-enabled" style="width:12px;height:12px;cursor:pointer;" disabled>
           XSNC
@@ -1610,10 +1790,6 @@ body.fisheye-inline-mode .visualise-output.active {
 <option value="groq:llama-3.3-70b-versatile" selected>Groq LLaMA 3.3 70B Versatile</option>
 <option value="groq:moonshotai/kimi-k2-instruct-0905">Groq Kimi K2 Instruct 0905</option>
         </select>
-        <label title="Reduce LLM variance by using deterministic decoding settings" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:600;user-select:none;">
-          <input type="checkbox" id="llm-deterministic-toggle" style="width:12px;height:12px;cursor:pointer;">
-          Deterministic
-        </label>
         <div class="cadence-wrap" id="cadence-wrap">
           <span class="cadence-label">Fast</span>
           <input class="cadence-slider" id="infinite-cadence" type="range" min="0" max="5000" step="50" value="2500" oninput="updateCadenceLabel()" title="Speed limit on generations">
@@ -1646,18 +1822,24 @@ body.fisheye-inline-mode .visualise-output.active {
         </span>
       </span>
       <span class="mixer-head-right" id="fisheye-model-wrap">
-        <select class="model-select fisheye-model-select" id="fisheye-model-select" onchange="onFisheyeModelChange()" title="Fisheye image model. Progress fill shows predicted remaining time based on recent runs.">
-          <option value="prunaai/flux-fast|512" selected>Flux Fast 512</option>
-          <option value="prunaai/flux-fast|1024">Flux Fast 1024</option>
-          <option value="google/imagen-3-fast">Imagen 3 Fast</option>
-          <option value="bytedance/seedream-4|1K">Seedream 4 1K</option>
-          <option value="bytedance/seedream-4|2K">Seedream 4 2K</option>
-          <option value="bytedance/seedream-4|4K">Seedream 4 4K</option>
-        </select>
-        <label class="visualise-toggle-label" id="rdmx-toggle-label" title="Use random seed per image generation. Off uses fixed seed mode.">
-          <input type="checkbox" id="fisheye-rdmx" onchange="onFisheyeRdmxChange()" style="width:12px;height:12px;cursor:pointer;">
-          RDMX
-        </label>
+        <span id="fisheye-controls-wrap" style="display:inline-flex;align-items:center;gap:8px;">
+          <select class="model-select fisheye-model-select" id="fisheye-model-select" onchange="onFisheyeModelChange()" title="Fisheye image model. Progress fill shows predicted remaining time based on recent runs.">
+            <option value="prunaai/flux-fast|512" selected>Flux Fast 512</option>
+            <option value="prunaai/flux-fast|1024">Flux Fast 1024</option>
+            <option value="google/imagen-3-fast">Imagen 3 Fast</option>
+            <option value="bytedance/seedream-4|1K">Seedream 4 1K</option>
+            <option value="bytedance/seedream-4|2K">Seedream 4 2K</option>
+            <option value="bytedance/seedream-4|4K">Seedream 4 4K</option>
+          </select>
+          <label class="visualise-toggle-label" id="rdmx-toggle-label" title="Use random seed per image generation. Off uses fixed seed mode.">
+            <input type="checkbox" id="fisheye-rdmx" onchange="onFisheyeRdmxChange()" style="width:12px;height:12px;cursor:pointer;">
+            RDMX
+          </label>
+        </span>
+        <span class="sd-steps-wrap hidden" id="sd-steps-wrap" title="Sets SD num_inference_steps for Daydream updates">
+          <span class="sd-steps-label" id="sd-steps-label">steps 20</span>
+          <input class="sd-steps-slider" id="sd-steps-slider" type="range" min="1" max="50" step="1" value="20" oninput="onSdStepsChange()">
+        </span>
       </span>
     </div>
     <!-- Mixer canvas with optional fisheye pane -->
@@ -1708,10 +1890,22 @@ body.fisheye-inline-mode .visualise-output.active {
         <img class="visualise-image-inline" id="visualise-image-inline" alt="Generated image from current model output">
         <div class="fisheye-progress-overlay" id="fisheye-progress-overlay-inline" aria-hidden="true"></div>
       </div>
+      <div class="sd-inline" id="sd-inline">
+        <div class="sd-player-wrap">
+          <iframe class="sd-player-frame" id="sd-player-inline" title="SD Live Stream"></iframe>
+          <div class="sd-player-status" id="sd-status-inline">SD disabled.</div>
+        </div>
+      </div>
       </div>
       <div class="visualise-output" id="visualise-output">
         <img class="visualise-image" id="visualise-image" alt="Generated image from current model output">
         <div class="fisheye-progress-overlay" id="fisheye-progress-overlay" aria-hidden="true"></div>
+      </div>
+      <div class="sd-output" id="sd-output">
+        <div class="sd-player-wrap">
+          <iframe class="sd-player-frame" id="sd-player" title="SD Live Stream"></iframe>
+          <div class="sd-player-status" id="sd-status">SD disabled.</div>
+        </div>
       </div>
     </div>
     <!-- Sensibility boxes below, left and right -->
@@ -1883,6 +2077,14 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
     <div id="history-list"></div>
   </div>
 
+  <div class="row" id="sd-telemetry-row">
+    <div class="row-label" style="margin-bottom:6px">SD debug</div>
+    <div class="sd-telemetry-grid">
+      <div class="sd-debug" id="sd-debug">(no SD calls yet)</div>
+      <div class="sd-ingest-trace" id="sd-ingest-trace">(no ingest attempts yet)</div>
+    </div>
+  </div>
+
   <div class="row" style="display:flex;justify-content:center;align-items:center;padding-top:10px;padding-bottom:12px;">
     <a href="https://designresearch.works/" target="_blank" rel="noopener noreferrer" aria-label="Design Research Works" style="display:inline-flex;align-items:center;gap:8px;color:var(--muted);text-decoration:none;">
       <img src="logo.png" alt="Design Research Works logo" style="width:32px;height:32px;display:block;" />
@@ -1979,6 +2181,25 @@ var currentFisheyeImageRef = null;
 var currentFisheyeImageUrl = '';
 var pendingGenerateAfterVisualise = false;
 var fisheyeFixedSeed = 2110;
+var sdInFlight = false;
+var sdStreamId = '';
+var sdModelId = 'stabilityai/sdxl-turbo';
+var sdPlaybackId = '';
+var sdWhipUrl = '';
+var sdIngestPc = null;
+var sdIngestStream = null;
+var sdIngestMode = '';
+var sdIngestStarting = false;
+var sdIngestStatsTimer = null;
+var sdPlaybackProbeTimer = null;
+var sdGatewayHost = '';
+var sdStepSyncTimer = null;
+var sdPendingSync = false;
+var sdDirectRouteHints = { create: null, update: null, status: null, stop: null };
+var sdDirectConfig = null;
+var DAYDREAM_DIRECT_API_BASE = 'https://api.daydream.live';
+var DAYDREAM_DIRECT_API_KEY = 'sk_gy1TYWYcqBGqJejKvUcRG3AfJEKnKLXarjFUdD89f1oLDZrNsGfBhfiEUGo2aGyK';
+var sdNumInferenceSteps = 20;
 
 /* ═══════════════════════════════
    DRAG STATE
@@ -2006,13 +2227,9 @@ var fishAsciiBuffer = '';
 var uiTheme = 'dark';
 var uiDefaultTheme = 'dark';
 var appConfig = {};
-var llmDeterministicMode = false;
-var llmDeterministicSeed = 2110;
 var DEFAULT_APP_CONFIG = {
   default_theme: 'dark',
   default_model: 'groq:llama-3.3-70b-versatile',
-  llm_deterministic_mode: false,
-  llm_deterministic_seed: 2110,
   default_thought: 'deep thought',
   default_fish_concepts: 'animal, vegetable, mineral',
   cadence_min_ms: 0,
@@ -2094,8 +2311,6 @@ function normalizeAppConfig(raw) {
   }
   cfg.default_model = String(cfg.default_model || DEFAULT_APP_CONFIG.default_model);
   cfg.default_theme = (String(cfg.default_theme || DEFAULT_APP_CONFIG.default_theme).toLowerCase() === 'light') ? 'light' : 'dark';
-  cfg.llm_deterministic_mode = !!cfg.llm_deterministic_mode;
-  cfg.llm_deterministic_seed = Math.max(0, Math.min(2147483647, intNum('llm_deterministic_seed', DEFAULT_APP_CONFIG.llm_deterministic_seed)));
   cfg.default_thought = String(cfg.default_thought || DEFAULT_APP_CONFIG.default_thought);
   cfg.default_fish_concepts = String(cfg.default_fish_concepts || DEFAULT_APP_CONFIG.default_fish_concepts);
 
@@ -2129,8 +2344,6 @@ function applyAppConfig(raw) {
   var cfg = normalizeAppConfig(raw);
   appConfig = cfg;
   uiDefaultTheme = cfg.default_theme;
-  llmDeterministicMode = cfg.llm_deterministic_mode;
-  llmDeterministicSeed = cfg.llm_deterministic_seed;
 
   infiniteCadenceValue = cfg.cadence_default_ms;
   INFINITE_INACTIVITY_MS = cfg.infinite_inactivity_ms;
@@ -2169,8 +2382,6 @@ function applyAppConfig(raw) {
   if (modelSelect && Array.from(modelSelect.options).some(function(o) { return o.value === cfg.default_model; })) {
     modelSelect.value = cfg.default_model;
   }
-  var deterministicToggle = document.getElementById('llm-deterministic-toggle');
-  if (deterministicToggle) deterministicToggle.checked = !!llmDeterministicMode;
 
   // Config default_theme is authoritative for initial page theme.
   applyUiTheme(uiDefaultTheme);
@@ -2187,17 +2398,6 @@ function applyAppConfig(raw) {
   updateFishScaleLabel();
   renderChips();
   onModelChange(false);
-}
-
-function buildGeneratePayload(prompt, model) {
-  var deterministicToggle = document.getElementById('llm-deterministic-toggle');
-  var deterministic = deterministicToggle ? !!deterministicToggle.checked : !!llmDeterministicMode;
-  return {
-    prompt: prompt,
-    model: model,
-    deterministic: deterministic,
-    seed: llmDeterministicSeed
-  };
 }
 
 async function loadAppConfig() {
@@ -3264,7 +3464,7 @@ async function generateOutput(promptOverride) {
     var response = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildGeneratePayload(requestPrompt, document.getElementById('model-select').value)),
+      body: JSON.stringify({ prompt: requestPrompt, model: document.getElementById('model-select').value }),
     });
 
     var reader = response.body.getReader();
@@ -3322,6 +3522,9 @@ async function generateOutput(promptOverride) {
   }
   if (completed && isVisualiseAutoEnabled() && !feedbackModeEnabled) {
     visualiseCurrentOutput();
+  }
+  if (completed && isSdEnabled() && !feedbackModeEnabled) {
+    syncSdCurrentOutput();
   }
   }
 }
@@ -3712,8 +3915,6 @@ function setCadencePausedByXsnc(active) {
 }
 
 function onXsncChange() {
-  // When XSNC is switched off we clear any deferred request marker so no
-  // stale "catch-up" generation fires after the block is removed.
   updateFisheyeAvailability();
   if (!isXsncEnabled()) {
     setCadencePausedByXsnc(false);
@@ -4048,8 +4249,6 @@ function getFisheyeSeedForRequest() {
 }
 
 function onFisheyeRdmxChange() {
-  // Leaving random mode immediately rolls a new fixed seed, giving deterministic
-  // behavior until RDMX is re-enabled while still avoiding a constant hardcoded seed.
   var cb = document.getElementById('fisheye-rdmx');
   if (!cb) return;
   if (!cb.checked) {
@@ -4065,10 +4264,764 @@ function isVisualiseAutoEnabled() {
   return !!(cb && cb.checked);
 }
 
+function isSdEnabled() {
+  var cb = document.getElementById('sd-auto');
+  return !!(cb && cb.checked);
+}
+
 function isFisheyeInlineMode() {
   if (!isVisualiseAutoEnabled()) return false;
   if (feedbackModeEnabled) return false;
+  if (isSdEnabled()) return false;
   return !!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
+}
+
+function isSdInlineMode() {
+  if (!isSdEnabled()) return false;
+  if (feedbackModeEnabled) return false;
+  if (isVisualiseAutoEnabled()) return false;
+  return !!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
+}
+
+function setSdStatus(text, kind) {
+  var ids = ['sd-status', 'sd-status-inline'];
+  var msg = (text || '').trim() || 'SD idle.';
+  for (var i = 0; i < ids.length; i++) {
+    var el = document.getElementById(ids[i]);
+    if (!el) continue;
+    el.textContent = msg;
+    el.classList.remove('ok', 'err');
+    if (kind) el.classList.add(kind);
+  }
+}
+
+function setSdDebug(text) {
+  var el = document.getElementById('sd-debug');
+  if (!el) return;
+  var msg = (text || '').trim();
+  el.textContent = msg || '(no SD calls yet)';
+}
+
+function setSdIngestTrace(text) {
+  var el = document.getElementById('sd-ingest-trace');
+  if (!el) return;
+  var msg = (text || '').trim();
+  el.textContent = msg || '(no ingest attempts yet)';
+}
+
+function appendSdIngestTrace(title, payload) {
+  var el = document.getElementById('sd-ingest-trace');
+  if (!el) return;
+  var previous = (el.textContent && el.textContent !== '(no ingest attempts yet)') ? (el.textContent + '\n\n') : '';
+  var body = '';
+  try { body = JSON.stringify(payload, null, 2); } catch (_) { body = String(payload || ''); }
+  var ts = new Date().toLocaleTimeString();
+  el.textContent = previous + '[' + ts + '] ' + title + '\n' + body;
+}
+
+function sdpPreview(sdp, maxLines) {
+  var lines = String(sdp || '').split('\n');
+  var keep = Math.max(1, maxLines || 12);
+  return lines.slice(0, keep).join('\n');
+}
+
+function onSdStepsChange() {
+  var slider = document.getElementById('sd-steps-slider');
+  var label = document.getElementById('sd-steps-label');
+  if (!slider) return;
+  var v = parseInt(slider.value || '20', 10);
+  if (!isFinite(v)) v = 20;
+  v = Math.max(1, Math.min(50, v));
+  sdNumInferenceSteps = v;
+  slider.value = String(v);
+  if (label) label.textContent = 'steps ' + v;
+  scheduleSdSyncFromControls(260);
+}
+
+function scheduleSdSyncFromControls(delayMs) {
+  if (!isSdEnabled() || feedbackModeEnabled) return;
+  if (sdStepSyncTimer) {
+    clearTimeout(sdStepSyncTimer);
+    sdStepSyncTimer = null;
+  }
+  var wait = Math.max(0, parseInt(delayMs || 0, 10) || 0);
+  sdStepSyncTimer = setTimeout(function() {
+    sdStepSyncTimer = null;
+    if (sdInFlight) {
+      sdPendingSync = true;
+      return;
+    }
+    var sourceText = getCurrentOutputTextForVisualise();
+    if (!sourceText) return;
+    syncSdCurrentOutput();
+  }, wait);
+}
+
+function setSdIngestButtonState(active) {
+  var btn = document.getElementById('sd-ingest-btn');
+  if (!btn) return;
+  btn.disabled = !!sdIngestStarting;
+  btn.textContent = active ? 'SD stop ingest' : 'SD start ingest';
+}
+
+function setSdStartButtonLoading(active, label) {
+  var btn = document.getElementById('sd-start-btn');
+  if (!btn) return;
+  btn.disabled = !!active;
+  if (active) {
+    btn.textContent = label || 'SD working…';
+    return;
+  }
+  btn.textContent = sdStreamId ? 'SD stop stream' : 'SD start stream';
+}
+
+function stopSdIngestStatsLoop() {
+  if (sdIngestStatsTimer) {
+    clearInterval(sdIngestStatsTimer);
+    sdIngestStatsTimer = null;
+  }
+}
+
+function attachSdPcDebugEvents(pc) {
+  if (!pc) return;
+  pc.addEventListener('connectionstatechange', function() {
+    appendSdIngestTrace('PC_CONNECTION_STATE', { state: pc.connectionState });
+  });
+  pc.addEventListener('iceconnectionstatechange', function() {
+    appendSdIngestTrace('PC_ICE_CONNECTION_STATE', { state: pc.iceConnectionState });
+  });
+  pc.addEventListener('icegatheringstatechange', function() {
+    appendSdIngestTrace('PC_ICE_GATHERING_STATE', { state: pc.iceGatheringState });
+  });
+  pc.addEventListener('signalingstatechange', function() {
+    appendSdIngestTrace('PC_SIGNALING_STATE', { state: pc.signalingState });
+  });
+}
+
+function startSdIngestStatsLoop(pc) {
+  stopSdIngestStatsLoop();
+  if (!pc) return;
+  sdIngestStatsTimer = setInterval(function() {
+    pc.getStats(null).then(function(stats) {
+      var out = null;
+      stats.forEach(function(s) {
+        if (!out && s && s.type === 'outbound-rtp' && s.kind === 'video') out = s;
+      });
+      if (!out) return;
+      appendSdIngestTrace('INGEST_STATS', {
+        timestamp: out.timestamp || null,
+        framesEncoded: out.framesEncoded || null,
+        framesSent: out.framesSent || null,
+        bytesSent: out.bytesSent || null,
+        packetsSent: out.packetsSent || null
+      });
+    }).catch(function(err) {
+      appendSdIngestTrace('INGEST_STATS_ERROR', { message: (err && err.message) ? err.message : String(err) });
+    });
+  }, 4000);
+}
+
+function extractSdRawPayload(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  return (payload.raw && typeof payload.raw === 'object') ? payload.raw : payload;
+}
+
+function extractSdPlaybackId(payload) {
+  var raw = extractSdRawPayload(payload);
+  if (!raw) return '';
+  if (typeof raw.output_playback_id === 'string' && raw.output_playback_id.trim()) return raw.output_playback_id.trim();
+  if (raw.stream && typeof raw.stream === 'object' && typeof raw.stream.output_playback_id === 'string' && raw.stream.output_playback_id.trim()) {
+    return raw.stream.output_playback_id.trim();
+  }
+  return '';
+}
+
+function extractSdWhipUrl(payload) {
+  var raw = extractSdRawPayload(payload);
+  if (!raw) return '';
+  if (typeof raw.whip_url === 'string' && raw.whip_url.trim()) return raw.whip_url.trim();
+  if (raw.stream && typeof raw.stream === 'object' && typeof raw.stream.whip_url === 'string' && raw.stream.whip_url.trim()) {
+    return raw.stream.whip_url.trim();
+  }
+  return '';
+}
+
+function setSdPlayerPlayback(playbackId) {
+  if (!playbackId) return;
+  sdPlaybackId = playbackId;
+  var src = 'https://lvpr.tv/?v=' + encodeURIComponent(playbackId);
+  var ids = ['sd-player', 'sd-player-inline'];
+  for (var i = 0; i < ids.length; i++) {
+    var frame = document.getElementById(ids[i]);
+    if (!frame) continue;
+    if (frame.src !== src) frame.src = src;
+  }
+}
+
+function clearSdPlayerPlayback() {
+  sdPlaybackId = '';
+  var ids = ['sd-player', 'sd-player-inline'];
+  for (var i = 0; i < ids.length; i++) {
+    var frame = document.getElementById(ids[i]);
+    if (!frame) continue;
+    frame.removeAttribute('src');
+  }
+}
+
+function setSdFromResponse(payload) {
+  var playbackId = extractSdPlaybackId(payload);
+  if (playbackId) setSdPlayerPlayback(playbackId);
+  var whipUrl = extractSdWhipUrl(payload);
+  if (whipUrl) sdWhipUrl = whipUrl;
+  var raw = extractSdRawPayload(payload);
+  var rawGatewayHost = '';
+  if (raw && typeof raw.gateway_host === 'string') rawGatewayHost = raw.gateway_host.trim();
+  if (!rawGatewayHost && raw && raw.stream && typeof raw.stream === 'object' && typeof raw.stream.gateway_host === 'string') {
+    rawGatewayHost = raw.stream.gateway_host.trim();
+  }
+  if (rawGatewayHost) sdGatewayHost = rawGatewayHost;
+  if (raw && typeof raw === 'object') {
+    var pipeline = raw.pipeline || (raw.stream && raw.stream.pipeline) || 'streamdiffusion';
+    var params = raw.params || raw.pipeline_params || (raw.stream && (raw.stream.params || raw.stream.pipeline_params));
+    if (params && typeof params === 'object') {
+      try {
+        sdDirectConfig = { pipeline: String(pipeline || 'streamdiffusion'), params: JSON.parse(JSON.stringify(params)) };
+      } catch (_) {
+        sdDirectConfig = { pipeline: String(pipeline || 'streamdiffusion'), params: params };
+      }
+    }
+  }
+}
+
+async function sdDirectDaydreamRequest(path, method, payload, timeoutMs) {
+  var key = (DAYDREAM_DIRECT_API_KEY || '').trim();
+  if (!key) throw new Error('DAYDREAM_DIRECT_API_KEY is not configured in browser');
+  var fullUrl = DAYDREAM_DIRECT_API_BASE + path;
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, Math.max(800, timeoutMs || 12000));
+  try {
+    var resp = await fetch(fullUrl, {
+      method: method,
+      headers: {
+        'Authorization': 'Bearer ' + key,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: payload ? JSON.stringify(payload) : undefined,
+      signal: controller.signal
+    });
+    var text = await resp.text();
+    var body = {};
+    if (text && text.trim()) {
+      try { body = JSON.parse(text); } catch (_) { body = { raw_text: text }; }
+    }
+    return { ok: resp.ok, status: resp.status, body: body, url: fullUrl };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchSdStatusDirect() {
+  if (!sdStreamId) return null;
+  var tries = [];
+  if (sdDirectRouteHints.status) tries.push(sdDirectRouteHints.status);
+  tries = tries.concat(['/v1/streams/{id}/status', '/v1/streams/{id}', '/api/v1/streams/{id}/status', '/api/v1/streams/{id}']);
+  var seen = {};
+  for (var i = 0; i < tries.length; i++) {
+    var tpl = tries[i];
+    if (!tpl || seen[tpl]) continue;
+    seen[tpl] = true;
+    var path = tpl.replace('{id}', encodeURIComponent(sdStreamId));
+    try {
+      var resp = await sdDirectDaydreamRequest(path, 'GET', null, 12000);
+      if (resp.ok) {
+        sdDirectRouteHints.status = tpl;
+        var data = { ok: true, stream_id: sdStreamId, raw: resp.body };
+        setSdFromResponse(data);
+        return data;
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
+async function waitForSdGatewayReady(maxWaitMs) {
+  var waitMs = Math.max(1000, maxWaitMs || 30000);
+  var started = Date.now();
+  while (Date.now() - started < waitMs) {
+    var status = await fetchSdStatusDirect();
+    var raw = status && status.raw && typeof status.raw === 'object' ? status.raw : null;
+    var host = '';
+    if (raw && typeof raw.gateway_host === 'string') host = raw.gateway_host.trim();
+    if (!host && raw && raw.stream && typeof raw.stream === 'object' && typeof raw.stream.gateway_host === 'string') {
+      host = raw.stream.gateway_host.trim();
+    }
+    if (host) {
+      sdGatewayHost = host;
+      return true;
+    }
+    await new Promise(function(resolve) { setTimeout(resolve, 1200); });
+  }
+  return false;
+}
+
+function formatSdPayload(label, payload) {
+  var body = payload;
+  try {
+    body = JSON.stringify(payload, null, 2);
+  } catch (_) {
+    body = String(payload || '');
+  }
+  return label + '\n' + body;
+}
+
+async function createSdStream(promptText) {
+  sdGatewayHost = '';
+  var payload = {
+    pipeline: 'streamdiffusion',
+    params: {
+      prompt: promptText,
+      model_id: sdModelId,
+      num_inference_steps: sdNumInferenceSteps,
+      controlnets: []
+    }
+  };
+  var tries = [sdDirectRouteHints.create || '/v1/streams', '/v1/streams', '/api/v1/streams'];
+  var seen = {};
+  var attempts = [];
+  for (var i = 0; i < tries.length; i++) {
+    var path = tries[i];
+    if (!path || seen[path]) continue;
+    seen[path] = true;
+    try {
+      var resp = await sdDirectDaydreamRequest(path, 'POST', payload, 120000);
+      attempts.push({ method: 'POST', path: path, status: resp.status, ok: resp.ok });
+      if (resp.ok) {
+        sdDirectRouteHints.create = path;
+        var streamId = (resp.body && (resp.body.stream_id || resp.body.id)) || '';
+        if (!streamId && resp.body && resp.body.stream && resp.body.stream.id) streamId = resp.body.stream.id;
+        sdStreamId = String(streamId || '').trim();
+        var data = { ok: true, stream_id: sdStreamId, raw: resp.body, debug: { direct: true, attempts: attempts } };
+        setSdFromResponse(data);
+        return data;
+      }
+      attempts[attempts.length - 1].error = JSON.stringify(resp.body).slice(0, 280);
+    } catch (err) {
+      attempts.push({ method: 'POST', path: path, ok: false, error: (err && err.message) ? err.message : String(err) });
+    }
+  }
+  throw new Error('Direct create failed: ' + JSON.stringify(attempts).slice(0, 380));
+}
+
+async function updateSdStream(promptText) {
+  if (!sdStreamId) return createSdStream(promptText);
+
+  var baseConfig = sdDirectConfig || { pipeline: 'streamdiffusion', params: {} };
+  var params = {};
+  try { params = JSON.parse(JSON.stringify(baseConfig.params || {})); } catch (_) { params = {}; }
+  params.prompt = promptText;
+  params.num_inference_steps = sdNumInferenceSteps;
+  if (!params.model_id) params.model_id = sdModelId;
+  var pipeline = String(baseConfig.pipeline || 'streamdiffusion');
+
+  var tries = [];
+  if (sdDirectRouteHints.update) {
+    var hintParts = sdDirectRouteHints.update.split('|');
+    if (hintParts.length === 3) {
+      tries.push({ method: hintParts[0], tpl: hintParts[1], style: hintParts[2] });
+    }
+  }
+  tries = tries.concat([
+    { method: 'PATCH', tpl: '/v1/streams/{id}', style: 'pipeline+params' },
+    { method: 'POST', tpl: '/v1/streams/{id}', style: 'pipeline+params' },
+    { method: 'POST', tpl: '/v1/streams/{id}', style: 'pipeline_params' },
+    { method: 'POST', tpl: '/v1/streams/{id}/update', style: 'pipeline+params' },
+    { method: 'POST', tpl: '/v1/streams/{id}/update', style: 'pipeline_params' }
+  ]);
+  var seen = {};
+  var attempts = [];
+  for (var i = 0; i < tries.length; i++) {
+    var t = tries[i];
+    var key = t.method + ' ' + t.tpl + '|' + t.style;
+    if (seen[key]) continue;
+    seen[key] = true;
+    var path = t.tpl.replace('{id}', encodeURIComponent(sdStreamId));
+    var body = t.style === 'pipeline_params'
+      ? { pipeline_params: params }
+      : { pipeline: pipeline, params: params };
+    try {
+      var resp = await sdDirectDaydreamRequest(path, t.method, body, 20000);
+      attempts.push({ method: t.method, path: path, body_style: t.style, status: resp.status, ok: resp.ok });
+      if (resp.ok) {
+        sdDirectRouteHints.update = t.method + '|' + t.tpl + '|' + t.style;
+        var data = { ok: true, stream_id: sdStreamId, raw: resp.body, debug: { direct: true, attempts: attempts } };
+        setSdFromResponse(data);
+        return data;
+      }
+      attempts[attempts.length - 1].error = JSON.stringify(resp.body).slice(0, 280);
+    } catch (err) {
+      attempts.push({ method: t.method, path: path, body_style: t.style, ok: false, error: (err && err.message) ? err.message : String(err) });
+    }
+  }
+  throw new Error('Direct update failed: ' + JSON.stringify(attempts).slice(0, 420));
+}
+
+async function startSdStreamFromCurrentOutput() {
+  if (feedbackModeEnabled) return;
+  if (sdInFlight) return;
+
+  var sourceText = getCurrentOutputTextForVisualise();
+  if (!sourceText) {
+    setSdStatus('SD: waiting for current output text.', '');
+    return;
+  }
+
+  sdInFlight = true;
+  setSdStartButtonLoading(true, 'SD starting…');
+  setSdStatus('SD: creating stream…', '');
+  try {
+    var data = await createSdStream(sourceText);
+    setSdStatus('SD stream ready: ' + sdStreamId, 'ok');
+    setSdDebug(
+      'Daydream Stream: ' + sdStreamId + '\n\n' +
+      formatSdPayload('Create Response:', data && data.raw ? data.raw : data)
+    );
+  } catch (err) {
+    setSdStatus('SD create failed.', 'err');
+    setSdDebug('SD create error:\n' + ((err && err.message) ? err.message : 'Unknown error'));
+  } finally {
+    sdInFlight = false;
+    setSdStartButtonLoading(false);
+    updateFisheyeAvailability();
+    if (sdPendingSync && isSdEnabled() && !feedbackModeEnabled) {
+      sdPendingSync = false;
+      setTimeout(function() {
+        if (sdInFlight) {
+          sdPendingSync = true;
+          return;
+        }
+        var txt = getCurrentOutputTextForVisualise();
+        if (!txt) return;
+        syncSdCurrentOutput();
+      }, 0);
+    }
+  }
+}
+
+async function stopSdStream() {
+  if (!sdStreamId || sdInFlight) return;
+  var stoppingStreamId = sdStreamId;
+  sdInFlight = true;
+  setSdStartButtonLoading(true, 'SD stopping…');
+  setSdStatus('SD: stopping stream…', '');
+  try {
+    await stopSdIngest();
+    var tries = [];
+    if (sdDirectRouteHints.stop) {
+      var hintParts = sdDirectRouteHints.stop.split('|');
+      if (hintParts.length === 2) tries.push({ method: hintParts[0], tpl: hintParts[1] });
+    }
+    tries = tries.concat([
+      { method: 'DELETE', tpl: '/v1/streams/{id}' },
+      { method: 'POST', tpl: '/v1/streams/{id}/stop' }
+    ]);
+    var stopOk = false;
+    var attempts = [];
+    var seen = {};
+    var lastError = 'Failed to stop Daydream stream';
+    for (var i = 0; i < tries.length; i++) {
+      var t = tries[i];
+      var key = t.method + '|' + t.tpl;
+      if (seen[key]) continue;
+      seen[key] = true;
+      var path = t.tpl.replace('{id}', encodeURIComponent(stoppingStreamId));
+      try {
+        var resp = await sdDirectDaydreamRequest(path, t.method, null, 10000);
+        attempts.push({ method: t.method, path: path, status: resp.status, ok: resp.ok });
+        if (resp.ok) {
+          stopOk = true;
+          sdDirectRouteHints.stop = t.method + '|' + t.tpl;
+          setSdDebug(formatSdPayload('Stop Response:', { raw: resp.body, attempts: attempts }));
+          break;
+        }
+        lastError = JSON.stringify(resp.body).slice(0, 260) || ('HTTP ' + resp.status);
+      } catch (err) {
+        var msg = (err && err.message) ? err.message : String(err);
+        attempts.push({ method: t.method, path: path, ok: false, error: msg });
+        lastError = msg;
+      }
+    }
+    if (!stopOk) throw new Error(lastError);
+    sdStreamId = '';
+    sdWhipUrl = '';
+    sdGatewayHost = '';
+    sdDirectConfig = null;
+    clearSdPlayerPlayback();
+    setSdStatus('SD stream stopped.', 'ok');
+  } catch (err) {
+    setSdStatus('SD stop failed.', 'err');
+    setSdDebug('SD stop error:\n' + ((err && err.message) ? err.message : 'Unknown error'));
+  } finally {
+    sdInFlight = false;
+    setSdStartButtonLoading(false);
+    updateFisheyeAvailability();
+  }
+}
+
+function toggleSdStream() {
+  if (sdInFlight) return;
+  if (sdStreamId) {
+    stopSdStream();
+    return;
+  }
+  startSdStreamFromCurrentOutput();
+}
+
+async function syncSdCurrentOutput() {
+  if (!isSdEnabled()) return;
+  if (feedbackModeEnabled) return;
+  if (sdInFlight) return;
+
+  var sourceText = getCurrentOutputTextForVisualise();
+  if (!sourceText) {
+    setSdStatus('SD: waiting for current output text.', '');
+    return;
+  }
+
+  sdInFlight = true;
+  setSdStartButtonLoading(true, sdStreamId ? 'SD updating…' : 'SD creating…');
+  setSdStatus(sdStreamId ? 'SD: updating stream…' : 'SD: creating stream…', '');
+
+  try {
+    var data = sdStreamId ? await updateSdStream(sourceText) : await createSdStream(sourceText);
+    setSdStatus('SD synced: ' + sdStreamId, 'ok');
+    setSdDebug(
+      'Daydream Stream: ' + sdStreamId + '\n\n' +
+      formatSdPayload(sdStreamId ? 'Latest Response:' : 'Create Response:', data && data.raw ? data.raw : data)
+    );
+  } catch (err) {
+    setSdStatus('SD sync failed.', 'err');
+    setSdDebug('SD error:\n' + ((err && err.message) ? err.message : 'Unknown Daydream error'));
+  } finally {
+    sdInFlight = false;
+    setSdStartButtonLoading(false);
+    updateFisheyeAvailability();
+  }
+}
+
+async function stopSdIngest() {
+  sdIngestStarting = false;
+  if (sdIngestPc) {
+    try { sdIngestPc.close(); } catch (_) {}
+    sdIngestPc = null;
+  }
+  if (sdIngestStream) {
+    sdIngestStream.getTracks().forEach(function(t) {
+      try { t.stop(); } catch (_) {}
+    });
+    sdIngestStream = null;
+  }
+  stopSdIngestStatsLoop();
+  sdIngestMode = '';
+  setSdIngestButtonState(false);
+  setSdStatus(sdStreamId ? ('SD stream ready: ' + sdStreamId) : 'SD ingest stopped.', '');
+  appendSdIngestTrace('INGEST_STOP', { stream_id: sdStreamId || null, whip_url: sdWhipUrl || null });
+}
+
+async function refreshSdCameraList() {
+  var select = document.getElementById('sd-camera-select');
+  if (!select) return;
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+    setSdStatus('Camera list unavailable in this browser.', 'err');
+    return;
+  }
+
+  var previous = select.value || '';
+  var placeholder = '<option value="">SD camera…</option>';
+  select.innerHTML = placeholder;
+
+  try {
+    var devices = await navigator.mediaDevices.enumerateDevices();
+    var cams = devices.filter(function(d) { return d && d.kind === 'videoinput'; });
+    for (var i = 0; i < cams.length; i++) {
+      var cam = cams[i];
+      var opt = document.createElement('option');
+      opt.value = cam.deviceId || '';
+      opt.textContent = cam.label || ('Camera ' + (i + 1));
+      select.appendChild(opt);
+    }
+    if (previous) select.value = previous;
+    if (!select.value && cams.length === 0) {
+      setSdStatus('No cameras detected.', 'err');
+    }
+  } catch (err) {
+    setSdStatus('Failed to load camera list.', 'err');
+    setSdDebug('Camera list error:\n' + ((err && err.message) ? err.message : String(err)));
+  }
+}
+
+async function startSdIngest() {
+  if (sdIngestStarting) return;
+  sdIngestStarting = true;
+  setSdIngestButtonState(false);
+  appendSdIngestTrace('INGEST_START', {
+    stream_id: sdStreamId || null,
+    has_whip_url: !!sdWhipUrl,
+    playback_id: sdPlaybackId || null
+  });
+  if (!window.isSecureContext) {
+    setSdStatus('SD ingest blocked: secure context required (HTTPS/localhost).', 'err');
+    setSdDebug('Ingest requires secure context.');
+    sdIngestStarting = false;
+    setSdIngestButtonState(false);
+    return;
+  }
+  if (sdStreamId) {
+    await fetchSdStatusDirect();
+  }
+  if (!sdWhipUrl) {
+    setSdStatus('SD ingest needs WHIP URL. Start stream first.', 'err');
+    setSdDebug('No WHIP URL available yet. Create stream first, then try ingest.');
+    sdIngestStarting = false;
+    setSdIngestButtonState(false);
+    return;
+  }
+  if (!sdGatewayHost) {
+    setSdStatus('SD ingest: waiting for Daydream gateway…', '');
+    appendSdIngestTrace('GATEWAY_WAIT_START', { stream_id: sdStreamId || null });
+    var ready = await waitForSdGatewayReady(30000);
+    appendSdIngestTrace('GATEWAY_WAIT_RESULT', { ready: !!ready, gateway_host: sdGatewayHost || null });
+    if (!ready) {
+      setSdStatus('Gateway not ready. Stream may stay offline.', 'err');
+      setSdDebug('Daydream returned empty gateway_host after waiting. Ingest is likely fine, but output routing is not ready yet.');
+    }
+  }
+  if (sdIngestPc) {
+    sdIngestStarting = false;
+    setSdIngestButtonState(true);
+    return;
+  }
+
+  var camSelect = document.getElementById('sd-camera-select');
+  var selectedCameraId = camSelect ? (camSelect.value || '').trim() : '';
+  if (!selectedCameraId) {
+    await refreshSdCameraList();
+    selectedCameraId = camSelect ? (camSelect.value || '').trim() : '';
+    if (!selectedCameraId) {
+      setSdStatus('Choose an SD camera before ingest.', 'err');
+      setSdDebug('Pick a camera in the "SD camera…" selector, then start ingest.');
+      sdIngestStarting = false;
+      setSdIngestButtonState(false);
+      return;
+    }
+  }
+
+  setSdStatus('SD ingest: requesting camera…', '');
+  var localStream = null;
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('navigator.mediaDevices.getUserMedia is not available in this browser/context.');
+    }
+    appendSdIngestTrace('CAMERA_REQUEST', {
+      selected_camera_id: selectedCameraId,
+      constraints: { video: { deviceId: { exact: selectedCameraId } }, audio: false }
+    });
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: selectedCameraId } },
+      audio: false
+    });
+    sdIngestMode = 'camera';
+    appendSdIngestTrace('CAMERA_GRANTED', {
+      track_count: localStream.getTracks().length,
+      track_labels: localStream.getTracks().map(function(t) { return t.label || t.kind; })
+    });
+
+    var pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+    attachSdPcDebugEvents(pc);
+    localStream.getTracks().forEach(function(track) {
+      pc.addTrack(track, localStream);
+    });
+    var offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    appendSdIngestTrace('WHIP_OFFER_READY', {
+      whip_url: sdWhipUrl,
+      sdp_preview: sdpPreview(offer.sdp, 18),
+      sdp_length: (offer.sdp || '').length
+    });
+
+    setSdStatus('SD ingest: publishing via WHIP…', '');
+    var resp = await fetch(sdWhipUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/sdp' },
+      body: offer.sdp
+    });
+    appendSdIngestTrace('WHIP_POST_RESULT', {
+      whip_url: sdWhipUrl,
+      http_status: resp.status,
+      ok: resp.ok
+    });
+    if (!resp.ok) {
+      var errBody = await resp.text().catch(function() { return ''; });
+      appendSdIngestTrace('WHIP_POST_ERROR', {
+        http_status: resp.status,
+        body_preview: String(errBody || '').slice(0, 500)
+      });
+      throw new Error('WHIP HTTP ' + resp.status + (errBody ? (': ' + errBody.slice(0, 240)) : ''));
+    }
+    var answerSdp = await resp.text();
+    appendSdIngestTrace('WHIP_ANSWER_RECEIVED', {
+      sdp_preview: sdpPreview(answerSdp, 18),
+      sdp_length: (answerSdp || '').length
+    });
+    await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+
+    sdIngestStream = localStream;
+    sdIngestPc = pc;
+    startSdIngestStatsLoop(pc);
+    setSdIngestButtonState(true);
+    setSdStatus('SD ingest active.', 'ok');
+    appendSdIngestTrace('INGEST_ACTIVE', {
+      stream_id: sdStreamId || null,
+      whip_url: sdWhipUrl || null,
+      mode: sdIngestMode || null
+    });
+  } catch (err) {
+    if (localStream) {
+      localStream.getTracks().forEach(function(t) {
+        try { t.stop(); } catch (_) {}
+      });
+    }
+    if (sdIngestPc) {
+      try { sdIngestPc.close(); } catch (_) {}
+      sdIngestPc = null;
+    }
+    sdIngestStream = null;
+    stopSdIngestStatsLoop();
+    sdIngestMode = '';
+    setSdIngestButtonState(false);
+    setSdStatus('SD ingest failed.', 'err');
+    setSdDebug('SD ingest error:\n' + ((err && err.message) ? err.message : String(err)));
+    appendSdIngestTrace('INGEST_FAILED', {
+      message: (err && err.message) ? err.message : String(err),
+      stream_id: sdStreamId || null,
+      whip_url: sdWhipUrl || null
+    });
+  } finally {
+    sdIngestStarting = false;
+    setSdIngestButtonState(!!sdIngestPc);
+  }
+}
+
+function toggleSdIngest() {
+  if (sdIngestStarting) return;
+  if (sdIngestPc) {
+    stopSdIngest();
+    return;
+  }
+  startSdIngest();
 }
 
 function setFisheyeImage(url) {
@@ -4117,24 +5070,49 @@ function attachFisheyeImageToHistory(outputText, imageRef, imageUrl) {
 function updateFisheyeAvailability() {
   var cb = document.getElementById('visualise-auto');
   var label = document.getElementById('visualise-toggle-label');
+  var sdCb = document.getElementById('sd-auto');
+  var sdLabel = document.getElementById('sd-toggle-label');
+  var sdStartBtn = document.getElementById('sd-start-btn');
+  var sdIngestBtn = document.getElementById('sd-ingest-btn');
+  var sdCameraSelect = document.getElementById('sd-camera-select');
+  var sdCameraRefreshBtn = document.getElementById('sd-camera-refresh-btn');
+  var sdStepsWrap = document.getElementById('sd-steps-wrap');
+  var sdStepsSlider = document.getElementById('sd-steps-slider');
   var xsncCb = document.getElementById('xsnc-enabled');
   var xsncLabel = document.getElementById('xsnc-toggle-label');
   var rdmxCb = document.getElementById('fisheye-rdmx');
   var rdmxLabel = document.getElementById('rdmx-toggle-label');
   var modelSelect = document.getElementById('fisheye-model-select');
   var modelWrap = document.getElementById('fisheye-model-wrap');
+  var fisheyeControlsWrap = document.getElementById('fisheye-controls-wrap');
   if (!cb) return;
 
   var blocked = !!feedbackModeEnabled;
   cb.disabled = blocked;
   if (label) label.classList.toggle('disabled', blocked);
   if (blocked && cb.checked) cb.checked = false;
+  if (sdCb) {
+    sdCb.disabled = blocked;
+    if (blocked && sdCb.checked) sdCb.checked = false;
+  }
+  if (sdLabel) sdLabel.classList.toggle('disabled', blocked);
+  if (sdStartBtn) sdStartBtn.disabled = blocked || sdInFlight;
+  if (sdIngestBtn) sdIngestBtn.disabled = blocked;
+  if (sdCameraSelect) sdCameraSelect.disabled = blocked;
+  if (sdCameraRefreshBtn) sdCameraRefreshBtn.disabled = blocked;
+  var sdStepsVisible = !blocked && !!(sdCb && sdCb.checked);
+  if (sdStepsWrap) sdStepsWrap.classList.toggle('hidden', !sdStepsVisible);
+  if (sdStepsSlider) sdStepsSlider.disabled = !sdStepsVisible;
 
   if (modelSelect) {
     modelSelect.disabled = blocked || !cb.checked;
   }
   if (modelWrap) {
-    modelWrap.classList.toggle('hidden', blocked || !cb.checked);
+    var showMixerRight = !blocked && (!!cb.checked || !!(sdCb && sdCb.checked));
+    modelWrap.classList.toggle('hidden', !showMixerRight);
+  }
+  if (fisheyeControlsWrap) {
+    fisheyeControlsWrap.style.display = (!blocked && !!cb.checked) ? 'inline-flex' : 'none';
   }
   var rdmxAvailable = !blocked && !!cb.checked;
   if (rdmxCb) {
@@ -4156,6 +5134,7 @@ function updateFisheyeAvailability() {
     xsncLabel.classList.toggle('disabled', !xsncAvailable);
   }
   updateFisheyeInlineMode();
+  updateSdInlineMode();
 }
 
 function updateFisheyeInlineMode() {
@@ -4167,27 +5146,41 @@ function updateFisheyeInlineMode() {
   }
 }
 
+function updateSdInlineMode() {
+  var inlineWrap = document.getElementById('sd-inline');
+  var inlineMode = isSdInlineMode();
+  document.body.classList.toggle('sd-inline-mode', inlineMode);
+  if (inlineWrap) inlineWrap.classList.toggle('active', inlineMode);
+}
+
 function updateMixerFisheyeLayout() {
-  var panel = document.getElementById('visualise-output');
+  var fisheyePanel = document.getElementById('visualise-output');
+  var sdPanel = document.getElementById('sd-output');
   var mixer = document.getElementById('mixer');
   var imageEl = document.getElementById('visualise-image');
-  if (!panel || !mixer) return;
-  if (!isVisualiseAutoEnabled()) return;
+  if (!fisheyePanel || !sdPanel || !mixer) return;
+  if (!isVisualiseAutoEnabled() && !isSdEnabled()) return;
 
-  var inlineMode = isFisheyeInlineMode();
+  var fisheyeActive = isVisualiseAutoEnabled();
+  var sdActive = isSdEnabled();
+  var inlineMode = isFisheyeInlineMode() || isSdInlineMode();
   if (inlineMode) {
     var inlineRatio = 1;
-    if (imageEl && imageEl.naturalWidth > 0 && imageEl.naturalHeight > 0) {
+    if (!isSdEnabled() && imageEl && imageEl.naturalWidth > 0 && imageEl.naturalHeight > 0) {
       inlineRatio = Math.max(0.6, Math.min(2.4, imageEl.naturalWidth / imageEl.naturalHeight));
     }
     var inlineW = Math.round((mixer.clientHeight || 300) * inlineRatio);
     var maxInlineW = Math.max(170, Math.floor((mixer.clientWidth || 600) * 0.62));
     inlineW = Math.max(170, Math.min(maxInlineW, inlineW));
     mixer.style.setProperty('--fisheye-inline-width', inlineW + 'px');
-    panel.style.width = '';
-    panel.style.minWidth = '';
-    panel.style.height = '';
-    panel.style.maxHeight = '';
+    fisheyePanel.style.width = '';
+    fisheyePanel.style.minWidth = '';
+    fisheyePanel.style.height = '';
+    fisheyePanel.style.maxHeight = '';
+    sdPanel.style.width = '';
+    sdPanel.style.minWidth = '';
+    sdPanel.style.height = '';
+    sdPanel.style.maxHeight = '';
     return;
   }
   mixer.style.removeProperty('--fisheye-inline-width');
@@ -4197,9 +5190,33 @@ function updateMixerFisheyeLayout() {
   if (imageEl && imageEl.naturalWidth > 0 && imageEl.naturalHeight > 0) {
     ratio = Math.max(0.6, Math.min(2.4, imageEl.naturalWidth / imageEl.naturalHeight));
   }
-  var paneW = Math.round(mixerH * ratio);
-  paneW = Math.max(220, Math.min(640, paneW));
 
+  var resetPanel = function(el) {
+    el.style.width = '';
+    el.style.minWidth = '';
+    el.style.height = '';
+    el.style.maxHeight = '';
+  };
+  if (!fisheyeActive) resetPanel(fisheyePanel);
+  if (!sdActive) resetPanel(sdPanel);
+  if (!fisheyeActive && !sdActive) return;
+
+  if (fisheyeActive && sdActive) {
+    var fisheyeW = Math.max(220, Math.min(520, Math.round(mixerH * ratio)));
+    var sdW = Math.max(220, Math.min(420, Math.round(mixerH * 1.0)));
+    fisheyePanel.style.width = fisheyeW + 'px';
+    fisheyePanel.style.minWidth = fisheyeW + 'px';
+    fisheyePanel.style.height = mixerH + 'px';
+    fisheyePanel.style.maxHeight = mixerH + 'px';
+    sdPanel.style.width = sdW + 'px';
+    sdPanel.style.minWidth = sdW + 'px';
+    sdPanel.style.height = mixerH + 'px';
+    sdPanel.style.maxHeight = mixerH + 'px';
+    return;
+  }
+
+  var paneW = Math.max(220, Math.min(640, Math.round(mixerH * ratio)));
+  var panel = fisheyeActive ? fisheyePanel : sdPanel;
   panel.style.width = paneW + 'px';
   panel.style.minWidth = paneW + 'px';
   panel.style.height = mixerH + 'px';
@@ -4208,16 +5225,29 @@ function updateMixerFisheyeLayout() {
 
 function updateVisualiseOutputVisibility() {
   var panel = document.getElementById('visualise-output');
-  if (!panel) return;
+  var sdPanel = document.getElementById('sd-output');
+  if (!panel && !sdPanel) return;
   updateFisheyeAvailability();
   updateFisheyeInlineMode();
-  var active = isVisualiseAutoEnabled();
-  panel.classList.toggle('active', active);
-  if (!active) {
+  updateSdInlineMode();
+  var fisheyeActive = isVisualiseAutoEnabled();
+  var sdActive = isSdEnabled();
+  if (panel) panel.classList.toggle('active', fisheyeActive);
+  if (sdPanel) sdPanel.classList.toggle('active', sdActive);
+
+  if (!fisheyeActive && panel) {
     panel.style.width = '';
     panel.style.minWidth = '';
     panel.style.height = '';
     panel.style.maxHeight = '';
+  }
+  if (!sdActive && sdPanel) {
+    sdPanel.style.width = '';
+    sdPanel.style.minWidth = '';
+    sdPanel.style.height = '';
+    sdPanel.style.maxHeight = '';
+  }
+  if (!fisheyeActive && !sdActive) {
     var mixer = document.getElementById('mixer');
     if (mixer) mixer.style.removeProperty('--fisheye-inline-width');
     renderChips();
@@ -4225,6 +5255,10 @@ function updateVisualiseOutputVisibility() {
   }
   updateMixerFisheyeLayout();
   renderChips();
+}
+
+function updateSdOutputVisibility() {
+  updateVisualiseOutputVisibility();
 }
 
 async function visualiseCurrentOutput() {
@@ -4306,6 +5340,16 @@ function onVisualiseAutoChange() {
   if (isVisualiseAutoEnabled() && getCurrentOutputTextForVisualise()) {
     visualiseCurrentOutput();
   }
+}
+
+function onSdToggleChange() {
+  var sdCb = document.getElementById('sd-auto');
+  if (sdCb && sdCb.checked) {
+    syncSdCurrentOutput();
+  } else {
+    setSdStatus('SD disabled.', '');
+  }
+  updateVisualiseOutputVisibility();
 }
 
 function resolveBmpCollisions(speedScale) {
@@ -4737,14 +5781,22 @@ function stopFisheyeProgressDisplay() {
 }
 
 function startFisheyeProgressDisplay() {
-  // Progress is intentionally tied to the model selector (not image overlay)
-  // so users always look in one place regardless of responsive layout mode.
   stopFisheyeProgressDisplay();
 
   var select = document.getElementById('fisheye-model-select');
-  if (!select) return;
-  select.classList.add('timing');
-  setFisheyeSelectProgress(0);
+  var useSelectProgress = isFisheyeInlineMode();
+  var overlays = getFisheyeProgressOverlays();
+  if (useSelectProgress) {
+    if (!select) return;
+    select.classList.add('timing');
+    setFisheyeSelectProgress(0);
+  } else {
+    if (!overlays.length) return;
+    for (var i = 0; i < overlays.length; i++) {
+      overlays[i].classList.add('active');
+      overlays[i].style.setProperty('--fisheye-progress', '0%');
+    }
+  }
 
   fisheyeRequestStartTs = performance.now();
 
@@ -4753,8 +5805,15 @@ function startFisheyeProgressDisplay() {
     var expectedMs = Math.max(500, getExpectedFisheyeMs());
     var elapsed = now - fisheyeRequestStartTs;
     var progress = Math.min(1, elapsed / expectedMs);
-    setFisheyeSelectProgress(progress * 100);
-    select.classList.toggle('overtime', elapsed > expectedMs);
+    if (useSelectProgress) {
+      setFisheyeSelectProgress(progress * 100);
+      if (select) select.classList.toggle('overtime', elapsed > expectedMs);
+    } else {
+      var progressPct = (progress * 100).toFixed(2) + '%';
+      for (var j = 0; j < overlays.length; j++) {
+        overlays[j].style.setProperty('--fisheye-progress', progressPct);
+      }
+    }
     fisheyeProgressRaf = requestAnimationFrame(tick);
   }
 
@@ -4764,7 +5823,8 @@ function startFisheyeProgressDisplay() {
 function setInfiniteButtonProgress(percent) {
   var btn = document.getElementById('infinite-feedback-btn');
   if (!btn) return;
-  btn.style.setProperty('--loop-progress', '0%');
+  var p = Math.max(0, Math.min(100, percent || 0));
+  btn.style.setProperty('--loop-progress', p.toFixed(2) + '%');
 }
 
 function clearInfiniteCountdown() {
@@ -4996,7 +6056,7 @@ async function callModelPrompt(prompt, model) {
   var response = await fetch('/api/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildGeneratePayload(prompt, model)),
+    body: JSON.stringify({ prompt: prompt, model: model }),
   });
   if (!response.ok || !response.body) throw new Error('generation failed');
 
@@ -5145,6 +6205,7 @@ window.addEventListener('resize', function() {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(function() {
     updateFisheyeInlineMode();
+    updateSdInlineMode();
     updateMixerFisheyeLayout();
     renderChips();
   }, 60);
@@ -5265,7 +6326,6 @@ restoreHistory = function(index) {
 /* ═══════════════════════════════
    INIT
 ═══════════════════════════════ */
-// Initialization keeps fisheye controls, timing state, and history restoration in sync.
 captureHardcodedPromptDefaults();
 loadSavedPromptTemplates();
 initUiTheme();
@@ -5293,6 +6353,18 @@ if (xsncEl) xsncEl.addEventListener('change', onXsncChange);
   });
 });
 updateFisheyeAvailability();
+onSdStepsChange();
+setSdStartButtonLoading(false);
+setSdStatus('SD disabled.', '');
+setSdDebug('');
+setSdIngestTrace('');
+setSdIngestButtonState(false);
+refreshSdCameraList();
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', function() {
+    refreshSdCameraList();
+  });
+}
 updateVisualiseOutputVisibility();
 
 var currentOutputEl = document.getElementById('output-current');

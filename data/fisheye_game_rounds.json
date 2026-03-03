@@ -1,0 +1,109 @@
+{
+  "items": [
+    {
+      "code": "9ALRKG",
+      "created_at": 1772133569,
+      "thought": "Big monkey on a boat",
+      "decoy_thought": "big boat on a monkey",
+      "thought_options": [
+        "big boat on a monkey",
+        "Big monkey on a boat"
+      ],
+      "correct_thought_index": 1,
+      "fish": [
+        {
+          "label": "fish 1",
+          "x_frac": 0.4849190854937315,
+          "y_frac": 0.3574222875831147
+        },
+        {
+          "label": "fish 2",
+          "x_frac": 0.4146906217119821,
+          "y_frac": 0.8324670854174433
+        }
+      ],
+      "image_prompt": "Create a symbolic square image that expresses this thought: Big monkey on a boat. Represent these guiding fish concepts as visual motifs: fish 1 (medium, centered), fish 2 (light, centered). Cinematic composition, crisp detail, no text overlay.",
+      "image_model": "prunaai/flux-fast|1024",
+      "image_ref": "f973469618c84dd8bd74",
+      "image_url": "/api/fisheye-images/f973469618c84dd8bd74",
+      "guesses": [
+        {
+          "created_at": 1772133600,
+          "thought_index": 1,
+          "thought_correct": true,
+          "fish_guess": [
+            {
+              "label": "guess fish 1",
+              "x_frac": 0.3249823489685658,
+              "y_frac": 0.29131510416666667
+            },
+            {
+              "label": "guess fish 2",
+              "x_frac": 0.4291157600687623,
+              "y_frac": 0.5292317708333333
+            }
+          ],
+          "avg_distance": 0.23831933914326459,
+          "position_score": 72,
+          "total_score": 86
+        }
+      ]
+    },
+    {
+      "code": "WVHRMP",
+      "created_at": 1772194869,
+      "thought": "What is a fish?",
+      "decoy_thought": "What is a goat?",
+      "thought_options": [
+        "What is a goat?",
+        "What is a fish?"
+      ],
+      "correct_thought_index": 1,
+      "fish": [
+        {
+          "label": "animal",
+          "x_frac": 0.33,
+          "y_frac": 0.36
+        },
+        {
+          "label": "mineral",
+          "x_frac": 0.71,
+          "y_frac": 0.68
+        }
+      ],
+      "direction_1": "",
+      "direction_2": "",
+      "keep_brief": true,
+      "base_preamble": "You have several transformation concepts to apply to the thought. Each has two properties:\n- Weight (0.00 = ignore, 1.00 = apply strongly)\n- Optionally, lean toward a sensibility",
+      "base_closing": "Reimagine the original thought applying these transformations proportionally.\nHigher-weighted concepts should have a more visible effect on the output.\nConcepts that lean toward a sensibility should pull the style in that direction.\nPreserve the core meaning of the original thought.\nOnly output your new idea, no meta commentary, none of the original prompt.",
+      "prompt_model": "groq:llama-3.3-70b-versatile",
+      "generated_prompt": "Here is the original thought:\n\n\"\"\"\nWhat is a fish?\n\"\"\"\n\nYou have several transformation concepts to apply to the thought. Each has two properties:\n- Weight (0.00 = ignore, 1.00 = apply strongly)\n- Optionally, lean toward a sensibility\n\nanimal: weight 0.64\nmineral: weight 0.32\n\nReimagine the original thought applying these transformations proportionally.\nHigher-weighted concepts should have a more visible effect on the output.\nConcepts that lean toward a sensibility should pull the style in that direction.\nPreserve the core meaning of the original thought.\nOnly output your new idea, no meta commentary, none of the original prompt.\nKeep your answer extremely brief (e.g., less than 20 words).",
+      "image_prompt": "A somewhat animalistic, possibly scale-covered creature, not quite mineral.",
+      "image_model": "prunaai/flux-fast|1024",
+      "image_ref": "4143af2476234c21bee0",
+      "image_url": "/api/fisheye-images/4143af2476234c21bee0",
+      "guesses": [
+        {
+          "created_at": 1772194896,
+          "thought_index": 1,
+          "thought_correct": true,
+          "fish_guess": [
+            {
+              "label": "guess fish 1",
+              "x_frac": 0.18637954322200392,
+              "y_frac": 0.4144140625
+            },
+            {
+              "label": "guess fish 2",
+              "x_frac": 0.36185765594302555,
+              "y_frac": 0.8459635416666667
+            }
+          ],
+          "avg_distance": 0.26963013625929033,
+          "position_score": 68,
+          "total_score": 84
+        }
+      ]
+    }
+  ]
+}

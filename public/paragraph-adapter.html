@@ -4,6 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Paragraph Adapter</title>
+<!--
+  Legacy single-page adapter.
+  What: original fish-mixer prompt editor + output pane.
+  Why: preserved as a lighter variant/reference while newer builds evolved.
+  How: client-side chip simulation + backend generation endpoint.
+-->
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -684,6 +690,7 @@ textarea:focus { border-color: var(--accent); }
 </head>
 <body>
 <div class="page">
+  <!-- This page keeps a compact structure for users who prefer the non-feedback/non-fisheye flow. -->
 
   <!-- 1. SOURCE PARAGRAPH -->
   <div class="row row-source">
@@ -1317,8 +1324,9 @@ async function generateOutput() {
           pushHistory(assembled);
           break outer;
         }
-        if (payload === '[ERROR]') {
-          outputEl.textContent = 'Error generating response. Check your API key and server.';
+        if (payload.startsWith('[ERROR]')) {
+          var errMsg = payload.length > 7 ? payload.slice(7).trim() : 'Error generating response. Check your API key and server.';
+          outputEl.textContent = errMsg || 'Error generating response. Check your API key and server.';
           break outer;
         }
         var token = payload.replace(/\\n/g, '\n').replace(/\\\\/g, '\\');

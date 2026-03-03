@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <title>Prompt Weight Mixer</title>
 <script>
+// Theme bootstrap:
+// Apply stored theme before first paint to avoid light/dark flash on load.
 (function () {
   var theme = "dark";
   try {
@@ -128,6 +130,12 @@ html, body {
 </head>
 <body>
 <div class="menu-wrap">
+  <!--
+    Home menu cards:
+    - What: entry points to each app variant.
+    - Why: keep specialized interfaces separate while sharing backend.
+    - How: plain anchor cards, each pointing to a dedicated HTML app.
+  -->
   <div class="cards">
 
     <a class="card" href="paragraph-adapter-feedback.html">
@@ -158,6 +166,24 @@ html, body {
       <div class="card-arrow">Open &rarr;</div>
     </a>
 
+    <a class="card" href="daydreamtest.html">
+      <div class="card-icon">&#129302;</div>
+      <div class="card-name">Daydream Test</div>
+      <div class="card-desc">
+        Standalone stream create/update/status diagnostics for Daydream API.
+      </div>
+      <div class="card-arrow">Open &rarr;</div>
+    </a>
+
+    <a class="card" href="paragraph-adapter-game.html">
+      <div class="card-icon">&#127918;</div>
+      <div class="card-name">Fisheye Decode</div>
+      <div class="card-desc">
+        Two-player image interpretation game: host sets thought + fish, guesser infers both from the generated image.
+      </div>
+      <div class="card-arrow">Open &rarr;</div>
+    </a>
+
     <div class="card stat-card" aria-live="polite">
       <div class="card-icon">&#128031;</div>
       <div class="card-name">Fed <span class="fish-count" id="fedFishCount">000</span> Fish so far</div>
@@ -170,6 +196,7 @@ html, body {
   </div>
 </div>
 <script>
+// Applies requested theme to root variables used across all menu UI styles.
 function applyTheme(theme) {
   const safeTheme = (theme === "light") ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", safeTheme);
@@ -196,6 +223,7 @@ async function loadTheme() {
 }
 
 async function loadFishCount() {
+  // Live stat is read from /api/stats so this landing page reflects usage in real time.
   const countEl = document.getElementById("fedFishCount");
   const statusEl = document.getElementById("fedFishStatus");
   if (!countEl || !statusEl) return;

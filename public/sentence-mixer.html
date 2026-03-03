@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <title>Prompt Weight Mixer</title>
+<!--
+  Split-layout mixer (legacy).
+  What: left-side prompt controls and right-side output/mixer panes.
+  Why: kept for experimentation/history alongside the newer stacked layouts.
+  How: same weighted-concept idea, different layout ergonomics.
+-->
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -441,6 +447,7 @@ textarea:focus { border-color: var(--accent); }
 </head>
 <body>
 <div class="split">
+  <!-- Left panel focuses on inputs; right panel focuses on generated output and visual controls. -->
 
   <!-- ════════════ LEFT ════════════ -->
   <div class="left">
@@ -784,8 +791,9 @@ async function generateOutput() {
           pushHistory(assembled);
           break outer;
         }
-        if (payload === '[ERROR]') {
-          outputEl.textContent = 'Error generating response. Check your API key and server.';
+        if (payload.startsWith('[ERROR]')) {
+          var errMsg = payload.length > 7 ? payload.slice(7).trim() : 'Error generating response. Check your API key and server.';
+          outputEl.textContent = errMsg || 'Error generating response. Check your API key and server.';
           break outer;
         }
         // Unescape newlines encoded by the server
