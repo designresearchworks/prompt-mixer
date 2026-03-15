@@ -67,6 +67,35 @@
   border-color: #c6cee1;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
 }
+[data-theme="light"] .api-log-panel {
+  background: #ffffff;
+  border-color: #cfd6e6;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+[data-theme="light"] .api-log-head {
+  background: rgba(90, 103, 216, 0.06);
+  border-bottom-color: rgba(90, 103, 216, 0.12);
+}
+[data-theme="light"] .api-log-panel .api-log-list {
+  background: linear-gradient(180deg, rgba(246, 247, 251, 0.95), rgba(255, 255, 255, 0.98));
+}
+[data-theme="light"] .api-log-empty,
+[data-theme="light"] .api-log-time {
+  color: #6b7280;
+}
+[data-theme="light"] .api-log-msg,
+[data-theme="light"] .api-log-item.info .api-log-msg {
+  color: #1f2937;
+}
+[data-theme="light"] .api-log-item.ok .api-log-msg {
+  color: #0f9f57;
+}
+[data-theme="light"] .api-log-item.warn .api-log-msg {
+  color: #b45309;
+}
+[data-theme="light"] .api-log-item.error .api-log-msg {
+  color: #dc2626;
+}
 [data-theme="light"] .combo-item {
   color: #1c2233;
 }
@@ -157,6 +186,7 @@ textarea {
 textarea:focus { border-color: var(--accent); }
 
 #mission,
+#steer-input,
 #food-for-thought,
 #direction-1,
 #direction-2,
@@ -181,11 +211,40 @@ textarea:focus { border-color: var(--accent); }
 }
 
 #mission,
+#steer-input,
 #food-for-thought {
   height: 84px;
   min-height: 84px;
   max-height: 84px;
   overflow-y: auto;
+}
+.source-input-row {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+.source-input-row textarea {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
+}
+.source-input-row.steer-enabled #mission,
+.source-input-row.steer-enabled .steer-wrap {
+  flex: 1 1 0;
+}
+.steer-wrap {
+  display: none;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.steer-wrap.active {
+  display: block;
+}
+@media (max-width: 780px) {
+  .source-input-row,
+  .source-input-row.steer-enabled {
+    flex-direction: column;
+  }
 }
 .output-current.editing {
   border-color: #f59e0b;
@@ -1698,6 +1757,107 @@ body.fisheye-inline-mode .visualise-inline.preview-enabled {
   max-height: 0;
   opacity: 0;
 }
+.configuration-body {
+  max-height: 6000px;
+  overflow: visible;
+}
+.config-embed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.config-panel {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 12px;
+}
+.config-panel-title {
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--heading);
+  margin-bottom: 10px;
+}
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.config-field.full {
+  grid-column: 1 / -1;
+}
+.config-field label {
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.config-field input,
+.config-field select,
+.config-field textarea {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-family: inherit;
+}
+.config-field textarea {
+  min-height: 88px;
+}
+[data-theme="dark"] .config-field input,
+[data-theme="dark"] .config-field select,
+[data-theme="dark"] .config-field textarea {
+  background: #151726;
+  border-color: #2b3150;
+  color: #d7dbef;
+}
+[data-theme="dark"] .config-field input::placeholder,
+[data-theme="dark"] .config-field textarea::placeholder {
+  color: #8b93b6;
+}
+[data-theme="dark"] .config-panel {
+  background: rgba(17, 17, 28, 0.88);
+}
+[data-theme="light"] .config-field input,
+[data-theme="light"] .config-field select,
+[data-theme="light"] .config-field textarea {
+  background: #ffffff;
+  border-color: #cfd6e6;
+  color: #1f2937;
+}
+.config-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.config-status {
+  font-size: 11px;
+  color: var(--muted);
+}
+.config-status.ok {
+  color: #7dd3fc;
+}
+.config-status.err {
+  color: #fca5a5;
+}
+@media (max-width: 900px) {
+  .config-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* ═══════════════════════════════
    HISTORY TOOLTIP
@@ -1866,8 +2026,19 @@ body.fisheye-inline-mode .visualise-output.active {
 
   <!-- 1. SOURCE PARAGRAPH -->
   <div class="row row-source" id="row-source">
-    <div class="row-label" title="This is what I'm thinking about, an idea that the fish in the tank will transform">Thought</div>
-    <textarea id="mission" rows="3" oninput="scheduleUpdate(800)">deep thought</textarea>
+    <div class="row-label" title="This is what I'm thinking about, an idea that the fish in the tank will transform">
+      Thought
+      <label title="Show an optional steer box that appends to the closing instruction." style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:600;user-select:none;">
+        <input type="checkbox" id="steer-toggle" style="width:12px;height:12px;cursor:pointer;">
+        Steer
+      </label>
+    </div>
+    <div class="source-input-row" id="source-input-row">
+      <textarea id="mission" rows="3" oninput="scheduleUpdate(800)">deep thought</textarea>
+      <div class="steer-wrap" id="steer-wrap">
+        <textarea id="steer-input" rows="3" oninput="scheduleUpdate(800)" placeholder="Optional steering appended to the closing instruction."></textarea>
+      </div>
+    </div>
   </div>
 
   <div class="row row-food" id="row-food" style="display:none;">
@@ -2269,6 +2440,126 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
     </div>
   </div>
 
+  <div class="row row-configuration">
+    <div class="row-label" title="Quick access to the configuration page.">
+      Configuration
+      <button class="collapse-btn" onclick="toggleCollapse('configuration-body', this)">show</button>
+    </div>
+    <div class="collapsible-body collapsed configuration-body" id="configuration-body">
+      <div class="config-embed">
+        <div class="config-panel">
+          <div class="config-panel-title">Defaults</div>
+          <div class="config-grid">
+            <div class="config-field">
+              <label for="cfg-default_theme" title="Chooses which theme the app starts with before any local override is applied.">Dark/Light by default</label>
+              <select id="cfg-default_theme" onchange="onEmbeddedThemeChange()">
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            </div>
+            <div class="config-field">
+              <label for="cfg-default_model" title="The default LLM selected when the page loads.">Default model</label>
+              <input id="cfg-default_model" type="text">
+            </div>
+            <div class="config-field">
+              <label for="cfg-llm_deterministic_mode" title="Uses deterministic decoding settings by default to reduce run-to-run variation.">LLM deterministic mode</label>
+              <input id="cfg-llm_deterministic_mode" type="checkbox">
+            </div>
+            <div class="config-field">
+              <label for="cfg-llm_deterministic_seed" title="Seed used for deterministic LLM mode.">LLM deterministic seed</label>
+              <input id="cfg-llm_deterministic_seed" type="number" step="1">
+            </div>
+            <div class="config-field">
+              <label for="cfg-default_thought" title="The initial text placed in the Thought box on page load.">Default thought</label>
+              <input id="cfg-default_thought" type="text">
+            </div>
+            <div class="config-field full">
+              <label for="cfg-default_fish_concepts" title="Comma-separated fish concepts loaded into the PthinkTank by default.">Default fish concepts (comma-separated)</label>
+              <input id="cfg-default_fish_concepts" type="text">
+            </div>
+          </div>
+        </div>
+
+        <div class="config-panel">
+          <div class="config-panel-title">Cadence & Limits</div>
+          <div class="config-grid">
+            <div class="config-field"><label for="cfg-fisheye_image_history_limit" title="How many fisheye images to keep in the shared local cache before older ones are pruned.">Fisheye image history limit</label><input id="cfg-fisheye_image_history_limit" type="number" step="1"></div>
+            <div class="config-field"><label for="cfg-slw_delay_ms" title="Default SLW debounce delay in milliseconds.">SLW delay (ms)</label><input id="cfg-slw_delay_ms" type="number" step="1"></div>
+            <div class="config-field"><label for="cfg-cadence_min_ms" title="Lower bound for the Fast/Slow cadence slider.">Cadence min (ms)</label><input id="cfg-cadence_min_ms" type="number" step="1"></div>
+            <div class="config-field"><label for="cfg-cadence_max_ms" title="Upper bound for the Fast/Slow cadence slider.">Cadence max (ms)</label><input id="cfg-cadence_max_ms" type="number" step="1"></div>
+            <div class="config-field"><label for="cfg-cadence_default_ms" title="Default starting value for the Fast/Slow cadence slider.">Cadence default (ms)</label><input id="cfg-cadence_default_ms" type="number" step="1"></div>
+            <div class="config-field"><label for="cfg-infinite_inactivity_ms" title="How long the app waits before pausing runaway feedback activity after no concept movement.">Inactivity timeout (ms)</label><input id="cfg-infinite_inactivity_ms" type="number" step="1"></div>
+            <div class="config-field"><label for="cfg-touch_ui_grace_ms" title="Short grace period after touch UI interaction before physics-driven prompting resumes.">Touch UI grace (ms)</label><input id="cfg-touch_ui_grace_ms" type="number" step="1"></div>
+            <div class="config-field"><label for="cfg-model_progress_default_ms" title="Fallback duration used for model progress indicators when there is not enough timing history yet.">Model progress fallback (ms)</label><input id="cfg-model_progress_default_ms" type="number" step="1"></div>
+          </div>
+        </div>
+
+        <div class="config-panel">
+          <div class="config-panel-title">Fish Physics</div>
+          <div class="config-grid">
+            <div class="config-field"><label for="cfg-chip_max_speed" title="Maximum speed used by fish/chip physics motion.">Chip max speed</label><input id="cfg-chip_max_speed" type="number" step="0.01"></div>
+            <div class="config-field"><label for="cfg-deadzone_half" title="Half-width of the center deadzone where fish stop leaning toward either sensibility.">Deadzone half</label><input id="cfg-deadzone_half" type="number" step="0.01"></div>
+            <div class="config-field"><label for="cfg-fish_scale_min_pct" title="Minimum value allowed on the fish scale slider.">Fish scale min (%)</label><input id="cfg-fish_scale_min_pct" type="number" step="1"></div>
+            <div class="config-field"><label for="cfg-fish_scale_max_pct" title="Maximum value allowed on the fish scale slider.">Fish scale max (%)</label><input id="cfg-fish_scale_max_pct" type="number" step="1"></div>
+            <div class="config-field"><label for="cfg-fish_scale_default_pct" title="Default starting value for the fish scale slider.">Fish scale default (%)</label><input id="cfg-fish_scale_default_pct" type="number" step="1"></div>
+            <div class="config-field"><label for="cfg-merge_hold_ms" title="How long two fish must be held together before they merge manually.">Manual merge hold (ms)</label><input id="cfg-merge_hold_ms" type="number" step="1"></div>
+            <div class="config-field"><label for="cfg-join_glow_ms" title="How long the glow highlight lasts after a merge.">Join glow duration (ms)</label><input id="cfg-join_glow_ms" type="number" step="1"></div>
+          </div>
+        </div>
+
+        <div class="config-panel">
+          <div class="config-panel-title">Fish Motion Tuning</div>
+          <div class="config-grid">
+            <div class="config-field"><label for="cfg-chip_scale_base" title="Base size multiplier used when rendering fish chips.">Chip scale base</label><input id="cfg-chip_scale_base" type="number" step="0.001"></div>
+            <div class="config-field"><label for="cfg-chip_scale_weight_factor" title="Additional size contribution from fish weight.">Chip scale weight factor</label><input id="cfg-chip_scale_weight_factor" type="number" step="0.001"></div>
+            <div class="config-field"><label for="cfg-rnd_base_min_factor" title="Minimum random motion factor used by RND launches.">RND base min factor</label><input id="cfg-rnd_base_min_factor" type="number" step="0.01"></div>
+            <div class="config-field"><label for="cfg-rnd_base_max_factor" title="Maximum random motion factor used by RND launches.">RND base max factor</label><input id="cfg-rnd_base_max_factor" type="number" step="0.01"></div>
+            <div class="config-field"><label for="cfg-rnd_launch_min_factor" title="Minimum launch boost factor applied during random fish launches.">RND launch min factor</label><input id="cfg-rnd_launch_min_factor" type="number" step="0.01"></div>
+            <div class="config-field"><label for="cfg-rnd_launch_max_factor" title="Maximum launch boost factor applied during random fish launches.">RND launch max factor</label><input id="cfg-rnd_launch_max_factor" type="number" step="0.01"></div>
+          </div>
+          <div class="config-actions">
+            <button class="feedback-btn" id="cfg-save-config-btn" type="button" onclick="saveEmbeddedConfig()" title="Saves the configuration values to data/app_config.json.">Save config</button>
+            <button class="collapse-btn" id="cfg-reset-config-btn" type="button" onclick="resetEmbeddedConfig()" title="Restores all configuration values to the backend hardcoded defaults.">Reset to default</button>
+            <span class="config-status" id="cfg-config-status"></span>
+          </div>
+        </div>
+
+        <div class="config-panel">
+          <div class="config-panel-title">Prompt Templates</div>
+          <div class="config-grid">
+            <div class="config-field full">
+              <label for="cfg-tpl-preamble" title="The opening instruction block used when building prompts.">Preamble</label>
+              <textarea id="cfg-tpl-preamble" rows="4"></textarea>
+            </div>
+            <div class="config-field full">
+              <label for="cfg-tpl-closing" title="The closing instruction block used when building prompts.">Closing instruction</label>
+              <textarea id="cfg-tpl-closing" rows="6"></textarea>
+            </div>
+          </div>
+          <div class="config-actions">
+            <button class="feedback-btn" id="cfg-save-preamble-btn" type="button" onclick="saveEmbeddedPromptSection('preamble')" title="Saves the preamble template to the backend prompt template store.">Save preamble</button>
+            <button class="feedback-btn" id="cfg-save-closing-btn" type="button" onclick="saveEmbeddedPromptSection('closing')" title="Saves the closing template to the backend prompt template store.">Save closing</button>
+            <button class="collapse-btn" id="cfg-reset-prompt-btn" type="button" onclick="resetEmbeddedPromptTemplatesHardcoded()" title="Restores the prompt templates to the hardcoded defaults.">Reset to hardcoded default</button>
+            <span class="config-status" id="cfg-prompt-status"></span>
+          </div>
+        </div>
+
+        <div class="config-panel">
+          <div class="config-panel-title">API Keys (.env)</div>
+          <div class="config-grid">
+            <div class="config-field full"><label for="cfg-openrouter-key" title="OpenRouter API key used for non-Groq text models.">OPENROUTER_API_KEY</label><input id="cfg-openrouter-key" type="password"></div>
+            <div class="config-field full"><label for="cfg-groq-key" title="Groq API key used for Groq-hosted text models.">GROQ_API_KEY</label><input id="cfg-groq-key" type="password"></div>
+            <div class="config-field full"><label for="cfg-replicate-key" title="Replicate API token used for fisheye image generation.">REPLICATE_API_TOKEN</label><input id="cfg-replicate-key" type="password"></div>
+          </div>
+          <div class="config-actions">
+            <button class="feedback-btn" id="cfg-save-keys-btn" type="button" onclick="saveEmbeddedApiKeys()" title="Writes the entered API keys to the server .env file.">Save keys to .env</button>
+            <span class="config-status" id="cfg-keys-status"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="row" style="display:flex;justify-content:center;align-items:center;padding-top:10px;padding-bottom:12px;">
     <a href="https://designresearch.works/" target="_blank" rel="noopener noreferrer" aria-label="Design Research Works" style="display:inline-flex;align-items:center;gap:8px;color:var(--muted);text-decoration:none;">
       <img src="logo.png" alt="Design Research Works logo" style="width:32px;height:32px;display:block;" />
@@ -2445,6 +2736,28 @@ var DEFAULT_APP_CONFIG = {
   join_glow_ms: 650,
   model_progress_default_ms: 3000
 };
+var EMBEDDED_CONFIG_KEYS = [
+  'default_theme',
+  'llm_deterministic_mode', 'llm_deterministic_seed',
+  'default_model', 'default_thought', 'default_fish_concepts',
+  'fisheye_image_history_limit', 'slw_delay_ms',
+  'cadence_min_ms', 'cadence_max_ms', 'cadence_default_ms',
+  'infinite_inactivity_ms', 'touch_ui_grace_ms',
+  'chip_max_speed', 'fish_scale_min_pct', 'fish_scale_max_pct', 'fish_scale_default_pct',
+  'chip_scale_base', 'chip_scale_weight_factor',
+  'rnd_base_min_factor', 'rnd_base_max_factor', 'rnd_launch_min_factor', 'rnd_launch_max_factor',
+  'deadzone_half', 'merge_hold_ms', 'join_glow_ms', 'model_progress_default_ms'
+];
+var EMBEDDED_NUMBER_KEYS = {
+  llm_deterministic_seed: true,
+  fisheye_image_history_limit: true, slw_delay_ms: true,
+  cadence_min_ms: true, cadence_max_ms: true, cadence_default_ms: true,
+  infinite_inactivity_ms: true, touch_ui_grace_ms: true,
+  chip_max_speed: true, fish_scale_min_pct: true, fish_scale_max_pct: true, fish_scale_default_pct: true,
+  chip_scale_base: true, chip_scale_weight_factor: true,
+  rnd_base_min_factor: true, rnd_base_max_factor: true, rnd_launch_min_factor: true, rnd_launch_max_factor: true,
+  deadzone_half: true, merge_hold_ms: true, join_glow_ms: true, model_progress_default_ms: true
+};
 
 /* ═══════════════════════════════
    SIMPLE MARKDOWN RENDERER
@@ -2600,6 +2913,221 @@ function applyAppConfig(raw) {
   updateFishScaleLabel();
   renderChips();
   onModelChange(false);
+}
+
+function setEmbeddedConfigStatus(id, text, kind) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'config-status' + (kind ? ' ' + kind : '');
+  el.textContent = text || '';
+}
+
+function fillEmbeddedConfigForm(config) {
+  EMBEDDED_CONFIG_KEYS.forEach(function(key) {
+    var el = document.getElementById('cfg-' + key);
+    if (!el) return;
+    var value = (config && Object.prototype.hasOwnProperty.call(config, key)) ? config[key] : '';
+    if (key === 'llm_deterministic_mode') {
+      el.checked = !!value;
+    } else {
+      el.value = value;
+    }
+  });
+}
+
+function readEmbeddedConfigForm() {
+  var out = {};
+  EMBEDDED_CONFIG_KEYS.forEach(function(key) {
+    var el = document.getElementById('cfg-' + key);
+    if (!el) return;
+    if (key === 'llm_deterministic_mode') {
+      out[key] = !!el.checked;
+      return;
+    }
+    if (EMBEDDED_NUMBER_KEYS[key]) {
+      var n = Number(el.value);
+      if (!isFinite(n)) return;
+      out[key] = n;
+      return;
+    }
+    out[key] = el.value;
+  });
+  return out;
+}
+
+async function loadEmbeddedConfig() {
+  setEmbeddedConfigStatus('cfg-config-status', 'Loading...', '');
+  try {
+    var res = await fetch('/api/app-config');
+    var data = await res.json();
+    if (!res.ok || !data || !data.ok) throw new Error('Failed to load config');
+    fillEmbeddedConfigForm(data.config || {});
+    setEmbeddedConfigStatus('cfg-config-status', 'Loaded.', 'ok');
+  } catch (err) {
+    setEmbeddedConfigStatus('cfg-config-status', (err && err.message) || 'Load failed', 'err');
+  }
+}
+
+async function saveEmbeddedConfig() {
+  var btn = document.getElementById('cfg-save-config-btn');
+  if (btn) btn.disabled = true;
+  setEmbeddedConfigStatus('cfg-config-status', 'Saving...', '');
+  try {
+    var res = await fetch('/api/app-config/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: readEmbeddedConfigForm() }),
+    });
+    var data = await res.json();
+    if (!res.ok || !data || !data.ok) throw new Error('Save failed');
+    fillEmbeddedConfigForm(data.config || {});
+    applyAppConfig(data.config || DEFAULT_APP_CONFIG);
+    setEmbeddedConfigStatus('cfg-config-status', 'Saved config to data/app_config.json', 'ok');
+  } catch (err) {
+    setEmbeddedConfigStatus('cfg-config-status', (err && err.message) || 'Save failed', 'err');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function resetEmbeddedConfig() {
+  var btn = document.getElementById('cfg-reset-config-btn');
+  if (btn) btn.disabled = true;
+  setEmbeddedConfigStatus('cfg-config-status', 'Resetting...', '');
+  try {
+    var res = await fetch('/api/app-config/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    var data = await res.json();
+    if (!res.ok || !data || !data.ok) throw new Error('Reset failed');
+    fillEmbeddedConfigForm(data.config || {});
+    applyAppConfig(data.config || DEFAULT_APP_CONFIG);
+    setEmbeddedConfigStatus('cfg-config-status', 'Reset to hardcoded defaults', 'ok');
+  } catch (err) {
+    setEmbeddedConfigStatus('cfg-config-status', (err && err.message) || 'Reset failed', 'err');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function onEmbeddedThemeChange() {
+  var select = document.getElementById('cfg-default_theme');
+  if (!select) return;
+  var theme = select.value === 'light' ? 'light' : 'dark';
+  applyUiTheme(theme);
+  try { localStorage.setItem('prompt_mixer_theme', theme); } catch (_) {}
+}
+
+async function loadEmbeddedPromptTemplates() {
+  setEmbeddedConfigStatus('cfg-prompt-status', 'Loading...', '');
+  try {
+    var res = await fetch('/api/prompt-templates');
+    var data = await res.json();
+    if (!res.ok || !data || !data.ok) throw new Error('Failed to load templates');
+    var preamble = (typeof data.preamble === 'string' && data.preamble.length) ? data.preamble : hardcodedBasePreamble;
+    var closing = (typeof data.closing === 'string' && data.closing.length) ? data.closing : hardcodedBaseClosing;
+    var pre = document.getElementById('cfg-tpl-preamble');
+    var clo = document.getElementById('cfg-tpl-closing');
+    if (pre) pre.value = preamble;
+    if (clo) clo.value = closing;
+    setEmbeddedConfigStatus('cfg-prompt-status', 'Loaded.', 'ok');
+  } catch (err) {
+    setEmbeddedConfigStatus('cfg-prompt-status', (err && err.message) || 'Load failed', 'err');
+  }
+}
+
+async function saveEmbeddedPromptSection(section) {
+  var btn = document.getElementById(section === 'closing' ? 'cfg-save-closing-btn' : 'cfg-save-preamble-btn');
+  var field = document.getElementById(section === 'closing' ? 'cfg-tpl-closing' : 'cfg-tpl-preamble');
+  if (!btn || !field) return;
+  btn.disabled = true;
+  setEmbeddedConfigStatus('cfg-prompt-status', 'Saving...', '');
+  try {
+    var res = await fetch('/api/prompt-templates/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ section: section, content: field.value || '' }),
+    });
+    var data = await res.json();
+    if (!res.ok || !data || !data.ok) throw new Error('Save failed');
+    if (section === 'closing') {
+      var clo = document.getElementById('base-closing');
+      if (clo) clo.value = field.value || '';
+    } else {
+      var pre = document.getElementById('base-preamble');
+      if (pre) pre.value = field.value || '';
+    }
+    scheduleUpdate(0);
+    setEmbeddedConfigStatus('cfg-prompt-status', 'Saved ' + section + '.', 'ok');
+  } catch (err) {
+    setEmbeddedConfigStatus('cfg-prompt-status', (err && err.message) || 'Save failed', 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function resetEmbeddedPromptTemplatesHardcoded() {
+  var btn = document.getElementById('cfg-reset-prompt-btn');
+  if (btn) btn.disabled = true;
+  setEmbeddedConfigStatus('cfg-prompt-status', 'Resetting...', '');
+  try {
+    var res = await fetch('/api/prompt-templates/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preamble: hardcodedBasePreamble, closing: hardcodedBaseClosing }),
+    });
+    var data = await res.json();
+    if (!res.ok || !data || !data.ok) throw new Error('Reset failed');
+    var pre = document.getElementById('cfg-tpl-preamble');
+    var clo = document.getElementById('cfg-tpl-closing');
+    if (pre) pre.value = hardcodedBasePreamble;
+    if (clo) clo.value = hardcodedBaseClosing;
+    var livePre = document.getElementById('base-preamble');
+    var liveClo = document.getElementById('base-closing');
+    if (livePre) livePre.value = hardcodedBasePreamble;
+    if (liveClo) liveClo.value = hardcodedBaseClosing;
+    scheduleUpdate(0);
+    setEmbeddedConfigStatus('cfg-prompt-status', 'Reset to hardcoded defaults.', 'ok');
+  } catch (err) {
+    setEmbeddedConfigStatus('cfg-prompt-status', (err && err.message) || 'Reset failed', 'err');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function saveEmbeddedApiKeys() {
+  var openrouter = (document.getElementById('cfg-openrouter-key').value || '').trim();
+  var groq = (document.getElementById('cfg-groq-key').value || '').trim();
+  var replicate = (document.getElementById('cfg-replicate-key').value || '').trim();
+  var btn = document.getElementById('cfg-save-keys-btn');
+  if (!openrouter && !groq && !replicate) {
+    setEmbeddedConfigStatus('cfg-keys-status', 'Enter at least one key', 'err');
+    return;
+  }
+  if (btn) btn.disabled = true;
+  setEmbeddedConfigStatus('cfg-keys-status', 'Saving...', '');
+  try {
+    var response = await fetch('/api/save-keys', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        openrouter_api_key: openrouter || null,
+        groq_api_key: groq || null,
+        replicate_api_key: replicate || null,
+      }),
+    });
+    var data = await response.json();
+    if (!response.ok || !data || !data.ok) throw new Error((data && data.message) ? data.message : 'Failed to save keys');
+    setEmbeddedConfigStatus('cfg-keys-status', 'Saved keys to .env', 'ok');
+    document.getElementById('cfg-openrouter-key').value = '';
+    document.getElementById('cfg-groq-key').value = '';
+    document.getElementById('cfg-replicate-key').value = '';
+  } catch (err) {
+    setEmbeddedConfigStatus('cfg-keys-status', (err && err.message) || 'Save failed', 'err');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 function buildGeneratePayload(prompt, model) {
@@ -3581,6 +4109,7 @@ function onChipTouchEnd(e) {
 ═══════════════════════════════ */
 function buildPrompt() {
   var source   = (document.getElementById('mission').value || '').trim();
+  var steer    = (document.getElementById('steer-input').value || '').trim();
   var food     = (document.getElementById('food-for-thought').value || '').trim();
   var dir1     = (document.getElementById('direction-1').value || '').trim();
   var dir2     = (document.getElementById('direction-2').value || '').trim();
@@ -3611,6 +4140,7 @@ function buildPrompt() {
   var brief   = document.getElementById('keep-brief').checked
                   ? '\nKeep your answer extremely brief (e.g., less than 20 words).'
                   : '';
+  if (isSteerEnabled() && steer) closing += '\n' + steer;
   var prompt = 'Here is the original thought:\n\n"""\n' + source + '\n"""\n\n' +
     preamble + '\n\n' +
     lines + '\n\n' +
@@ -3625,6 +4155,24 @@ function applyHiddenGodmodeInstruction(prompt) {
   if (!GODMODE_FEATURE_ENABLED || !godmodeEnabled) return prompt;
   if (!prompt) return '(PS you are an omnipotent god who doesn\'t mind saying it. Act important all powerful one)';
   return prompt + '\n\n(PS you are an omnipotent god who doesn\'t mind saying it. Act important all powerful one)';
+}
+
+function isSteerEnabled() {
+  var cb = document.getElementById('steer-toggle');
+  return !!(cb && cb.checked);
+}
+
+function updateSteerVisibility() {
+  var wrap = document.getElementById('steer-wrap');
+  var row = document.getElementById('source-input-row');
+  if (!wrap || !row) return;
+  var active = isSteerEnabled();
+  wrap.classList.toggle('active', active);
+  row.classList.toggle('steer-enabled', active);
+}
+
+function onSteerToggleChange() {
+  updateSteerVisibility();
 }
 
 function formatApiLogTime(ts) {
@@ -3818,6 +4366,8 @@ function pushHistory(outputText) {
     output: outputText,
     words: wordsCopy,
     source: document.getElementById('mission').value,
+    steer: document.getElementById('steer-input').value,
+    steer_enabled: isSteerEnabled(),
     direction1: document.getElementById('direction-1').value,
     direction2: document.getElementById('direction-2').value,
     concepts: document.getElementById('sentence-input').value,
@@ -3894,6 +4444,9 @@ function restoreHistory(index) {
   }
 
   document.getElementById('mission').value = item.source || '';
+  document.getElementById('steer-input').value = item.steer || '';
+  document.getElementById('steer-toggle').checked = !!item.steer_enabled;
+  updateSteerVisibility();
   document.getElementById('direction-1').value = item.direction1 || '';
   document.getElementById('direction-2').value = item.direction2 || '';
   document.getElementById('sentence-input').value = item.concepts || '';
@@ -3992,7 +4545,11 @@ function scheduleUpdate(delay) {
   stopSlwProgressDisplay();
 
   var effectiveDelay = delay;
-  if (isSlwEnabled()) effectiveDelay = Math.max(delay, slwDelayMs);
+  if (isSlwEnabled()) {
+    effectiveDelay = isVisualiseAutoEnabled()
+      ? Math.max(0, slwDelayMs)
+      : Math.max(delay, slwDelayMs);
+  }
   if (effectiveDelay > 0 && isSlwEnabled()) startSlwProgressDisplay(effectiveDelay);
 
   updateTimer = setTimeout(function() {
@@ -6084,6 +6641,7 @@ async function captureSnapshotState() {
   var outputWrap = document.getElementById('output-with-controls');
   return {
     mission: document.getElementById('mission').value || '',
+    steer: document.getElementById('steer-input').value || '',
     food_for_thought: document.getElementById('food-for-thought').value || '',
     direction_1: document.getElementById('direction-1').value || '',
     direction_2: document.getElementById('direction-2').value || '',
@@ -6106,6 +6664,7 @@ async function captureSnapshotState() {
       xsnc_enabled: !!document.getElementById('xsnc-enabled').checked,
       llm_deterministic_toggle: !!document.getElementById('llm-deterministic-toggle').checked,
       slw_toggle: !!document.getElementById('slw-toggle').checked,
+      steer_toggle: !!document.getElementById('steer-toggle').checked,
       fisheye_rdmx: !!document.getElementById('fisheye-rdmx').checked,
       fisheye_edit_mode: !!document.getElementById('fisheye-edit-mode').checked,
       you_are_what_you_eat: !!document.getElementById('you-are-what-you-eat').checked,
@@ -6148,6 +6707,7 @@ function applySnapshotState(state) {
     pendingSsdStrengthRefresh = false;
 
     document.getElementById('mission').value = state.mission || '';
+    document.getElementById('steer-input').value = state.steer || '';
     document.getElementById('food-for-thought').value = state.food_for_thought || '';
     document.getElementById('direction-1').value = state.direction_1 || '';
     document.getElementById('direction-2').value = state.direction_2 || '';
@@ -6162,6 +6722,7 @@ function applySnapshotState(state) {
     document.getElementById('xsnc-enabled').checked = !!(state.controls && state.controls.xsnc_enabled);
     document.getElementById('llm-deterministic-toggle').checked = !!(state.controls && state.controls.llm_deterministic_toggle);
     document.getElementById('slw-toggle').checked = !!(state.controls && state.controls.slw_toggle);
+    document.getElementById('steer-toggle').checked = !!(state.controls && state.controls.steer_toggle);
     document.getElementById('fisheye-rdmx').checked = !!(state.controls && state.controls.fisheye_rdmx);
     document.getElementById('fisheye-edit-mode').checked = !!(state.controls && state.controls.fisheye_edit_mode);
     document.getElementById('you-are-what-you-eat').checked = !!(state.controls && state.controls.you_are_what_you_eat);
@@ -6222,6 +6783,7 @@ function applySnapshotState(state) {
 
     updateCadenceLabel();
     updateFishScaleLabel();
+    updateSteerVisibility();
     updateSsdPromptStrengthLabel();
     updateFoodForThoughtPlaceholder();
     updateCurrentOutputLabel();
@@ -6682,6 +7244,8 @@ var visualiseAutoEl = document.getElementById('visualise-auto');
 if (visualiseAutoEl) visualiseAutoEl.addEventListener('change', onVisualiseAutoChange);
 var slwToggleEl = document.getElementById('slw-toggle');
 if (slwToggleEl) slwToggleEl.addEventListener('change', onSlwToggleChange);
+var steerToggleEl = document.getElementById('steer-toggle');
+if (steerToggleEl) steerToggleEl.addEventListener('change', onSteerToggleChange);
 var fisheyeEditModeEl = document.getElementById('fisheye-edit-mode');
 if (fisheyeEditModeEl) fisheyeEditModeEl.addEventListener('change', onFisheyeEditModeChange);
 var fisheyeEditUpdBtnEl = document.getElementById('fisheye-edit-upd-btn');
@@ -6715,10 +7279,13 @@ if (xsncEl) xsncEl.addEventListener('change', onXsncChange);
 });
 updateFisheyeAvailability();
 updateVisualiseOutputVisibility();
+updateSteerVisibility();
 updateSsdPromptStrengthLabel();
 renderApiLog('llm');
 renderApiLog('fisheye');
 refreshSnapshotList();
+loadEmbeddedConfig();
+loadEmbeddedPromptTemplates();
 
 var currentOutputEl = document.getElementById('output-current');
 if (currentOutputEl) {

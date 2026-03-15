@@ -9,3 +9,4 @@ data/fisheye_images/
 data/fisheye_images_index.json
 data/snapshots/
 data/fisheye_game_rounds.json
+data/app_config.json
