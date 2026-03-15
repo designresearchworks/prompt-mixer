@@ -291,6 +291,43 @@ textarea:focus { border-color: var(--accent); }
   align-items: stretch;
   gap: 10px;
 }
+.fisheye-resize-handle {
+  display: none;
+  width: 12px;
+  flex: 0 0 12px;
+  position: relative;
+  cursor: ew-resize;
+  user-select: none;
+  touch-action: none;
+}
+.fisheye-resize-handle.active {
+  display: block;
+}
+.fisheye-resize-handle::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 5px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to bottom,
+    rgba(124,92,252,0.08),
+    rgba(124,92,252,0.45),
+    rgba(124,92,252,0.08)
+  );
+}
+.fisheye-resize-handle::after {
+  content: "⋮";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
 
 .mixer-wrap {
   flex: 1 1 auto;
@@ -571,31 +608,40 @@ textarea:focus { border-color: var(--accent); }
   position: relative;
 }
 .mixer-resize-handle::before {
-  content: '↕';
+  content: "";
   position: absolute;
-  left: 2px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 20px;
-  color: var(--muted);
-  line-height: 1;
-  background: var(--bg);
-  padding-right: 6px;
+  left: 10px;
+  right: 10px;
+  top: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    rgba(124,92,252,0.08),
+    rgba(124,92,252,0.45),
+    rgba(124,92,252,0.08)
+  );
 }
 .mixer-resize-handle::after {
-  content: '';
+  content: '⋯';
   position: absolute;
-  left: 0;
-  right: 0;
   top: 50%;
-  transform: translateY(-50%);
-  border-top: 2px solid var(--border2);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--muted);
 }
 @media (hover: hover) and (pointer: fine) {
   .mixer-section {
     border-bottom: none;
   }
   .mixer-resize-handle {
+    display: block;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .mixer-resize-handle.active {
     display: block;
   }
 }
@@ -920,6 +966,19 @@ textarea:focus { border-color: var(--accent); }
 .output-with-controls .output-current {
   flex: 1 1 auto;
 }
+.output-with-controls.collapsed .output-current,
+.output-with-controls.collapsed .output-size-controls {
+  display: none;
+}
+.output-collapse-btn {
+  padding: 2px 7px;
+}
+.output-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 15px;
+}
 .output-size-controls {
   display: flex;
   flex-direction: column;
@@ -1087,12 +1146,109 @@ textarea:focus { border-color: var(--accent); }
     );
   color: #e4e4f8;
 }
+.model-select.slw-timing {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(239, 68, 68, 0.30) 0%,
+      rgba(239, 68, 68, 0.30) var(--slw-progress, 0%),
+      rgba(24, 24, 40, 0.96) var(--slw-progress, 0%),
+      rgba(24, 24, 40, 0.96) 100%
+    );
+  color: #f3d6d6;
+}
 .model-select.timing.overtime {
   animation: modelOvertimePulse 1.2s ease-in-out infinite;
 }
 .model-select:hover, .model-select:focus {
   border-color: var(--accent);
   color: var(--text);
+}
+.model-log-anchor {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.api-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.03);
+}
+.api-log-title {
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--heading);
+}
+.api-log-hint {
+  font-size: 9px;
+  color: var(--muted);
+}
+.api-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  overflow-y: auto;
+  min-height: 78px;
+}
+.api-log-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.api-log-panel {
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  background: rgba(10, 12, 20, 0.72);
+  overflow: hidden;
+}
+.api-log-panel .api-log-list {
+  max-height: 220px;
+  min-height: 110px;
+  overflow-y: auto;
+}
+@media (max-width: 900px) {
+  .api-log-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.api-log-empty {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.api-log-item {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 8px;
+  align-items: start;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.api-log-time {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+.api-log-msg {
+  color: var(--text);
+}
+.api-log-item.info .api-log-msg {
+  color: var(--text);
+}
+.api-log-item.ok .api-log-msg {
+  color: #9be7b2;
+}
+.api-log-item.warn .api-log-msg {
+  color: #f7d27a;
+}
+.api-log-item.error .api-log-msg {
+  color: #f5a3a3;
 }
 .fisheye-model-select {
   min-width: 186px;
@@ -1211,6 +1367,15 @@ textarea:focus { border-color: var(--accent); }
   opacity: 0.45;
   cursor: not-allowed;
 }
+.fisheye-edit-upd-btn {
+  padding: 4px 8px;
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  min-width: 0;
+}
+.fisheye-edit-upd-btn.hidden {
+  display: none;
+}
 .cadence-wrap.paused-by-xsnc {
   animation: xsncPausePulse 1.05s ease-in-out infinite;
 }
@@ -1241,6 +1406,14 @@ textarea:focus { border-color: var(--accent); }
   display: flex;
   flex-direction: column;
 }
+.visualise-image-stage {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 8px;
+}
 .visualise-image {
   display: none;
   width: 100%;
@@ -1254,6 +1427,56 @@ textarea:focus { border-color: var(--accent); }
   height: 100%;
   min-height: 0;
   object-fit: contain;
+}
+.visualise-original-preview {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: contain;
+  background: rgba(8, 8, 14, 0.78);
+  z-index: 2;
+}
+.visualise-original-badge {
+  display: none;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(10, 10, 18, 0.56);
+  color: #f4f4ff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+.visualise-image-stage.preview-enabled:hover .visualise-original-preview,
+.visualise-image-stage.preview-enabled:focus-within .visualise-original-preview {
+  display: block;
+}
+.visualise-image-stage.preview-enabled:hover .visualise-original-badge,
+.visualise-image-stage.preview-enabled:focus-within .visualise-original-badge {
+  display: inline-flex;
+  align-items: center;
+  opacity: 1;
+}
+.visualise-original-badge.flash-visible {
+  display: inline-flex;
+  align-items: center;
+  opacity: 1;
+}
+.visualise-original-badge.flash-fade {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0;
 }
 .fisheye-progress-overlay {
   display: none;
@@ -1298,6 +1521,34 @@ textarea:focus { border-color: var(--accent); }
   gap: 8px;
   flex: 0 0 auto;
 }
+.fisheye-ssd-strength {
+  height: 26px;
+  box-sizing: border-box;
+  gap: 6px;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-right: 6px;
+}
+.fisheye-ssd-strength.hidden {
+  display: none;
+}
+.fisheye-ssd-strength-label,
+.fisheye-ssd-strength-value {
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.fisheye-ssd-strength-value {
+  color: var(--text);
+  min-width: 34px;
+  text-align: right;
+}
+.fisheye-ssd-strength .cadence-slider {
+  width: 78px;
+}
 .mixer-head-right.hidden {
   display: none;
 }
@@ -1327,6 +1578,9 @@ textarea:focus { border-color: var(--accent); }
 }
 .visualise-image-inline.active {
   display: block;
+}
+body.fisheye-inline-mode .visualise-inline.preview-enabled {
+  pointer-events: auto;
 }
 .infinite-feedback-msg {
   margin-top: 8px;
@@ -1385,6 +1639,55 @@ textarea:focus { border-color: var(--accent); }
   line-height: 1.6;
 }
 .collapse-btn:hover { color: var(--text); border-color: var(--accent); }
+.snapshot-save-btn {
+  position: relative;
+  overflow: hidden;
+}
+.snapshot-save-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(250, 204, 21, 0.04) 0%,
+    rgba(250, 204, 21, 0.32) 50%,
+    rgba(250, 204, 21, 0.04) 100%
+  );
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.snapshot-save-btn.is-saving::before {
+  opacity: 1;
+  animation: snapshotSavingSweep 1s linear infinite;
+}
+.snapshot-save-btn.is-saved {
+  border-color: rgba(250, 204, 21, 0.78);
+  color: #fff3bf;
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.18), 0 0 18px rgba(250, 204, 21, 0.18);
+}
+.snapshot-save-btn.is-saved::before {
+  opacity: 1;
+  animation: snapshotSavedSparkle 720ms ease-out forwards;
+}
+@keyframes snapshotSavingSweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes snapshotSavedSparkle {
+  0% {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  30% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.08);
+    opacity: 0;
+  }
+}
 .collapsible-body {
   overflow: hidden;
   transition: max-height 0.25s ease, opacity 0.2s ease;
@@ -1599,6 +1902,7 @@ body.fisheye-inline-mode .visualise-output.active {
         <select class="model-select" id="model-select" onchange="onModelChange()" title="The groq models are faster, sonnet is smarter, no right or wrong, just different">
           <option value="google/gemini-3.1-pro-preview">Gemini 3.1 Pro</option>
           <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6</option>
+          <option value="anthropic/claude-haiku-4.5">Claude Haiku 4.5</option>
           <option value="qwen/qwen3.5-plus-02-15">Qwen 3.5 Plus</option>
           <option value="x-ai/grok-4.1-fast">Grok 4.1 Fast</option>
           <option value="google/gemini-3-flash-preview">Gemini 3 Flash</option>
@@ -1614,12 +1918,16 @@ body.fisheye-inline-mode .visualise-output.active {
           <input type="checkbox" id="llm-deterministic-toggle" style="width:12px;height:12px;cursor:pointer;">
           Deterministic
         </label>
+        <label title="Adds a short delay before text generation triggers so multiple fish moves can be grouped together" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:600;user-select:none;">
+          <input type="checkbox" id="slw-toggle" style="width:12px;height:12px;cursor:pointer;">
+          SLW
+        </label>
+        <button class="feedback-btn" id="theme-toggle-btn" title="Toggle light/dark mode">Light</button>
         <div class="cadence-wrap" id="cadence-wrap">
           <span class="cadence-label">Fast</span>
           <input class="cadence-slider" id="infinite-cadence" type="range" min="0" max="5000" step="50" value="2500" oninput="updateCadenceLabel()" title="Speed limit on generations">
           <span class="cadence-label">Slow</span>
         </div>
-        <button class="feedback-btn" id="theme-toggle-btn" title="Toggle light/dark mode">Light</button>
         <button class="feedback-btn" id="feedback-btn" title="Where usually the text in the Thought box is what the model is thinking about, with FDBK on it will think about the last thing it generated, last thing it generated, last thing it generated - get it?">fdbk</button>
         <button class="feedback-btn infinite-btn" id="infinite-feedback-btn" title="With this on the model won't stop after each generation, it'll just keep going (which it will do anyway if Fish Physics mode is on)">∞</button>
       </div>
@@ -1633,6 +1941,10 @@ body.fisheye-inline-mode .visualise-output.active {
         <button class="output-size-btn" onclick="adjustOutputWindowHeight(1)" title="Add rows to the output box">+</button>
         <button class="output-size-btn" onclick="adjustOutputWindowHeight(-1)" title="Remove rows from output box">-</button>
       </div>
+    </div>
+    <div class="output-action-row">
+      <button class="collapse-btn output-collapse-btn" id="output-collapse-btn" type="button" onclick="toggleOutputCollapse()">hide</button>
+      <button class="collapse-btn output-collapse-btn snapshot-save-btn" id="save-snapshot-btn" type="button" onclick="saveSnapshot()">snapshot</button>
     </div>
   </div>
 
@@ -1650,6 +1962,11 @@ body.fisheye-inline-mode .visualise-output.active {
           <option value="prunaai/flux-fast|512" selected>Flux Fast 512</option>
           <option value="prunaai/flux-fast|1024">Flux Fast 1024</option>
           <option value="google/imagen-3-fast">Imagen 3 Fast</option>
+          <option value="lucataco/ssd-1b:b19e3639452c59ce8295b82aba70a231404cb062f2eb580ea894b31e8ce5bbb6">SSD-1B</option>
+          <option value="google/nano-banana">Nano Banana</option>
+          <option value="google/nano-banana-2|1K">Nano Banana 2 1K</option>
+          <option value="google/nano-banana-2|2K">Nano Banana 2 2K</option>
+          <option value="google/nano-banana-2|4K">Nano Banana 2 4K</option>
           <option value="bytedance/seedream-4|1K">Seedream 4 1K</option>
           <option value="bytedance/seedream-4|2K">Seedream 4 2K</option>
           <option value="bytedance/seedream-4|4K">Seedream 4 4K</option>
@@ -1658,6 +1975,16 @@ body.fisheye-inline-mode .visualise-output.active {
           <input type="checkbox" id="fisheye-rdmx" onchange="onFisheyeRdmxChange()" style="width:12px;height:12px;cursor:pointer;">
           RDMX
         </label>
+        <label class="visualise-toggle-label disabled" id="fisheye-edit-toggle-label" title="Edit-capable models only. Use the selected fisheye image as the edit input image for subsequent generations.">
+          <input type="checkbox" id="fisheye-edit-mode" style="width:12px;height:12px;cursor:pointer;" disabled>
+          Edit
+        </label>
+        <button class="feedback-btn fisheye-edit-upd-btn hidden" id="fisheye-edit-upd-btn" type="button" title="Update the Nano Banana edit input to the image currently being shown.">UPD</button>
+        <div class="cadence-wrap fisheye-ssd-strength hidden" id="fisheye-ssd-strength-wrap" title="SSD-1B prompt strength for img2img update mode.">
+          <span class="fisheye-ssd-strength-label">PSTR</span>
+          <input class="cadence-slider" id="fisheye-ssd-strength" type="range" min="0" max="1" step="0.01" value="0.8">
+          <span class="fisheye-ssd-strength-value" id="fisheye-ssd-strength-value">0.80</span>
+        </div>
       </span>
     </div>
     <!-- Mixer canvas with optional fisheye pane -->
@@ -1704,13 +2031,20 @@ body.fisheye-inline-mode .visualise-output.active {
         <div class="mixer-empty-icon">⟳</div>
         Type transformation concepts below
       </div>
-      <div class="visualise-inline" id="visualise-inline">
+      <div class="visualise-inline visualise-image-stage" id="visualise-inline" tabindex="0">
         <img class="visualise-image-inline" id="visualise-image-inline" alt="Generated image from current model output">
+        <img class="visualise-original-preview" id="visualise-original-inline" alt="Original image used for Nano Banana edit mode">
+        <div class="visualise-original-badge" id="visualise-original-inline-badge">Original Image</div>
         <div class="fisheye-progress-overlay" id="fisheye-progress-overlay-inline" aria-hidden="true"></div>
       </div>
       </div>
+      <div class="fisheye-resize-handle" id="fisheye-resize-handle" title="Drag to resize image output"></div>
       <div class="visualise-output" id="visualise-output">
-        <img class="visualise-image" id="visualise-image" alt="Generated image from current model output">
+        <div class="visualise-image-stage" id="visualise-image-stage" tabindex="0">
+          <img class="visualise-image" id="visualise-image" alt="Generated image from current model output">
+          <img class="visualise-original-preview" id="visualise-original-image" alt="Original image used for Nano Banana edit mode">
+          <div class="visualise-original-badge" id="visualise-original-badge">Original Image</div>
+        </div>
         <div class="fisheye-progress-overlay" id="fisheye-progress-overlay" aria-hidden="true"></div>
       </div>
     </div>
@@ -1822,6 +2156,28 @@ body.fisheye-inline-mode .visualise-output.active {
     </div>
   </div>
 
+  <div class="row row-snapshots">
+    <div class="row-label" title="Save or restore a full UI snapshot, including mixer state, controls, models, output, and fisheye images, without triggering new AI calls.">
+      Snapshots
+      <button class="collapse-btn" id="snapshots-toggle-btn" onclick="toggleSnapshotsRow()">show</button>
+      <span id="snapshot-status" style="font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:none;"></span>
+    </div>
+    <div class="trawl-row" id="snapshots-row-body" style="display:none;">
+      <select class="trawl-input" id="snapshot-day-select">
+        <option value="">Select day…</option>
+      </select>
+      <select class="trawl-input" id="snapshot-select">
+        <option value="">Select snapshot…</option>
+      </select>
+      <button class="feedback-btn" id="load-snapshot-btn" type="button">Load</button>
+      <select class="trawl-input" id="snapshot-zip-day-select">
+        <option value="all">All days</option>
+      </select>
+      <button class="collapse-btn" id="download-snapshot-current-outputs-btn" type="button">zip current outputs</button>
+      <button class="collapse-btn" id="refresh-snapshot-btn" type="button">refresh</button>
+    </div>
+  </div>
+
   <div class="row row-trawl">
     <div class="row-label" title="You can use this to be lazy and create a new Thought and several new fish. Uses the same model that's selected, just for testing really.">
       Trawl
@@ -1876,11 +2232,41 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
 
   <!-- 7. PREVIOUS OUTPUTS -->
   <div class="row row-history">
-    <div class="row-label" style="margin-bottom:6px" title="Self explanatory, if you click one then that state should be loaded back in (if fish mode enabled then.. good luck)">Previous outputs</div>
-    <div class="history-empty" id="history-empty">
-      Previous outputs will appear here as you adjust the mixer.
+    <div class="row-label" style="margin-bottom:6px" title="Self explanatory, if you click one then that state should be loaded back in (if fish mode enabled then.. good luck)">
+      Previous outputs
+      <button class="collapse-btn" onclick="toggleCollapse('history-body', this)">hide</button>
     </div>
-    <div id="history-list"></div>
+    <div class="collapsible-body" id="history-body">
+      <div class="history-empty" id="history-empty">
+        Previous outputs will appear here as you adjust the mixer.
+      </div>
+      <div id="history-list"></div>
+    </div>
+  </div>
+
+  <div class="row row-fishtails">
+    <div class="row-label" title="Recent frontend-side API activity for text and image generation.">
+      Fishtails (API access log)
+      <button class="collapse-btn" onclick="toggleCollapse('fishtails-body', this)">show</button>
+    </div>
+    <div class="collapsible-body collapsed" id="fishtails-body">
+      <div class="api-log-grid">
+        <div class="api-log-panel">
+          <div class="api-log-head">
+            <span class="api-log-title">LLM API Log</span>
+            <span class="api-log-hint">recent text calls</span>
+          </div>
+          <div class="api-log-list" id="llm-api-log-list"></div>
+        </div>
+        <div class="api-log-panel">
+          <div class="api-log-head">
+            <span class="api-log-title">Image API Log</span>
+            <span class="api-log-hint">recent image calls</span>
+          </div>
+          <div class="api-log-list" id="fisheye-api-log-list"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="row" style="display:flex;justify-content:center;align-items:center;padding-top:10px;padding-bottom:12px;">
@@ -1965,6 +2351,10 @@ var trawlInFlight = false;
 var mixerResizeActive = false;
 var mixerResizeStartY = 0;
 var mixerResizeStartH = 0;
+var fisheyeResizeActive = false;
+var fisheyeResizeStartX = 0;
+var fisheyeResizeStartW = 0;
+var fisheyePaneManualWidth = null;
 var currentOutputEditActive = false;
 var manualOutputEditPause = false;
 var outputTouchStartX = 0;
@@ -1977,8 +2367,23 @@ var promptTemplateStatusTimer = null;
 var visualiseInFlight = false;
 var currentFisheyeImageRef = null;
 var currentFisheyeImageUrl = '';
+var fisheyeEditSourceRef = null;
+var fisheyeEditSourceUrl = '';
+var fisheyeBadgeFlashTimers = {};
+var fisheyeDisplayValidationTimer = null;
+var pendingVisualiseRefresh = false;
+var pendingSsdStrengthRefresh = false;
+var ssdStrengthRefreshTimer = null;
 var pendingGenerateAfterVisualise = false;
+var snapshotStatusTimer = null;
+var snapshotButtonFxTimer = null;
+var snapshotRestoreInProgress = false;
+var snapshotListCache = [];
 var fisheyeFixedSeed = 2110;
+var apiLogState = {
+  llm: [],
+  fisheye: [],
+};
 
 /* ═══════════════════════════════
    DRAG STATE
@@ -2008,11 +2413,16 @@ var uiDefaultTheme = 'dark';
 var appConfig = {};
 var llmDeterministicMode = false;
 var llmDeterministicSeed = 2110;
+var slwDelayMs = 800;
+var slwProgressRaf = null;
+var slwProgressStartTs = 0;
+var slwProgressDelayMs = 0;
 var DEFAULT_APP_CONFIG = {
   default_theme: 'dark',
   default_model: 'groq:llama-3.3-70b-versatile',
   llm_deterministic_mode: false,
   llm_deterministic_seed: 2110,
+  slw_delay_ms: 800,
   default_thought: 'deep thought',
   default_fish_concepts: 'animal, vegetable, mineral',
   cadence_min_ms: 0,
@@ -2096,6 +2506,7 @@ function normalizeAppConfig(raw) {
   cfg.default_theme = (String(cfg.default_theme || DEFAULT_APP_CONFIG.default_theme).toLowerCase() === 'light') ? 'light' : 'dark';
   cfg.llm_deterministic_mode = !!cfg.llm_deterministic_mode;
   cfg.llm_deterministic_seed = Math.max(0, Math.min(2147483647, intNum('llm_deterministic_seed', DEFAULT_APP_CONFIG.llm_deterministic_seed)));
+  cfg.slw_delay_ms = Math.max(0, Math.min(5000, intNum('slw_delay_ms', DEFAULT_APP_CONFIG.slw_delay_ms)));
   cfg.default_thought = String(cfg.default_thought || DEFAULT_APP_CONFIG.default_thought);
   cfg.default_fish_concepts = String(cfg.default_fish_concepts || DEFAULT_APP_CONFIG.default_fish_concepts);
 
@@ -2131,6 +2542,7 @@ function applyAppConfig(raw) {
   uiDefaultTheme = cfg.default_theme;
   llmDeterministicMode = cfg.llm_deterministic_mode;
   llmDeterministicSeed = cfg.llm_deterministic_seed;
+  slwDelayMs = cfg.slw_delay_ms;
 
   infiniteCadenceValue = cfg.cadence_default_ms;
   INFINITE_INACTIVITY_MS = cfg.infinite_inactivity_ms;
@@ -2171,6 +2583,7 @@ function applyAppConfig(raw) {
   }
   var deterministicToggle = document.getElementById('llm-deterministic-toggle');
   if (deterministicToggle) deterministicToggle.checked = !!llmDeterministicMode;
+  syncSlwDefaultToVisualise();
 
   // Config default_theme is authoritative for initial page theme.
   applyUiTheme(uiDefaultTheme);
@@ -3214,6 +3627,42 @@ function applyHiddenGodmodeInstruction(prompt) {
   return prompt + '\n\n(PS you are an omnipotent god who doesn\'t mind saying it. Act important all powerful one)';
 }
 
+function formatApiLogTime(ts) {
+  var d = new Date(ts);
+  var hh = String(d.getHours()).padStart(2, '0');
+  var mm = String(d.getMinutes()).padStart(2, '0');
+  var ss = String(d.getSeconds()).padStart(2, '0');
+  return hh + ':' + mm + ':' + ss;
+}
+
+function renderApiLog(kind) {
+  var listEl = document.getElementById(kind + '-api-log-list');
+  if (!listEl) return;
+  var items = apiLogState[kind] || [];
+  if (!items.length) {
+    listEl.innerHTML = '<div class="api-log-empty">No calls yet. This panel will show request starts, queueing, stream progress, API statuses, completions, and retry events.</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(function(item) {
+    return '<div class="api-log-item ' + item.level + '">' +
+      '<span class="api-log-time">' + formatApiLogTime(item.ts) + '</span>' +
+      '<span class="api-log-msg">' + escHtml(item.message) + '</span>' +
+    '</div>';
+  }).join('');
+  listEl.scrollTop = 0;
+}
+
+function pushApiLog(kind, level, message) {
+  if (!apiLogState[kind]) return;
+  apiLogState[kind].unshift({
+    ts: Date.now(),
+    level: level || 'info',
+    message: message || '',
+  });
+  if (apiLogState[kind].length > 22) apiLogState[kind].pop();
+  renderApiLog(kind);
+}
+
 /* ═══════════════════════════════
    STREAMING STATUS HELPERS
 ═══════════════════════════════ */
@@ -3259,17 +3708,22 @@ async function generateOutput(promptOverride) {
   var assembled = '';
   var completed = false;
   var requestStartedAt = performance.now();
+  var tokenLogged = false;
+  var selectedModel = document.getElementById('model-select').value;
+  pushApiLog('llm', 'info', 'Starting /api/generate via ' + selectedModel + '.');
 
   try {
     var response = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildGeneratePayload(requestPrompt, document.getElementById('model-select').value)),
+      body: JSON.stringify(buildGeneratePayload(requestPrompt, selectedModel)),
     });
+    pushApiLog('llm', response.ok ? 'ok' : 'error', 'HTTP ' + response.status + ' from /api/generate.');
 
     var reader = response.body.getReader();
     var decoder = new TextDecoder();
     var buffer = '';
+    pushApiLog('llm', 'info', 'Opened streaming response reader.');
 
     outputEl.classList.remove('fading');
     outputEl.innerHTML = '';
@@ -3288,41 +3742,55 @@ async function generateOutput(promptOverride) {
         var payload = line.slice(6);
         if (payload === '[DONE]') {
           completed = true;
+          pushApiLog('llm', 'ok', 'Stream completed successfully.');
           pushHistory(assembled);
           break outer;
         }
         if (payload.startsWith('[ERROR]')) {
           var errMsg = payload.length > 7 ? payload.slice(7).trim() : 'Error generating response. Check your API key and server.';
+          pushApiLog('llm', 'error', 'Model/API error: ' + errMsg);
           outputEl.textContent = errMsg || 'Error generating response. Check your API key and server.';
           break outer;
         }
         var token = payload.replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+        if (!tokenLogged) {
+          tokenLogged = true;
+          pushApiLog('llm', 'info', 'Received first streamed token chunk.');
+        }
         assembled += token;
         outputEl.innerHTML = simpleMarkdown(assembled);
       }
     }
   } catch (err) {
+    pushApiLog('llm', 'error', 'Request failed before completion: ' + (err && err.message ? err.message : 'unknown error'));
     outputEl.classList.remove('fading');
     outputEl.textContent = 'Request failed. Is the server running?';
   } finally {
-  var requestElapsedMs = Math.max(1, performance.now() - requestStartedAt);
-  if (completed) recordModelResponseTime(requestElapsedMs);
-  isStreaming = false;
-  setStreamingState(false);
-  inFlightPrompt = null;
+    var requestElapsedMs = Math.max(1, performance.now() - requestStartedAt);
+    if (completed) recordModelResponseTime(requestElapsedMs);
+    if (completed) pushApiLog('llm', 'ok', 'LLM request settled in ' + (requestElapsedMs / 1000).toFixed(2) + 's.');
+    isStreaming = false;
+    setStreamingState(false);
+    inFlightPrompt = null;
+    var shouldAutoVisualise = completed && isVisualiseAutoEnabled() && !feedbackModeEnabled;
 
-  if (infiniteFeedbackEnabled && completed) {
-    stateDirtyWhileStreaming = false;
-    if (!isYouAreWhatYouEatEnabled()) syncMissionToCurrentOutput();
-    var nextDelay = getInfiniteCadenceDelayMs();
-    startInfiniteCountdown(nextDelay);
-  } else if (stateDirtyWhileStreaming) {
-    stateDirtyWhileStreaming = false;
-    requestGenerate();
-  }
-  if (completed && isVisualiseAutoEnabled() && !feedbackModeEnabled) {
-    visualiseCurrentOutput();
-  }
+    if (shouldAutoVisualise && stateDirtyWhileStreaming) {
+      stateDirtyWhileStreaming = false;
+      pushApiLog('llm', 'warn', 'Suppressed queued text regeneration because image refresh is taking priority.');
+    }
+
+    if (infiniteFeedbackEnabled && completed) {
+      stateDirtyWhileStreaming = false;
+      if (!isYouAreWhatYouEatEnabled()) syncMissionToCurrentOutput();
+      var nextDelay = getInfiniteCadenceDelayMs();
+      startInfiniteCountdown(nextDelay);
+    } else if (stateDirtyWhileStreaming) {
+      stateDirtyWhileStreaming = false;
+      requestGenerate();
+    }
+    if (shouldAutoVisualise) {
+      requestVisualiseRefresh();
+    }
   }
 }
 
@@ -3465,6 +3933,16 @@ function toggleCollapse(id, btn) {
   btn.textContent = isCollapsed ? 'hide' : 'show';
 }
 
+function toggleOutputCollapse() {
+  var wrap = document.getElementById('output-with-controls');
+  var btn = document.getElementById('output-collapse-btn');
+  if (!wrap || !btn) return;
+  var nextCollapsed = !wrap.classList.contains('collapsed');
+  wrap.classList.toggle('collapsed', nextCollapsed);
+  btn.textContent = nextCollapsed ? 'show' : 'hide';
+  updateCurrentOutputLabel();
+}
+
 /* ═══════════════════════════════
    HISTORY TOOLTIP
 ═══════════════════════════════ */
@@ -3508,10 +3986,18 @@ function hideHistoryTooltip() {
 var updateTimer = null;
 
 function scheduleUpdate(delay) {
+  if (snapshotRestoreInProgress) return;
   if (delay === undefined) delay = 800;
   clearTimeout(updateTimer);
+  stopSlwProgressDisplay();
+
+  var effectiveDelay = delay;
+  if (isSlwEnabled()) effectiveDelay = Math.max(delay, slwDelayMs);
+  if (effectiveDelay > 0 && isSlwEnabled()) startSlwProgressDisplay(effectiveDelay);
 
   updateTimer = setTimeout(function() {
+    updateTimer = null;
+    stopSlwProgressDisplay();
     var nextPrompt = buildPrompt();
     document.getElementById('generated-prompt').textContent = nextPrompt;
     if (generationSafetyPaused) return;
@@ -3523,7 +4009,7 @@ function scheduleUpdate(delay) {
       requestGenerate();
     }
 
-  }, delay);
+  }, effectiveDelay);
 }
 
 function applyOutputWindowHeight() {
@@ -3685,6 +4171,20 @@ function updateCadenceLabel() {
   }
 }
 
+function onSlwToggleChange() {
+  var cb = document.getElementById('slw-toggle');
+  if (!cb) return;
+  cb.setAttribute('data-user-set', '1');
+  if (!cb.checked) stopSlwProgressDisplay();
+}
+
+function syncSlwDefaultToVisualise() {
+  var slwToggle = document.getElementById('slw-toggle');
+  if (!slwToggle || slwToggle.hasAttribute('data-user-set')) return;
+  slwToggle.checked = !!isVisualiseAutoEnabled();
+  if (!slwToggle.checked) stopSlwProgressDisplay();
+}
+
 function updateFishScaleLabel() {
   var slider = document.getElementById('fish-speed-scale');
   if (!slider) return;
@@ -3705,6 +4205,10 @@ function isXsncEnabled() {
   return !!(cb && cb.checked && !cb.disabled);
 }
 
+function shouldDeferTextGenerationForVisualise() {
+  return !!visualiseInFlight;
+}
+
 function setCadencePausedByXsnc(active) {
   var wrap = document.getElementById('cadence-wrap');
   if (!wrap) return;
@@ -3722,6 +4226,7 @@ function onXsncChange() {
 }
 
 function requestGenerate() {
+  stopSlwProgressDisplay();
   if (generationSafetyPaused) {
     stopCadenceProgressDisplay();
     return;
@@ -3734,19 +4239,21 @@ function requestGenerate() {
     stopCadenceProgressDisplay();
     return;
   }
-  if (isXsncEnabled() && visualiseInFlight) {
-    pendingGenerateAfterVisualise = true;
+  if (shouldDeferTextGenerationForVisualise()) {
+    pendingGenerateAfterVisualise = false;
     stopCadenceProgressDisplay();
     setCadencePausedByXsnc(true);
+    pushApiLog('llm', 'warn', 'Skipped text generation because an image request is in flight.');
     return;
   }
   setCadencePausedByXsnc(false);
 
   function runGenerationNow() {
     if (generationSafetyPaused || isStreaming) return;
-    if (isXsncEnabled() && visualiseInFlight) {
-      pendingGenerateAfterVisualise = true;
+    if (shouldDeferTextGenerationForVisualise()) {
+      pendingGenerateAfterVisualise = false;
       setCadencePausedByXsnc(true);
+      pushApiLog('llm', 'warn', 'Skipped delayed text generation because an image request is in flight.');
       return;
     }
     var prompt = buildPrompt();
@@ -4000,8 +4507,11 @@ function onYouAreWhatYouEatChange() {
 
 function updateCurrentOutputLabel() {
   var label = document.getElementById('current-io-label');
+  var wrap = document.getElementById('output-with-controls');
   if (!label) return;
-  label.textContent = (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) ? 'Current I/O' : 'Current Output';
+  var text = (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) ? 'Current I/O' : 'Current Output';
+  if (wrap && wrap.classList.contains('collapsed')) text += ' (Hidden)';
+  label.textContent = text;
 }
 
 function updateChipPhysicsButtonState() {
@@ -4047,6 +4557,145 @@ function getFisheyeSeedForRequest() {
   return fisheyeFixedSeed;
 }
 
+function getCurrentFisheyeModelBase() {
+  var select = document.getElementById('fisheye-model-select');
+  if (!select) return '';
+  return (select.value || '').split('|', 1)[0];
+}
+
+function isFisheyeEditCapableModelSelected() {
+  var model = getCurrentFisheyeModelBase();
+  return model === 'google/nano-banana'
+    || model === 'google/nano-banana-2'
+    || model.indexOf('lucataco/ssd-1b') === 0;
+}
+
+function isSsd1bModelSelected() {
+  return getCurrentFisheyeModelBase().indexOf('lucataco/ssd-1b') === 0;
+}
+
+function isFisheyeEditModeEnabled() {
+  var cb = document.getElementById('fisheye-edit-mode');
+  return !!(cb && cb.checked && !cb.disabled && isFisheyeEditCapableModelSelected());
+}
+
+function getSsdPromptStrengthValue() {
+  var slider = document.getElementById('fisheye-ssd-strength');
+  if (!slider) return 0.8;
+  var raw = Number(slider.value);
+  if (!isFinite(raw)) return 0.8;
+  return Math.max(0, Math.min(1, raw));
+}
+
+function updateSsdPromptStrengthLabel() {
+  var valueEl = document.getElementById('fisheye-ssd-strength-value');
+  if (!valueEl) return;
+  valueEl.textContent = getSsdPromptStrengthValue().toFixed(2);
+}
+
+function queueSsdPromptStrengthVisualise() {
+  if (!isSsd1bModelSelected() || !isFisheyeEditModeEnabled() || !isVisualiseAutoEnabled() || feedbackModeEnabled) {
+    return;
+  }
+  if (!getCurrentOutputTextForVisualise()) return;
+  if (ssdStrengthRefreshTimer) clearTimeout(ssdStrengthRefreshTimer);
+  ssdStrengthRefreshTimer = setTimeout(function() {
+    ssdStrengthRefreshTimer = null;
+    if (visualiseInFlight) {
+      pendingSsdStrengthRefresh = true;
+      return;
+    }
+    requestVisualiseRefresh();
+  }, 120);
+}
+
+async function ensureFisheyeImageStored(imageRef, imageUrl) {
+  var ref = imageRef || null;
+  var url = imageUrl || '';
+  if (ref) {
+    return { image_ref: ref, image_url: url || ('/api/fisheye-images/' + ref) };
+  }
+  if (!url) return null;
+
+  try {
+    var res = await fetch('/api/fisheye-images/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image_ref: ref,
+        source_url: url,
+      }),
+    });
+    var data = await res.json();
+    if (!res.ok || !data || !data.ok || !data.image_ref) return null;
+    return {
+      image_ref: data.image_ref,
+      image_url: data.image_url || ('/api/fisheye-images/' + data.image_ref),
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+async function captureCurrentFisheyeAsEditSource() {
+  var stored = await ensureFisheyeImageStored(currentFisheyeImageRef, currentFisheyeImageUrl);
+  if (!stored) return false;
+  fisheyeEditSourceRef = stored.image_ref || null;
+  fisheyeEditSourceUrl = stored.image_url || '';
+  updateFisheyeOriginalPreview();
+  updateFisheyeEditControls();
+  return !!fisheyeEditSourceRef;
+}
+
+function flashFisheyeBadge(text) {
+  var badgeIds = ['visualise-original-badge', 'visualise-original-inline-badge'];
+  for (var i = 0; i < badgeIds.length; i++) {
+    (function(badgeId) {
+      var badgeEl = document.getElementById(badgeId);
+      if (!badgeEl) return;
+      if (fisheyeBadgeFlashTimers[badgeId]) {
+        clearTimeout(fisheyeBadgeFlashTimers[badgeId]);
+        delete fisheyeBadgeFlashTimers[badgeId];
+      }
+      badgeEl.textContent = text;
+      badgeEl.classList.remove('flash-fade');
+      badgeEl.classList.add('flash-visible');
+      fisheyeBadgeFlashTimers[badgeId] = setTimeout(function() {
+        badgeEl.classList.remove('flash-visible');
+        badgeEl.classList.add('flash-fade');
+        fisheyeBadgeFlashTimers[badgeId] = setTimeout(function() {
+          badgeEl.classList.remove('flash-fade');
+          badgeEl.textContent = 'Original Image';
+          delete fisheyeBadgeFlashTimers[badgeId];
+        }, 260);
+      }, 520);
+    })(badgeIds[i]);
+  }
+}
+
+function updateFisheyeOriginalPreview() {
+  var previewIds = ['visualise-original-image', 'visualise-original-inline'];
+  var stageIds = ['visualise-image-stage', 'visualise-inline'];
+  var hasPreview = isFisheyeEditModeEnabled() && !!fisheyeEditSourceUrl;
+
+  for (var i = 0; i < previewIds.length; i++) {
+    var previewEl = document.getElementById(previewIds[i]);
+    if (!previewEl) continue;
+    if (hasPreview) {
+      previewEl.src = fisheyeEditSourceUrl;
+    } else {
+      previewEl.removeAttribute('src');
+    }
+  }
+
+  for (var j = 0; j < stageIds.length; j++) {
+    var stageEl = document.getElementById(stageIds[j]);
+    if (!stageEl) continue;
+    stageEl.classList.toggle('preview-enabled', hasPreview);
+    stageEl.setAttribute('aria-label', hasPreview ? 'Hover to preview original image' : 'Generated image preview');
+  }
+}
+
 function onFisheyeRdmxChange() {
   // Leaving random mode immediately rolls a new fixed seed, giving deterministic
   // behavior until RDMX is re-enabled while still avoiding a constant hardcoded seed.
@@ -4056,7 +4705,49 @@ function onFisheyeRdmxChange() {
     fisheyeFixedSeed = randomFisheyeSeed();
   }
   if (isVisualiseAutoEnabled() && !feedbackModeEnabled && getCurrentOutputTextForVisualise()) {
-    visualiseCurrentOutput();
+    requestVisualiseRefresh();
+  }
+}
+
+async function onFisheyeEditModeChange() {
+  var cb = document.getElementById('fisheye-edit-mode');
+  if (!cb) return;
+  if (!cb.checked) {
+    pushApiLog('fisheye', 'info', 'Edit mode disabled; restoring stored source image to the viewer.');
+    if (fisheyeEditSourceUrl) {
+      currentFisheyeImageRef = fisheyeEditSourceRef || null;
+      currentFisheyeImageUrl = fisheyeEditSourceUrl;
+      if (currentOutputEntry) {
+        currentOutputEntry.fisheye_image_ref = currentFisheyeImageRef;
+        currentOutputEntry.fisheye_image_url = currentFisheyeImageUrl;
+      }
+      setFisheyeImage(fisheyeEditSourceUrl);
+      updateMixerFisheyeLayout();
+      renderHistory();
+    }
+    fisheyeEditSourceRef = null;
+    fisheyeEditSourceUrl = '';
+    updateFisheyeEditControls();
+    return;
+  }
+  var captured = await captureCurrentFisheyeAsEditSource();
+  if (!captured) {
+    pushApiLog('fisheye', 'error', 'Edit mode could not capture a saved source image.');
+    cb.checked = false;
+    fisheyeEditSourceRef = null;
+    fisheyeEditSourceUrl = '';
+  } else {
+    pushApiLog('fisheye', 'ok', 'Edit mode enabled with current image captured as source.');
+  }
+  updateFisheyeEditControls();
+}
+
+async function onFisheyeEditUpdate() {
+  if (!isFisheyeEditModeEnabled()) return;
+  var captured = await captureCurrentFisheyeAsEditSource();
+  if (captured) {
+    pushApiLog('fisheye', 'ok', 'Updated stored edit-source image from the current visible image.');
+    flashFisheyeBadge("OG IMG UPD'D");
   }
 }
 
@@ -4084,6 +4775,48 @@ function setFisheyeImage(url) {
       imageEl.src = '';
     }
   }
+  updateFisheyeEditControls();
+}
+
+function hasLoadedCurrentFisheyeImage() {
+  var imageIds = ['visualise-image', 'visualise-image-inline'];
+  for (var i = 0; i < imageIds.length; i++) {
+    var imageEl = document.getElementById(imageIds[i]);
+    if (!imageEl) continue;
+    var src = imageEl.getAttribute('src') || imageEl.currentSrc || '';
+    if (src && imageEl.classList.contains('active')) return true;
+  }
+  return false;
+}
+
+function getDisplayedFisheyeSrc() {
+  var imageIds = ['visualise-image-inline', 'visualise-image'];
+  for (var i = 0; i < imageIds.length; i++) {
+    var imageEl = document.getElementById(imageIds[i]);
+    if (!imageEl || !imageEl.classList.contains('active')) continue;
+    var src = imageEl.getAttribute('src') || imageEl.currentSrc || '';
+    if (src) return src;
+  }
+  return '';
+}
+
+function validateDisplayedFisheyeUpdate(expectedUrl, requestOutputText, retryCount) {
+  if (fisheyeDisplayValidationTimer) {
+    clearTimeout(fisheyeDisplayValidationTimer);
+    fisheyeDisplayValidationTimer = null;
+  }
+  fisheyeDisplayValidationTimer = setTimeout(function() {
+    fisheyeDisplayValidationTimer = null;
+    if ((currentOutput || '').trim() !== requestOutputText) return;
+    var displayedSrc = getDisplayedFisheyeSrc();
+    var stateMatches = (currentFisheyeImageUrl || '') === (expectedUrl || '');
+    var domMatches = !!expectedUrl && displayedSrc === expectedUrl;
+    if (stateMatches && domMatches) return;
+    if ((retryCount || 0) >= 1) return;
+    pushApiLog('fisheye', 'warn', 'Image response completed but display did not update; retrying once.');
+    pendingVisualiseRefresh = true;
+    visualiseCurrentOutput((retryCount || 0) + 1);
+  }, 180);
 }
 
 function getFisheyeProgressOverlays() {
@@ -4114,6 +4847,40 @@ function attachFisheyeImageToHistory(outputText, imageRef, imageUrl) {
   }
 }
 
+function updateFisheyeEditControls() {
+  var editCb = document.getElementById('fisheye-edit-mode');
+  var editLabel = document.getElementById('fisheye-edit-toggle-label');
+  var updBtn = document.getElementById('fisheye-edit-upd-btn');
+  var ssdWrap = document.getElementById('fisheye-ssd-strength-wrap');
+  var available = !feedbackModeEnabled && isVisualiseAutoEnabled() && isFisheyeEditCapableModelSelected();
+  var hasVisibleImage = hasLoadedCurrentFisheyeImage();
+  var editActive = !!(editCb && editCb.checked && !editCb.disabled);
+
+  if (editCb) {
+    editCb.disabled = !available;
+    if (!available) editCb.checked = false;
+  }
+  if (editLabel) {
+    editLabel.classList.toggle('disabled', !available);
+    editLabel.style.display = available ? '' : 'none';
+    editLabel.title = editActive
+      ? 'Edit mode is using a saved fisheye image as image input.'
+      : 'Edit-capable models only. Use the selected fisheye image as the edit input image for subsequent generations.';
+  }
+  if (updBtn) {
+    updBtn.classList.toggle('hidden', !(available && editActive));
+    updBtn.disabled = !available || !editActive || visualiseInFlight || !hasVisibleImage;
+  }
+  if (ssdWrap) {
+    ssdWrap.classList.toggle('hidden', !(available && editActive && isSsd1bModelSelected()));
+  }
+  if (!available) {
+    fisheyeEditSourceRef = null;
+    fisheyeEditSourceUrl = '';
+  }
+  updateFisheyeOriginalPreview();
+}
+
 function updateFisheyeAvailability() {
   var cb = document.getElementById('visualise-auto');
   var label = document.getElementById('visualise-toggle-label');
@@ -4123,6 +4890,7 @@ function updateFisheyeAvailability() {
   var rdmxLabel = document.getElementById('rdmx-toggle-label');
   var modelSelect = document.getElementById('fisheye-model-select');
   var modelWrap = document.getElementById('fisheye-model-wrap');
+  var resizeHandle = document.getElementById('fisheye-resize-handle');
   if (!cb) return;
 
   var blocked = !!feedbackModeEnabled;
@@ -4155,15 +4923,23 @@ function updateFisheyeAvailability() {
   if (xsncLabel) {
     xsncLabel.classList.toggle('disabled', !xsncAvailable);
   }
+  if (resizeHandle) {
+    resizeHandle.classList.toggle('active', !blocked && !!cb.checked && !isFisheyeInlineMode());
+  }
+  updateFisheyeEditControls();
   updateFisheyeInlineMode();
 }
 
 function updateFisheyeInlineMode() {
   var inlineWrap = document.getElementById('visualise-inline');
+  var resizeHandle = document.getElementById('fisheye-resize-handle');
   var inlineMode = isFisheyeInlineMode();
   document.body.classList.toggle('fisheye-inline-mode', inlineMode);
   if (inlineWrap) {
     inlineWrap.classList.toggle('active', inlineMode);
+  }
+  if (resizeHandle) {
+    resizeHandle.classList.toggle('active', isVisualiseAutoEnabled() && !feedbackModeEnabled && !inlineMode);
   }
 }
 
@@ -4171,6 +4947,7 @@ function updateMixerFisheyeLayout() {
   var panel = document.getElementById('visualise-output');
   var mixer = document.getElementById('mixer');
   var imageEl = document.getElementById('visualise-image');
+  var resizeHandle = document.getElementById('fisheye-resize-handle');
   if (!panel || !mixer) return;
   if (!isVisualiseAutoEnabled()) return;
 
@@ -4188,17 +4965,22 @@ function updateMixerFisheyeLayout() {
     panel.style.minWidth = '';
     panel.style.height = '';
     panel.style.maxHeight = '';
+    if (resizeHandle) resizeHandle.classList.remove('active');
     return;
   }
   mixer.style.removeProperty('--fisheye-inline-width');
+  if (resizeHandle) resizeHandle.classList.add('active');
 
   var mixerH = mixer.clientHeight || 300;
   var ratio = 1;
   if (imageEl && imageEl.naturalWidth > 0 && imageEl.naturalHeight > 0) {
     ratio = Math.max(0.6, Math.min(2.4, imageEl.naturalWidth / imageEl.naturalHeight));
   }
-  var paneW = Math.round(mixerH * ratio);
-  paneW = Math.max(220, Math.min(640, paneW));
+  var paneW = fisheyePaneManualWidth;
+  if (typeof paneW !== 'number' || !isFinite(paneW) || paneW <= 0) {
+    paneW = Math.round(mixerH * ratio);
+  }
+  paneW = clampFisheyePaneWidth(paneW);
 
   panel.style.width = paneW + 'px';
   panel.style.minWidth = paneW + 'px';
@@ -4227,7 +5009,22 @@ function updateVisualiseOutputVisibility() {
   renderChips();
 }
 
-async function visualiseCurrentOutput() {
+function requestVisualiseRefresh() {
+  if (snapshotRestoreInProgress) return;
+  if (feedbackModeEnabled) return;
+  if (!isVisualiseAutoEnabled()) return;
+  if (!getCurrentOutputTextForVisualise()) return;
+  if (visualiseInFlight) {
+    pushApiLog('fisheye', 'warn', 'Queued image refresh while another image request is in flight.');
+    pendingVisualiseRefresh = true;
+    return;
+  }
+  pendingVisualiseRefresh = false;
+  visualiseCurrentOutput();
+}
+
+async function visualiseCurrentOutput(retryCount) {
+  if (retryCount === undefined) retryCount = 0;
   if (feedbackModeEnabled) return;
   if (visualiseInFlight) return;
 
@@ -4238,9 +5035,34 @@ async function visualiseCurrentOutput() {
   if (!modelEl) return;
   var imageSeed = getFisheyeSeedForRequest();
   var requestOutputText = sourceText;
+  var useInputImage = isFisheyeEditModeEnabled();
+  pushApiLog(
+    'fisheye',
+    'info',
+    'Starting /api/visualise via ' + modelEl.value + (useInputImage ? ' in edit mode.' : '.')
+  );
+  if (useInputImage && !fisheyeEditSourceRef && currentFisheyeImageUrl) {
+    var captured = await captureCurrentFisheyeAsEditSource();
+    if (!captured) useInputImage = false;
+  }
 
   visualiseInFlight = true;
+  if (updateTimer) {
+    clearTimeout(updateTimer);
+    updateTimer = null;
+    stopSlwProgressDisplay();
+    pushApiLog('llm', 'info', 'Cleared pending prompt update because image generation started.');
+  }
+  if (generateThrottleTimer) {
+    clearTimeout(generateThrottleTimer);
+    generateThrottleTimer = null;
+    stopCadenceProgressDisplay();
+    stopSlwProgressDisplay();
+    pushApiLog('llm', 'info', 'Cleared pending text generation because image generation started.');
+  }
+  pendingGenerateAfterVisualise = false;
   startFisheyeProgressDisplay();
+  updateFisheyeEditControls();
   var requestStartedAt = performance.now();
   var completed = false;
 
@@ -4252,11 +5074,17 @@ async function visualiseCurrentOutput() {
         output_text: sourceText,
         image_model: modelEl.value,
         image_seed: imageSeed,
+        prompt_strength: isSsd1bModelSelected() ? getSsdPromptStrengthValue() : null,
+        use_input_image: useInputImage,
+        input_image_ref: useInputImage ? fisheyeEditSourceRef : null,
+        input_image_url: useInputImage ? fisheyeEditSourceUrl : null,
       }),
     });
     var data = await res.json();
+    pushApiLog('fisheye', res.ok ? 'ok' : 'error', 'HTTP ' + res.status + ' from /api/visualise.');
 
     if (!res.ok || !data || !data.ok) {
+      pushApiLog('fisheye', 'error', 'Image request was rejected: ' + ((data && data.message) ? data.message : 'unknown error'));
       return;
     }
 
@@ -4273,13 +5101,17 @@ async function visualiseCurrentOutput() {
       updateMixerFisheyeLayout();
       renderChips();
       renderHistory();
+      pushApiLog('fisheye', 'ok', 'Image ready and attached to current output' + (returnedRef ? ' (' + returnedRef + ').' : '.'));
+      validateDisplayedFisheyeUpdate(returnedUrl, requestOutputText, retryCount);
       completed = !!returnedUrl;
     } else {
       attachFisheyeImageToHistory(requestOutputText, returnedRef, returnedUrl);
       renderHistory();
+      pushApiLog('fisheye', 'warn', 'Image completed for a previous output; attached to history instead of active view.');
       completed = !!returnedUrl;
     }
   } catch (_) {
+    pushApiLog('fisheye', 'error', 'Image request failed before completion.');
     if ((currentOutput || '').trim() === requestOutputText) {
       currentFisheyeImageRef = null;
       currentFisheyeImageUrl = '';
@@ -4289,22 +5121,34 @@ async function visualiseCurrentOutput() {
     if (completed) {
       var elapsed = Math.max(1, performance.now() - requestStartedAt);
       recordFisheyeResponseTime(elapsed);
+      pushApiLog('fisheye', 'ok', 'Image request settled in ' + (elapsed / 1000).toFixed(2) + 's.');
     }
     visualiseInFlight = false;
     stopFisheyeProgressDisplay();
     setCadencePausedByXsnc(false);
     pendingGenerateAfterVisualise = false;
+    updateFisheyeEditControls();
+    if (pendingSsdStrengthRefresh) {
+      pendingSsdStrengthRefresh = false;
+      if (isSsd1bModelSelected() && isFisheyeEditModeEnabled() && isVisualiseAutoEnabled() && !feedbackModeEnabled) {
+        requestVisualiseRefresh();
+      }
+    }
+    if (((currentOutput || '').trim() !== requestOutputText) || pendingVisualiseRefresh) {
+      requestVisualiseRefresh();
+    }
   }
 }
 
 function onVisualiseAutoChange() {
+  syncSlwDefaultToVisualise();
   updateVisualiseOutputVisibility();
   var xsncCb = document.getElementById('xsnc-enabled');
   if (isVisualiseAutoEnabled() && xsncCb && !xsncCb.disabled) {
     xsncCb.checked = true;
   }
   if (isVisualiseAutoEnabled() && getCurrentOutputTextForVisualise()) {
-    visualiseCurrentOutput();
+    requestVisualiseRefresh();
   }
 }
 
@@ -4581,6 +5425,7 @@ function onModelChange(triggerUpdate) {
   if (triggerUpdate === undefined) triggerUpdate = true;
   var select = document.getElementById('model-select');
   if (!select) return;
+  pushApiLog('llm', 'info', 'Selected model: ' + select.value);
   modelTiming.modelId = select.value;
   modelTiming.avgMs = 0;
   modelTiming.count = 0;
@@ -4628,6 +5473,57 @@ function setModelProgress(percent) {
   select.style.setProperty('--req-progress', p.toFixed(2) + '%');
 }
 
+function setSlwProgress(percent) {
+  var select = document.getElementById('model-select');
+  if (!select) return;
+  var p = Math.max(0, Math.min(100, percent || 0));
+  select.style.setProperty('--slw-progress', p.toFixed(2) + '%');
+}
+
+function isSlwEnabled() {
+  var cb = document.getElementById('slw-toggle');
+  return !!(cb && cb.checked);
+}
+
+function stopSlwProgressDisplay() {
+  if (slwProgressRaf) {
+    cancelAnimationFrame(slwProgressRaf);
+    slwProgressRaf = null;
+  }
+  var select = document.getElementById('model-select');
+  if (!select) return;
+  select.classList.remove('slw-timing');
+  setSlwProgress(0);
+}
+
+function startSlwProgressDisplay(delayMs) {
+  stopSlwProgressDisplay();
+  if (!delayMs || delayMs <= 0 || isStreaming) return;
+  var select = document.getElementById('model-select');
+  if (!select) return;
+  slwProgressStartTs = performance.now();
+  slwProgressDelayMs = delayMs;
+  select.classList.add('slw-timing');
+  setSlwProgress(100);
+
+  function tick(now) {
+    if (!updateTimer || isStreaming) {
+      stopSlwProgressDisplay();
+      return;
+    }
+    var elapsed = now - slwProgressStartTs;
+    var remaining = Math.max(0, 1 - (elapsed / Math.max(1, slwProgressDelayMs)));
+    setSlwProgress(remaining * 100);
+    if (remaining > 0) {
+      slwProgressRaf = requestAnimationFrame(tick);
+    } else {
+      slwProgressRaf = null;
+    }
+  }
+
+  slwProgressRaf = requestAnimationFrame(tick);
+}
+
 function setFisheyeSelectProgress(percent) {
   var select = document.getElementById('fisheye-model-select');
   if (!select) return;
@@ -4636,6 +5532,7 @@ function setFisheyeSelectProgress(percent) {
 }
 
 function stopRequestProgressDisplay() {
+  stopSlwProgressDisplay();
   if (requestProgressRaf) {
     cancelAnimationFrame(requestProgressRaf);
     requestProgressRaf = null;
@@ -4674,13 +5571,15 @@ function onFisheyeModelChange(triggerRefresh) {
   if (triggerRefresh === undefined) triggerRefresh = true;
   var select = document.getElementById('fisheye-model-select');
   if (!select) return;
+  pushApiLog('fisheye', 'info', 'Selected image model: ' + select.value);
   fisheyeTiming.modelId = select.value;
   fisheyeTiming.avgMs = 0;
   fisheyeTiming.count = 0;
   updateFisheyeTimingHint();
   stopFisheyeProgressDisplay();
+  updateFisheyeEditControls();
   if (triggerRefresh && isVisualiseAutoEnabled() && !feedbackModeEnabled && getCurrentOutputTextForVisualise()) {
-    visualiseCurrentOutput();
+    requestVisualiseRefresh();
   }
 }
 
@@ -4992,6 +5891,457 @@ function toggleTrawlRow() {
   btn.textContent = hidden ? 'hide' : 'show';
 }
 
+function setSnapshotStatus(text, isError) {
+  var el = document.getElementById('snapshot-status');
+  if (!el) return;
+  if (snapshotStatusTimer) {
+    clearTimeout(snapshotStatusTimer);
+    snapshotStatusTimer = null;
+  }
+  el.textContent = text || '';
+  el.style.color = isError ? '#fca5a5' : 'var(--muted)';
+  if (text) {
+    snapshotStatusTimer = setTimeout(function() {
+      el.textContent = '';
+    }, 2600);
+  }
+}
+
+function clearSnapshotButtonFxTimer() {
+  if (snapshotButtonFxTimer) {
+    clearTimeout(snapshotButtonFxTimer);
+    snapshotButtonFxTimer = null;
+  }
+}
+
+function setSnapshotButtonSaving(active) {
+  var btn = document.getElementById('save-snapshot-btn');
+  if (!btn) return;
+  clearSnapshotButtonFxTimer();
+  btn.classList.toggle('is-saving', !!active);
+  if (active) {
+    btn.classList.remove('is-saved');
+    btn.disabled = true;
+    btn.textContent = 'saving...';
+  } else {
+    btn.classList.remove('is-saving');
+    btn.disabled = false;
+    btn.textContent = 'snapshot';
+  }
+}
+
+function flashSnapshotButtonSaved() {
+  var btn = document.getElementById('save-snapshot-btn');
+  if (!btn) return;
+  clearSnapshotButtonFxTimer();
+  btn.classList.remove('is-saving');
+  btn.classList.add('is-saved');
+  btn.disabled = false;
+  btn.textContent = 'saved';
+  snapshotButtonFxTimer = setTimeout(function() {
+    btn.classList.remove('is-saved');
+    btn.textContent = 'snapshot';
+    snapshotButtonFxTimer = null;
+  }, 1100);
+}
+
+function toggleSnapshotsRow() {
+  var body = document.getElementById('snapshots-row-body');
+  var btn = document.getElementById('snapshots-toggle-btn');
+  if (!body || !btn) return;
+  var hidden = body.style.display === 'none';
+  body.style.display = hidden ? 'flex' : 'none';
+  btn.textContent = hidden ? 'hide' : 'show';
+}
+
+function clonePlain(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function getSnapshotDayValue(createdAt) {
+  var ts = Number(createdAt || 0);
+  if (!isFinite(ts) || ts <= 0) return '';
+  var d = new Date(ts * 1000);
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+function formatSnapshotDayLabel(dayValue) {
+  if (!dayValue || !/^\d{4}-\d{2}-\d{2}$/.test(dayValue)) return dayValue || 'Unknown day';
+  var parts = dayValue.split('-');
+  var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  return d.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function refreshSnapshotSelectors(selectIdToUse) {
+  var daySelect = document.getElementById('snapshot-day-select');
+  var snapshotSelect = document.getElementById('snapshot-select');
+  var zipDaySelect = document.getElementById('snapshot-zip-day-select');
+  if (!daySelect || !snapshotSelect || !zipDaySelect) return;
+
+  var snapshots = Array.isArray(snapshotListCache) ? snapshotListCache.slice() : [];
+  var selectedSnapshotId = selectIdToUse || snapshotSelect.value || '';
+  var selectedSnapshot = selectedSnapshotId
+    ? snapshots.find(function(item) { return String(item.id || '') === selectedSnapshotId; })
+    : null;
+
+  var dayMap = {};
+  snapshots.forEach(function(item) {
+    var day = getSnapshotDayValue(item.created_at);
+    if (!day) return;
+    if (!dayMap[day]) dayMap[day] = [];
+    dayMap[day].push(item);
+  });
+
+  var days = Object.keys(dayMap).sort().reverse();
+  var desiredDay = (selectedSnapshot && getSnapshotDayValue(selectedSnapshot.created_at)) || daySelect.value || (days[0] || '');
+  if (desiredDay && !dayMap[desiredDay]) desiredDay = days[0] || '';
+
+  daySelect.innerHTML = '<option value="">Select day…</option>' + days.map(function(day) {
+    return '<option value="' + escHtml(day) + '">' + escHtml(formatSnapshotDayLabel(day)) + '</option>';
+  }).join('');
+  if (desiredDay) daySelect.value = desiredDay;
+
+  var filteredSnapshots = desiredDay && dayMap[desiredDay] ? dayMap[desiredDay] : [];
+  snapshotSelect.innerHTML = '<option value="">Select snapshot…</option>' + filteredSnapshots.map(function(item) {
+    var name = escHtml(item.name || item.id || 'snapshot');
+    var id = escHtml(item.id || '');
+    return '<option value="' + id + '">' + name + '</option>';
+  }).join('');
+
+  if (selectedSnapshotId && filteredSnapshots.some(function(item) { return String(item.id || '') === selectedSnapshotId; })) {
+    snapshotSelect.value = selectedSnapshotId;
+  }
+
+  var zipSelected = zipDaySelect.value || 'all';
+  zipDaySelect.innerHTML = '<option value="all">All days</option>' + days.map(function(day) {
+    return '<option value="' + escHtml(day) + '">' + escHtml(formatSnapshotDayLabel(day)) + '</option>';
+  }).join('');
+  if (zipSelected === 'all' || dayMap[zipSelected]) {
+    zipDaySelect.value = zipSelected;
+  }
+}
+
+function snapshotWordPool(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s'-]/g, ' ')
+    .split(/\s+/)
+    .map(function(word) { return word.trim(); })
+    .filter(function(word) {
+      return word && word.length >= 3 && !/^\d+$/.test(word);
+    });
+}
+
+function pickSnapshotWord(words, fallback) {
+  if (!Array.isArray(words) || !words.length) return fallback;
+  return words[Math.floor(Math.random() * words.length)] || fallback;
+}
+
+function buildSnapshotTitle(state) {
+  var thoughtWords = snapshotWordPool(state && state.mission);
+  var outputWords = snapshotWordPool(state && state.current_output);
+  var tankSource = Array.isArray(state && state.tag_tokens) ? state.tag_tokens.join(' ') : '';
+  var tankWords = snapshotWordPool(tankSource);
+  var parts = [];
+
+  parts.push(pickSnapshotWord(thoughtWords, 'thought'));
+  parts.push(pickSnapshotWord(outputWords, 'output'));
+  parts.push(pickSnapshotWord(tankWords, 'tank'));
+
+  var now = new Date();
+  var month = now.toLocaleString('en-US', { month: 'short' }).toLowerCase();
+  var day = String(now.getDate());
+  parts.push(month, day);
+
+  var title = parts.join(' ');
+  if (state && state.controls && state.controls.visualise_auto) title += ' (FE)';
+  return title;
+}
+
+async function ensureSnapshotImageRef(imageRef, imageUrl) {
+  if (!imageRef && !imageUrl) return { image_ref: null, image_url: '' };
+  if (!imageRef && /^\/api\/snapshots\/[^/]+\/images\//.test(String(imageUrl || ''))) {
+    return { image_ref: null, image_url: String(imageUrl || '') };
+  }
+  var stored = await ensureFisheyeImageStored(imageRef, imageUrl);
+  if (!stored) return { image_ref: null, image_url: '' };
+  return {
+    image_ref: stored.image_ref || null,
+    image_url: stored.image_url || '',
+  };
+}
+
+async function captureSnapshotState() {
+  var currentImage = await ensureSnapshotImageRef(currentFisheyeImageRef, currentFisheyeImageUrl);
+  var editImage = await ensureSnapshotImageRef(fisheyeEditSourceRef, fisheyeEditSourceUrl);
+  var outputWrap = document.getElementById('output-with-controls');
+  return {
+    mission: document.getElementById('mission').value || '',
+    food_for_thought: document.getElementById('food-for-thought').value || '',
+    direction_1: document.getElementById('direction-1').value || '',
+    direction_2: document.getElementById('direction-2').value || '',
+    base_preamble: document.getElementById('base-preamble').value || '',
+    base_closing: document.getElementById('base-closing').value || '',
+    tag_tokens: clonePlain(tagTokens),
+    words: clonePlain(words),
+    current_output: currentOutput || '',
+    current_output_entry: currentOutputEntry ? clonePlain(currentOutputEntry) : null,
+    output_history: clonePlain(outputHistory),
+    ui: {
+      theme: document.documentElement.getAttribute('data-theme') || 'dark',
+      output_collapsed: !!(outputWrap && outputWrap.classList.contains('collapsed')),
+      mixer_height: (document.getElementById('mixer').clientHeight || 300),
+      fisheye_pane_manual_width: fisheyePaneManualWidth,
+    },
+    controls: {
+      keep_brief: !!document.getElementById('keep-brief').checked,
+      visualise_auto: !!document.getElementById('visualise-auto').checked,
+      xsnc_enabled: !!document.getElementById('xsnc-enabled').checked,
+      llm_deterministic_toggle: !!document.getElementById('llm-deterministic-toggle').checked,
+      slw_toggle: !!document.getElementById('slw-toggle').checked,
+      fisheye_rdmx: !!document.getElementById('fisheye-rdmx').checked,
+      fisheye_edit_mode: !!document.getElementById('fisheye-edit-mode').checked,
+      you_are_what_you_eat: !!document.getElementById('you-are-what-you-eat').checked,
+      feedback_mode_enabled: !!feedbackModeEnabled,
+      infinite_feedback_enabled: !!infiniteFeedbackEnabled,
+      chip_physics_enabled: !!chipPhysicsEnabled,
+      chip_physics_bmp_mode: !!chipPhysicsBmpMode,
+    },
+    models: {
+      text_model: document.getElementById('model-select').value || '',
+      image_model: document.getElementById('fisheye-model-select').value || '',
+    },
+    sliders: {
+      infinite_cadence: document.getElementById('infinite-cadence').value || '2500',
+      fish_speed_scale: document.getElementById('fish-speed-scale').value || '0',
+      fisheye_ssd_strength: document.getElementById('fisheye-ssd-strength').value || '0.8',
+    },
+    fisheye: {
+      current_image_ref: currentImage.image_ref,
+      current_image_url: currentImage.image_url,
+      edit_source_ref: editImage.image_ref,
+      edit_source_url: editImage.image_url,
+    },
+  };
+}
+
+function applySnapshotState(state) {
+  if (!state || typeof state !== 'object') return;
+  snapshotRestoreInProgress = true;
+  try {
+    clearInfiniteCountdown();
+    stopCadenceProgressDisplay();
+    stopRequestProgressDisplay();
+    stopFisheyeProgressDisplay();
+    if (generateThrottleTimer) {
+      clearTimeout(generateThrottleTimer);
+      generateThrottleTimer = null;
+    }
+    pendingVisualiseRefresh = false;
+    pendingSsdStrengthRefresh = false;
+
+    document.getElementById('mission').value = state.mission || '';
+    document.getElementById('food-for-thought').value = state.food_for_thought || '';
+    document.getElementById('direction-1').value = state.direction_1 || '';
+    document.getElementById('direction-2').value = state.direction_2 || '';
+    document.getElementById('base-preamble').value = state.base_preamble || '';
+    document.getElementById('base-closing').value = state.base_closing || '';
+
+    document.getElementById('model-select').value = (state.models && state.models.text_model) || document.getElementById('model-select').value;
+    document.getElementById('fisheye-model-select').value = (state.models && state.models.image_model) || document.getElementById('fisheye-model-select').value;
+
+    document.getElementById('keep-brief').checked = !!(state.controls && state.controls.keep_brief);
+    document.getElementById('visualise-auto').checked = !!(state.controls && state.controls.visualise_auto);
+    document.getElementById('xsnc-enabled').checked = !!(state.controls && state.controls.xsnc_enabled);
+    document.getElementById('llm-deterministic-toggle').checked = !!(state.controls && state.controls.llm_deterministic_toggle);
+    document.getElementById('slw-toggle').checked = !!(state.controls && state.controls.slw_toggle);
+    document.getElementById('fisheye-rdmx').checked = !!(state.controls && state.controls.fisheye_rdmx);
+    document.getElementById('fisheye-edit-mode').checked = !!(state.controls && state.controls.fisheye_edit_mode);
+    document.getElementById('you-are-what-you-eat').checked = !!(state.controls && state.controls.you_are_what_you_eat);
+
+    document.getElementById('infinite-cadence').value = (state.sliders && state.sliders.infinite_cadence) || '2500';
+    document.getElementById('fish-speed-scale').value = (state.sliders && state.sliders.fish_speed_scale) || '0';
+    document.getElementById('fisheye-ssd-strength').value = (state.sliders && state.sliders.fisheye_ssd_strength) || '0.8';
+
+    feedbackModeEnabled = !!(state.controls && state.controls.feedback_mode_enabled);
+    infiniteFeedbackEnabled = !!(state.controls && state.controls.infinite_feedback_enabled);
+    chipPhysicsEnabled = !!(state.controls && state.controls.chip_physics_enabled);
+    chipPhysicsBmpMode = !!(state.controls && state.controls.chip_physics_bmp_mode);
+
+    tagTokens = Array.isArray(state.tag_tokens) ? clonePlain(state.tag_tokens) : [];
+    document.getElementById('sentence-input').value = tagTokens.join(', ');
+    tagRender();
+    tagSyncTextarea();
+
+    words = Array.isArray(state.words) ? state.words.map(function(w) {
+      return {
+        key: w.key,
+        label: w.label,
+        xFrac: w.xFrac,
+        yFrac: w.yFrac,
+        vx: typeof w.vx === 'number' ? w.vx : 0,
+        vy: typeof w.vy === 'number' ? w.vy : 0,
+      };
+    }) : [];
+
+    currentOutput = state.current_output || '';
+    currentOutputEntry = state.current_output_entry ? clonePlain(state.current_output_entry) : null;
+    outputHistory = Array.isArray(state.output_history) ? clonePlain(state.output_history) : [];
+
+    currentFisheyeImageRef = (state.fisheye && state.fisheye.current_image_ref) || null;
+    currentFisheyeImageUrl = (state.fisheye && state.fisheye.current_image_url) || '';
+    fisheyeEditSourceRef = (state.fisheye && state.fisheye.edit_source_ref) || null;
+    fisheyeEditSourceUrl = (state.fisheye && state.fisheye.edit_source_url) || '';
+
+    if (currentOutputEntry) {
+      currentOutputEntry.fisheye_image_ref = currentFisheyeImageRef;
+      currentOutputEntry.fisheye_image_url = currentFisheyeImageUrl;
+    }
+
+    fisheyePaneManualWidth = (state.ui && typeof state.ui.fisheye_pane_manual_width === 'number')
+      ? state.ui.fisheye_pane_manual_width
+      : null;
+    applyUiTheme((state.ui && state.ui.theme) || 'dark');
+    try { localStorage.setItem('prompt_mixer_theme', (state.ui && state.ui.theme) || 'dark'); } catch (_) {}
+
+    var outputEl = document.getElementById('output-current');
+    if (outputEl) {
+      outputEl.contentEditable = 'false';
+      outputEl.classList.remove('editing');
+      outputEl.innerHTML = simpleMarkdown(currentOutput || '');
+    }
+    currentOutputEditActive = false;
+    manualOutputEditPause = false;
+
+    updateCadenceLabel();
+    updateFishScaleLabel();
+    updateSsdPromptStrengthLabel();
+    updateFoodForThoughtPlaceholder();
+    updateCurrentOutputLabel();
+    updateSourceModeVisibility();
+    updateChipPhysicsButtonState();
+    updateBmpButtonState();
+    updateFeedbackButtonState();
+    updateInfiniteFeedbackButtonState();
+    refreshInactivityWatchState();
+    onModelChange(false);
+    onFisheyeModelChange(false);
+    renderChips();
+    renderHistory();
+    setFisheyeImage((currentFisheyeImageUrl && !feedbackModeEnabled) ? currentFisheyeImageUrl : '');
+    updateFisheyeAvailability();
+    updateVisualiseOutputVisibility();
+    updateFisheyeOriginalPreview();
+    updateMixerFisheyeLayout();
+
+    var wrap = document.getElementById('output-with-controls');
+    var btn = document.getElementById('output-collapse-btn');
+    var shouldCollapse = !!(state.ui && state.ui.output_collapsed);
+    if (wrap) wrap.classList.toggle('collapsed', shouldCollapse);
+    if (btn) btn.textContent = shouldCollapse ? 'show' : 'hide';
+    updateCurrentOutputLabel();
+
+    if (state.ui && typeof state.ui.mixer_height === 'number') {
+      applyMixerHeight(state.ui.mixer_height);
+    }
+  } finally {
+    snapshotRestoreInProgress = false;
+  }
+}
+
+async function refreshSnapshotList(selectIdToUse) {
+  try {
+    var res = await fetch('/api/snapshots');
+    var data = await res.json();
+    if (!res.ok || !data || !data.ok) throw new Error('load failed');
+    snapshotListCache = Array.isArray(data.snapshots) ? data.snapshots : [];
+    refreshSnapshotSelectors(selectIdToUse);
+  } catch (_) {
+    setSnapshotStatus('Snapshot list failed to load.', true);
+  }
+}
+
+async function saveSnapshot() {
+  setSnapshotButtonSaving(true);
+  setSnapshotStatus('Saving snapshot...');
+  try {
+    var state = await captureSnapshotState();
+    var snapshotName = buildSnapshotTitle(state);
+    var res = await fetch('/api/snapshots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: snapshotName, state: state }),
+    });
+    var data = await res.json();
+    if (!res.ok || !data || !data.ok || !data.snapshot) throw new Error('save failed');
+    await refreshSnapshotList(data.snapshot.id);
+    setSnapshotStatus('Snapshot saved.');
+    flashSnapshotButtonSaved();
+  } catch (_) {
+    setSnapshotStatus('Snapshot save failed.', true);
+    setSnapshotButtonSaving(false);
+  } finally {
+    var btn = document.getElementById('save-snapshot-btn');
+    if (btn && !btn.classList.contains('is-saved')) {
+      setSnapshotButtonSaving(false);
+    }
+  }
+}
+
+async function loadSelectedSnapshot() {
+  var select = document.getElementById('snapshot-select');
+  var btn = document.getElementById('load-snapshot-btn');
+  if (!select || !select.value) return;
+  if (isStreaming || visualiseInFlight) {
+    setSnapshotStatus('Wait for active generation to finish before loading.', true);
+    return;
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'loading...';
+  }
+  setSnapshotStatus('Loading snapshot...');
+  try {
+    var res = await fetch('/api/snapshots/' + encodeURIComponent(select.value));
+    var data = await res.json();
+    if (!res.ok || !data || !data.ok || !data.snapshot || !data.snapshot.state) throw new Error('load failed');
+    applySnapshotState(data.snapshot.state);
+    setSnapshotStatus('Snapshot loaded.');
+  } catch (_) {
+    setSnapshotStatus('Snapshot load failed.', true);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Load';
+    }
+  }
+}
+
+function downloadSnapshotCurrentOutputsZip() {
+  var zipDaySelect = document.getElementById('snapshot-zip-day-select');
+  var day = zipDaySelect ? String(zipDaySelect.value || 'all') : 'all';
+  setSnapshotStatus('Preparing current-output zip...');
+  var url = '/api/snapshots-current-output-images.zip';
+  if (day && day !== 'all') url += '?day=' + encodeURIComponent(day);
+  window.location.href = url;
+  setTimeout(function() {
+    setSnapshotStatus('Current-output zip requested.');
+  }, 180);
+}
+
+function onSnapshotDayChange() {
+  var snapshotSelect = document.getElementById('snapshot-select');
+  refreshSnapshotSelectors('');
+  if (snapshotSelect) snapshotSelect.value = '';
+}
+
 async function callModelPrompt(prompt, model) {
   var response = await fetch('/api/generate', {
     method: 'POST',
@@ -5099,13 +6449,29 @@ async function haulTrawl() {
    RESIZE
 ═══════════════════════════════ */
 function clampMixerHeight(px) {
-  return Math.max(220, Math.min(760, Math.round(px)));
+  var viewportCap = Math.max(760, window.innerHeight - 160);
+  return Math.max(220, Math.min(viewportCap, Math.round(px)));
 }
 
 function applyMixerHeight(px) {
   var mixer = document.getElementById('mixer');
   if (!mixer) return;
   mixer.style.height = clampMixerHeight(px) + 'px';
+  updateMixerFisheyeLayout();
+  renderChips();
+}
+
+function clampFisheyePaneWidth(px) {
+  var row = document.getElementById('mixer-top-row');
+  if (!row) return Math.max(220, Math.min(640, Math.round(px || 280)));
+  var totalW = row.clientWidth || 960;
+  var minW = 180;
+  var maxW = Math.max(minW, Math.floor(totalW * 0.68));
+  return Math.max(minW, Math.min(maxW, Math.round(px)));
+}
+
+function applyFisheyePaneWidth(px) {
+  fisheyePaneManualWidth = clampFisheyePaneWidth(px);
   updateMixerFisheyeLayout();
   renderChips();
 }
@@ -5135,6 +6501,37 @@ function setupMixerResizer() {
   document.addEventListener('mouseup', function() {
     if (!mixerResizeActive) return;
     mixerResizeActive = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+}
+
+function setupFisheyeResizer() {
+  var handle = document.getElementById('fisheye-resize-handle');
+  var panel = document.getElementById('visualise-output');
+  if (!handle || !panel) return;
+  if (!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+
+  handle.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) return;
+    if (isFisheyeInlineMode() || !isVisualiseAutoEnabled()) return;
+    e.preventDefault();
+    fisheyeResizeActive = true;
+    fisheyeResizeStartX = e.clientX;
+    fisheyeResizeStartW = panel.clientWidth || 280;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!fisheyeResizeActive) return;
+    var nextW = fisheyeResizeStartW - (e.clientX - fisheyeResizeStartX);
+    applyFisheyePaneWidth(nextW);
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (!fisheyeResizeActive) return;
+    fisheyeResizeActive = false;
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
   });
@@ -5277,11 +6674,35 @@ bindControlButton('rnd-btn', launchRandomTrajectories);
 bindControlButton('bmp-btn', toggleBmpMode);
 bindControlButton('trawl-haul-btn', haulTrawl);
 setupMixerResizer();
+setupFisheyeResizer();
 setupSensibilityCombo('direction-1', 'direction-1-arrow', 'direction-1-list', 'direction-1-options');
 setupSensibilityCombo('direction-2', 'direction-2-arrow', 'direction-2-list', 'direction-2-options');
 onFisheyeModelChange(false);
 var visualiseAutoEl = document.getElementById('visualise-auto');
 if (visualiseAutoEl) visualiseAutoEl.addEventListener('change', onVisualiseAutoChange);
+var slwToggleEl = document.getElementById('slw-toggle');
+if (slwToggleEl) slwToggleEl.addEventListener('change', onSlwToggleChange);
+var fisheyeEditModeEl = document.getElementById('fisheye-edit-mode');
+if (fisheyeEditModeEl) fisheyeEditModeEl.addEventListener('change', onFisheyeEditModeChange);
+var fisheyeEditUpdBtnEl = document.getElementById('fisheye-edit-upd-btn');
+if (fisheyeEditUpdBtnEl) fisheyeEditUpdBtnEl.addEventListener('click', onFisheyeEditUpdate);
+var fisheyeSsdStrengthEl = document.getElementById('fisheye-ssd-strength');
+if (fisheyeSsdStrengthEl) fisheyeSsdStrengthEl.addEventListener('input', function() {
+  updateSsdPromptStrengthLabel();
+  queueSsdPromptStrengthVisualise();
+});
+var snapshotDaySelectEl = document.getElementById('snapshot-day-select');
+if (snapshotDaySelectEl) snapshotDaySelectEl.addEventListener('change', onSnapshotDayChange);
+var snapshotSelectEl = document.getElementById('snapshot-select');
+if (snapshotSelectEl) snapshotSelectEl.addEventListener('change', loadSelectedSnapshot);
+var loadSnapshotBtnEl = document.getElementById('load-snapshot-btn');
+if (loadSnapshotBtnEl) loadSnapshotBtnEl.addEventListener('click', loadSelectedSnapshot);
+var downloadSnapshotCurrentOutputsBtnEl = document.getElementById('download-snapshot-current-outputs-btn');
+if (downloadSnapshotCurrentOutputsBtnEl) downloadSnapshotCurrentOutputsBtnEl.addEventListener('click', downloadSnapshotCurrentOutputsZip);
+var refreshSnapshotBtnEl = document.getElementById('refresh-snapshot-btn');
+if (refreshSnapshotBtnEl) refreshSnapshotBtnEl.addEventListener('click', function() {
+  refreshSnapshotList();
+});
 var xsncEl = document.getElementById('xsnc-enabled');
 if (xsncEl) xsncEl.addEventListener('change', onXsncChange);
 ['visualise-image', 'visualise-image-inline'].forEach(function(id) {
@@ -5294,6 +6715,10 @@ if (xsncEl) xsncEl.addEventListener('change', onXsncChange);
 });
 updateFisheyeAvailability();
 updateVisualiseOutputVisibility();
+updateSsdPromptStrengthLabel();
+renderApiLog('llm');
+renderApiLog('fisheye');
+refreshSnapshotList();
 
 var currentOutputEl = document.getElementById('output-current');
 if (currentOutputEl) {

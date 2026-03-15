@@ -138,18 +138,9 @@ html, body {
   -->
   <div class="cards">
 
-    <a class="card" href="paragraph-adapter-feedback.html">
-      <div class="card-icon">&#129504;</div>
-      <div class="card-name">PthinkTank</div>
-      <div class="card-desc">
-        Fishy wishy spatial prompt mixing.
-      </div>
-      <div class="card-arrow">Open &rarr;</div>
-    </a>
-
     <a class="card" href="paragraph-adapter-visualise.html">
       <div class="card-icon">&#127858;</div>
-      <div class="card-name">Fisheye Soup</div>
+      <div class="card-name">PThinkTank with Fisheye Soup</div>
       <div class="card-desc">
         Version with visualiser - Fisheye - option added.
       </div>
@@ -165,33 +156,6 @@ html, body {
       </div>
       <div class="card-arrow">Open &rarr;</div>
     </a>
-
-    <a class="card" href="daydreamtest.html">
-      <div class="card-icon">&#129302;</div>
-      <div class="card-name">Daydream Test</div>
-      <div class="card-desc">
-        Standalone stream create/update/status diagnostics for Daydream API.
-      </div>
-      <div class="card-arrow">Open &rarr;</div>
-    </a>
-
-    <a class="card" href="paragraph-adapter-game.html">
-      <div class="card-icon">&#127918;</div>
-      <div class="card-name">Fisheye Decode</div>
-      <div class="card-desc">
-        Two-player image interpretation game: host sets thought + fish, guesser infers both from the generated image.
-      </div>
-      <div class="card-arrow">Open &rarr;</div>
-    </a>
-
-    <div class="card stat-card" aria-live="polite">
-      <div class="card-icon">&#128031;</div>
-      <div class="card-name">Fed <span class="fish-count" id="fedFishCount">000</span> Fish so far</div>
-      <div class="card-desc">
-        Total API calls made by this system, persisted server-side.
-      </div>
-      <div class="card-arrow" id="fedFishStatus">Loading...</div>
-    </div>
 
   </div>
 </div>
@@ -222,26 +186,7 @@ async function loadTheme() {
   }
 }
 
-async function loadFishCount() {
-  // Live stat is read from /api/stats so this landing page reflects usage in real time.
-  const countEl = document.getElementById("fedFishCount");
-  const statusEl = document.getElementById("fedFishStatus");
-  if (!countEl || !statusEl) return;
-
-  try {
-    const res = await fetch("/api/stats");
-    if (!res.ok) throw new Error("stats request failed");
-    const data = await res.json();
-    const total = Number.isFinite(Number(data.total_api_calls)) ? Math.max(0, Number(data.total_api_calls)) : 0;
-    countEl.textContent = String(Math.floor(total)).padStart(3, "0");
-    statusEl.textContent = "Live";
-  } catch (_) {
-    statusEl.textContent = "Unavailable";
-  }
-}
-
 loadTheme();
-loadFishCount();
 </script>
 <footer style="display:flex;justify-content:center;padding:12px 0 18px;">
   <a href="https://designresearch.works/" target="_blank" rel="noopener noreferrer" aria-label="Design Research Works" style="display:inline-flex;align-items:center;gap:8px;color:var(--muted);text-decoration:none;">

@@ -15,14 +15,18 @@ How:
 
 import os
 import json
+import shutil
+import io
 import threading
 import time
 import uuid
 import traceback
 import mimetypes
+import zipfile
 import urllib.error
 import urllib.request
 import urllib.parse
+import base64
 from typing import Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException
@@ -70,6 +74,8 @@ API_COUNTER_PATH = os.path.join(PROMPT_STORE_DIR, "api_call_counter.json")
 FISHEYE_IMAGE_DIR = os.path.join(PROMPT_STORE_DIR, "fisheye_images")
 FISHEYE_IMAGE_INDEX_PATH = os.path.join(PROMPT_STORE_DIR, "fisheye_images_index.json")
 FISHEYE_GAME_ROUNDS_PATH = os.path.join(PROMPT_STORE_DIR, "fisheye_game_rounds.json")
+SNAPSHOT_DIR = os.path.join(PROMPT_STORE_DIR, "snapshots")
+SNAPSHOT_IMAGE_DIR = os.path.join(SNAPSHOT_DIR, "images")
 API_COUNTER_LOCK = threading.Lock()
 FISHEYE_GAME_LOCK = threading.Lock()
 DEFAULT_APP_CONFIG = {
@@ -77,6 +83,8 @@ DEFAULT_APP_CONFIG = {
     "default_model": "groq:llama-3.3-70b-versatile",
     "default_thought": "deep thought",
     "default_fish_concepts": "animal, vegetable, mineral",
+    "fisheye_image_history_limit": 1000,
+    "slw_delay_ms": 800,
     "cadence_min_ms": 0,
     "cadence_max_ms": 5000,
     "cadence_default_ms": 2500,
@@ -134,6 +142,20 @@ class VisualisePayload(BaseModel):
     prompt_model: Optional[str] = None
     image_model: Optional[str] = None
     image_seed: Optional[int] = None
+    prompt_strength: Optional[float] = None
+    use_input_image: Optional[bool] = False
+    input_image_ref: Optional[str] = None
+    input_image_url: Optional[str] = None
+
+
+class FisheyeImageImportPayload(BaseModel):
+    image_ref: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class SnapshotCreatePayload(BaseModel):
+    name: Optional[str] = None
+    state: dict
 
 
 class FisheyeGameFishPayload(BaseModel):
@@ -317,6 +339,10 @@ def _normalize_app_config(raw: Optional[dict]) -> dict:
         out["infinite_inactivity_ms"] = max(5000, out["infinite_inactivity_ms"])
     if "touch_ui_grace_ms" in out:
         out["touch_ui_grace_ms"] = max(0, out["touch_ui_grace_ms"])
+    if "fisheye_image_history_limit" in out:
+        out["fisheye_image_history_limit"] = max(1, min(100000, out["fisheye_image_history_limit"]))
+    if "slw_delay_ms" in out:
+        out["slw_delay_ms"] = max(0, min(5000, out["slw_delay_ms"]))
     if "chip_max_speed" in out:
         out["chip_max_speed"] = max(0.05, out["chip_max_speed"])
     if "fish_scale_min_pct" in out:
@@ -662,10 +688,13 @@ def _store_fisheye_image(source_url: str) -> tuple[str, str]:
         }
     )
 
-    # Keep only the most recent 20 images.
-    if len(items) > 20:
-        stale = items[:-20]
-        items = items[-20:]
+    retention_limit = int(_get_current_app_config().get("fisheye_image_history_limit", 1000))
+    retention_limit = max(1, min(100000, retention_limit))
+
+    # Keep only the most recent configured number of images.
+    if len(items) > retention_limit:
+        stale = items[:-retention_limit]
+        items = items[-retention_limit:]
         for old in stale:
             old_name = str(old.get("filename") or "").strip()
             if not old_name:
@@ -679,6 +708,222 @@ def _store_fisheye_image(source_url: str) -> tuple[str, str]:
 
     _write_json_list(FISHEYE_IMAGE_INDEX_PATH, items)
     return image_ref, f"/api/fisheye-images/{image_ref}"
+
+
+def _find_fisheye_image_record(image_ref: str) -> Optional[dict]:
+    ref = (image_ref or "").strip()
+    if not ref:
+        return None
+    items = _read_json_list(FISHEYE_IMAGE_INDEX_PATH)
+    return next((x for x in items if str(x.get("ref", "")).strip() == ref), None)
+
+
+def _snapshot_path(snapshot_id: str) -> str:
+    safe_id = (snapshot_id or "").strip()
+    return os.path.join(SNAPSHOT_DIR, f"{safe_id}.json")
+
+
+def _snapshot_summary(record: dict) -> dict:
+    return {
+        "id": str(record.get("id") or "").strip(),
+        "name": str(record.get("name") or "").strip(),
+        "created_at": int(record.get("created_at") or 0),
+    }
+
+
+def _read_snapshot(snapshot_id: str) -> Optional[dict]:
+    data = _read_json(_snapshot_path(snapshot_id))
+    return data if isinstance(data, dict) else None
+
+
+def _list_snapshots() -> list[dict]:
+    os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+    items: list[dict] = []
+    for name in os.listdir(SNAPSHOT_DIR):
+        if not name.endswith(".json"):
+            continue
+        data = _read_json(os.path.join(SNAPSHOT_DIR, name))
+        if not isinstance(data, dict):
+            continue
+        snapshot_id = str(data.get("id") or os.path.splitext(name)[0]).strip()
+        if not snapshot_id:
+            continue
+        items.append(
+            {
+                "id": snapshot_id,
+                "name": str(data.get("name") or snapshot_id).strip(),
+                "created_at": int(data.get("created_at") or 0),
+            }
+        )
+    items.sort(key=lambda x: (int(x.get("created_at") or 0), str(x.get("id") or "")), reverse=True)
+    return items
+
+
+def _local_fisheye_file_path(image_ref: str) -> Optional[str]:
+    record = _find_fisheye_image_record(image_ref)
+    if not record:
+        return None
+    filename = str(record.get("filename") or "").strip()
+    if not filename:
+        return None
+    file_path = os.path.join(FISHEYE_IMAGE_DIR, filename)
+    if not os.path.exists(file_path):
+        return None
+    return file_path
+
+
+def _coerce_fisheye_ref_from_url(image_url: Optional[str]) -> Optional[str]:
+    raw = (image_url or "").strip()
+    if not raw:
+        return None
+    parsed = urllib.parse.urlparse(raw)
+    path = parsed.path or raw
+    marker = "/api/fisheye-images/"
+    if marker not in path:
+        return None
+    return path.rsplit("/", 1)[-1].strip() or None
+
+
+def _parse_snapshot_image_url(image_url: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    raw = (image_url or "").strip()
+    if not raw:
+        return None, None
+    path = urllib.parse.urlparse(raw).path or raw
+    marker = "/api/snapshots/"
+    if marker not in path or "/images/" not in path:
+        return None, None
+    tail = path.split(marker, 1)[1]
+    snapshot_id, _, image_name = tail.partition("/images/")
+    snapshot_id = snapshot_id.strip().strip("/")
+    image_name = image_name.strip().strip("/")
+    if not snapshot_id or not image_name or "/" in image_name:
+        return None, None
+    return snapshot_id, image_name
+
+
+def _snapshot_image_path(snapshot_id: str, image_name: str) -> str:
+    safe_snapshot_id = (snapshot_id or "").strip()
+    safe_image_name = os.path.basename((image_name or "").strip())
+    return os.path.join(SNAPSHOT_IMAGE_DIR, safe_snapshot_id, safe_image_name)
+
+
+def _resolve_local_image_file(
+    image_ref: Optional[str] = None,
+    image_url: Optional[str] = None,
+) -> Optional[str]:
+    ref = (image_ref or "").strip() or (_coerce_fisheye_ref_from_url(image_url) or "")
+    if ref:
+        file_path = _local_fisheye_file_path(ref)
+        if file_path:
+            return file_path
+
+    snapshot_id, image_name = _parse_snapshot_image_url(image_url)
+    if snapshot_id and image_name:
+        file_path = _snapshot_image_path(snapshot_id, image_name)
+        if os.path.exists(file_path):
+            return file_path
+    return None
+
+
+def _copy_snapshot_image(
+    snapshot_id: str,
+    slot_name: str,
+    image_ref: Optional[str] = None,
+    image_url: Optional[str] = None,
+) -> Optional[dict]:
+    slot = (slot_name or "").strip() or "image"
+    source_file = _resolve_local_image_file(image_ref=image_ref, image_url=image_url)
+    source_url = (image_url or "").strip()
+
+    if source_file and os.path.exists(source_file):
+        ext = os.path.splitext(source_file)[1].lower() or ".jpg"
+        image_name = f"{slot}{ext}"
+        dest_path = _snapshot_image_path(snapshot_id, image_name)
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        shutil.copyfile(source_file, dest_path)
+        return {
+            "image_ref": None,
+            "image_url": f"/api/snapshots/{snapshot_id}/images/{image_name}",
+        }
+
+    if source_url.startswith(("http://", "https://")):
+        payload, content_type = _download_binary(source_url)
+        ext = _infer_image_extension(source_url, content_type)
+        image_name = f"{slot}{ext}"
+        dest_path = _snapshot_image_path(snapshot_id, image_name)
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        with open(dest_path, "wb") as f:
+            f.write(payload)
+        return {
+            "image_ref": None,
+            "image_url": f"/api/snapshots/{snapshot_id}/images/{image_name}",
+        }
+
+    return None
+
+
+def _copy_snapshot_images_into_state(snapshot_id: str, state: dict) -> dict:
+    snapshot_state = json.loads(json.dumps(state))
+
+    def apply_copy(target: dict, ref_key: str, url_key: str, slot_name: str) -> None:
+        if not isinstance(target, dict):
+            return
+        copied = _copy_snapshot_image(
+            snapshot_id=snapshot_id,
+            slot_name=slot_name,
+            image_ref=target.get(ref_key),
+            image_url=target.get(url_key),
+        )
+        if not copied:
+            return
+        target[ref_key] = copied["image_ref"]
+        target[url_key] = copied["image_url"]
+
+    fisheye = snapshot_state.get("fisheye")
+    if isinstance(fisheye, dict):
+        apply_copy(fisheye, "current_image_ref", "current_image_url", "current")
+        apply_copy(fisheye, "edit_source_ref", "edit_source_url", "original")
+
+    current_entry = snapshot_state.get("current_output_entry")
+    if isinstance(current_entry, dict):
+        apply_copy(current_entry, "fisheye_image_ref", "fisheye_image_url", "current-output")
+
+    history = snapshot_state.get("output_history")
+    if isinstance(history, list):
+        for idx, item in enumerate(history):
+            if isinstance(item, dict):
+                apply_copy(item, "fisheye_image_ref", "fisheye_image_url", f"history-{idx:03d}")
+
+    return snapshot_state
+
+
+def _build_data_uri_from_file(file_path: str) -> str:
+    mime = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+    with open(file_path, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
+
+def _resolve_fisheye_input_image_uri(
+    image_ref: Optional[str] = None,
+    image_url: Optional[str] = None,
+) -> Optional[str]:
+    ref = (image_ref or "").strip() or (_coerce_fisheye_ref_from_url(image_url) or "")
+    if ref:
+        record = _find_fisheye_image_record(ref)
+        if record:
+            source_url = str(record.get("source_url") or "").strip()
+            if source_url.startswith(("http://", "https://")):
+                return source_url
+
+    local_file = _resolve_local_image_file(image_ref=image_ref, image_url=image_url)
+    if local_file:
+        return _build_data_uri_from_file(local_file)
+
+    raw_url = (image_url or "").strip()
+    if raw_url.startswith(("http://", "https://")):
+        return raw_url
+    return None
 
 
 def _extract_replicate_image_url(output: object) -> Optional[str]:
@@ -868,7 +1113,11 @@ def _generate_text_once(prompt: str, model: str) -> str:
 
 # Builds per-model payloads from fisheye selector values (model + optional size token).
 def _build_replicate_input(
-    prompt: str, model_slug: str, image_seed: Optional[int] = None
+    prompt: str,
+    model_slug: str,
+    image_seed: Optional[int] = None,
+    input_image_uri: Optional[str] = None,
+    prompt_strength: Optional[float] = None,
 ) -> dict[str, object]:
     raw = model_slug.strip()
     model = raw.lower()
@@ -906,6 +1155,52 @@ def _build_replicate_input(
             "safety_filter_level": "block_medium_and_above",
         }
 
+    if model.startswith("lucataco/ssd-1b"):
+        strength_value = 0.8
+        if isinstance(prompt_strength, (int, float)):
+            strength_value = max(0.0, min(1.0, float(prompt_strength)))
+        payload = {
+            "prompt": prompt,
+            "negative_prompt": "low quality image",
+            "num_outputs": 1,
+            "guidance_scale": 7.5,
+            "num_inference_steps": 25,
+        }
+        if isinstance(image_seed, int):
+            payload["seed"] = max(1, min(999999, image_seed))
+        if input_image_uri:
+            payload["image"] = input_image_uri
+            payload["prompt_strength"] = strength_value
+        return payload
+
+    if model == "google/nano-banana":
+        payload = {
+            "prompt": prompt,
+            "output_format": "jpg",
+        }
+        if input_image_uri:
+            payload["image_input"] = [input_image_uri]
+            payload["aspect_ratio"] = "match_input_image"
+        else:
+            payload["aspect_ratio"] = "1:1"
+        return payload
+
+    if model == "google/nano-banana-2":
+        nano_resolution = (size_token or "1K").upper()
+        if nano_resolution not in {"1K", "2K", "4K"}:
+            nano_resolution = "1K"
+        payload = {
+            "prompt": prompt,
+            "resolution": nano_resolution,
+            "output_format": "jpg",
+        }
+        if input_image_uri:
+            payload["image_input"] = [input_image_uri]
+            payload["aspect_ratio"] = "match_input_image"
+        else:
+            payload["aspect_ratio"] = "1:1"
+        return payload
+
     # Default profile: prunaai/flux-fast
     seed_value = 2110
     if isinstance(image_seed, int):
@@ -925,9 +1220,19 @@ def _build_replicate_input(
 
 
 def _replicate_generate_image(
-    prompt: str, model_slug: str, image_seed: Optional[int] = None
+    prompt: str,
+    model_slug: str,
+    image_seed: Optional[int] = None,
+    input_image_uri: Optional[str] = None,
+    prompt_strength: Optional[float] = None,
 ) -> str:
-    replicate_input = _build_replicate_input(prompt, model_slug, image_seed)
+    replicate_input = _build_replicate_input(
+        prompt,
+        model_slug,
+        image_seed,
+        input_image_uri,
+        prompt_strength,
+    )
     endpoint_model = model_slug.split("|", 1)[0].strip()
 
     prediction: Optional[dict] = None
@@ -1070,13 +1375,40 @@ def visualise(payload: VisualisePayload):
         image_seed = max(1, min(999999, image_seed))
     else:
         image_seed = None
+    prompt_strength = payload.prompt_strength
+    if isinstance(prompt_strength, (int, float)):
+        prompt_strength = max(0.0, min(1.0, float(prompt_strength)))
+    else:
+        prompt_strength = None
+    use_input_image = bool(payload.use_input_image)
+    input_image_uri = None
+    endpoint_model = image_model.split("|", 1)[0].strip().lower()
+    if use_input_image and (
+        endpoint_model in {"google/nano-banana", "google/nano-banana-2"}
+        or endpoint_model.startswith("lucataco/ssd-1b")
+    ):
+        input_image_uri = _resolve_fisheye_input_image_uri(
+            image_ref=payload.input_image_ref,
+            image_url=payload.input_image_url,
+        )
+        if not input_image_uri:
+            return {
+                "ok": False,
+                "message": "Nano Banana edit mode requires a saved image input",
+            }
 
     # Use current output text directly as the image-generation prompt.
     image_prompt = output_text
 
     try:
         _increment_api_call_count()
-        image_url = _replicate_generate_image(image_prompt, image_model, image_seed)
+        image_url = _replicate_generate_image(
+            image_prompt,
+            image_model,
+            image_seed,
+            input_image_uri=input_image_uri,
+            prompt_strength=prompt_strength,
+        )
         image_ref, local_image_url = _store_fisheye_image(image_url)
     except Exception as exc:
         return {"ok": False, "message": f"Failed to generate image via Replicate: {exc}"}
@@ -1090,6 +1422,155 @@ def visualise(payload: VisualisePayload):
         "image_model": image_model,
         "prompt_model": None,
     }
+
+
+@app.post("/api/fisheye-images/import")
+def import_fisheye_image(payload: FisheyeImageImportPayload):
+    image_ref = (payload.image_ref or "").strip()
+    if image_ref:
+        record = _find_fisheye_image_record(image_ref)
+        file_path = _local_fisheye_file_path(image_ref)
+        if record and file_path:
+            return {
+                "ok": True,
+                "image_ref": image_ref,
+                "image_url": f"/api/fisheye-images/{image_ref}",
+                "source_url": str(record.get("source_url") or "").strip(),
+            }
+
+    source_url = (payload.source_url or "").strip()
+    inferred_ref = _coerce_fisheye_ref_from_url(source_url)
+    if inferred_ref:
+        record = _find_fisheye_image_record(inferred_ref)
+        file_path = _local_fisheye_file_path(inferred_ref)
+        if record and file_path:
+            return {
+                "ok": True,
+                "image_ref": inferred_ref,
+                "image_url": f"/api/fisheye-images/{inferred_ref}",
+                "source_url": str(record.get("source_url") or "").strip(),
+            }
+
+    if not source_url:
+        return {"ok": False, "message": "image_ref or source_url is required"}
+
+    try:
+        image_ref, local_image_url = _store_fisheye_image(source_url)
+    except Exception as exc:
+        return {"ok": False, "message": f"Failed to store fisheye image: {exc}"}
+
+    record = _find_fisheye_image_record(image_ref) or {}
+    return {
+        "ok": True,
+        "image_ref": image_ref,
+        "image_url": local_image_url,
+        "source_url": str(record.get("source_url") or "").strip(),
+    }
+
+
+@app.get("/api/snapshots")
+def list_snapshots():
+    return {"ok": True, "snapshots": _list_snapshots()}
+
+
+@app.get("/api/snapshots/{snapshot_id}")
+def get_snapshot(snapshot_id: str):
+    record = _read_snapshot(snapshot_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return {
+        "ok": True,
+        "snapshot": {
+            "id": str(record.get("id") or snapshot_id).strip(),
+            "name": str(record.get("name") or snapshot_id).strip(),
+            "created_at": int(record.get("created_at") or 0),
+            "state": record.get("state") if isinstance(record.get("state"), dict) else {},
+        },
+    }
+
+
+@app.get("/api/snapshots/{snapshot_id}/images/{image_name}")
+def get_snapshot_image(snapshot_id: str, image_name: str):
+    file_path = _snapshot_image_path(snapshot_id, image_name)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Snapshot image not found")
+    media_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+    return FileResponse(path=file_path, media_type=media_type, filename=os.path.basename(file_path))
+
+
+@app.post("/api/snapshots")
+def create_snapshot(payload: SnapshotCreatePayload):
+    if not isinstance(payload.state, dict):
+        return {"ok": False, "message": "state is required"}
+
+    os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+    os.makedirs(SNAPSHOT_IMAGE_DIR, exist_ok=True)
+    snapshot_id = uuid.uuid4().hex[:16]
+    created_at = int(time.time())
+    provided_name = (payload.name or "").strip()
+    display_name = provided_name or time.strftime("Snapshot %Y-%m-%d %H:%M:%S", time.localtime(created_at))
+    snapshot_state = _copy_snapshot_images_into_state(snapshot_id, payload.state)
+    record = {
+        "id": snapshot_id,
+        "name": display_name,
+        "created_at": created_at,
+        "state": snapshot_state,
+    }
+    _write_json(_snapshot_path(snapshot_id), record)
+    return {"ok": True, "snapshot": _snapshot_summary(record)}
+
+
+@app.get("/api/snapshots-current-output-images.zip")
+def download_snapshot_current_output_images_zip(day: Optional[str] = None):
+    snapshots = _list_snapshots()
+    day_filter = (day or "").strip()
+    if day_filter:
+        snapshots = [
+            item
+            for item in snapshots
+            if time.strftime("%Y-%m-%d", time.localtime(int(item.get("created_at") or 0))) == day_filter
+        ]
+    archive_buffer = io.BytesIO()
+
+    with zipfile.ZipFile(archive_buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        added = 0
+        for item in snapshots:
+            snapshot_id = str(item.get("id") or "").strip()
+            if not snapshot_id:
+                continue
+            base_dir = os.path.join(SNAPSHOT_IMAGE_DIR, snapshot_id)
+            if not os.path.isdir(base_dir):
+                continue
+
+            current_output_name = None
+            for name in sorted(os.listdir(base_dir)):
+                if name.startswith("current-output."):
+                    current_output_name = name
+                    break
+            if not current_output_name:
+                continue
+
+            file_path = os.path.join(base_dir, current_output_name)
+            if not os.path.exists(file_path):
+                continue
+
+            snapshot_name = str(item.get("name") or snapshot_id).strip() or snapshot_id
+            safe_name = "".join(ch if ch.isalnum() or ch in ("-", "_", " ") else "_" for ch in snapshot_name).strip()
+            safe_name = safe_name or snapshot_id
+            ext = os.path.splitext(current_output_name)[1].lower() or ".jpg"
+            arcname = f"{snapshot_id} - {safe_name}{ext}"
+            zf.write(file_path, arcname=arcname)
+            added += 1
+
+        if added == 0:
+            zf.writestr("README.txt", "No snapshot current-output images were found.\n")
+
+    archive_buffer.seek(0)
+    return StreamingResponse(
+        archive_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="snapshot-current-output-images.zip"'},
+    )
 
 
 @app.post("/api/fisheye-game/rounds")

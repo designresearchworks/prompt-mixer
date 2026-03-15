@@ -2,6 +2,10 @@
 .venv/
 __pycache__/
 *.pyc
+.DS_Store
+data/.DS_Store
 data/api_call_counter.json
 data/fisheye_images/
 data/fisheye_images_index.json
+data/snapshots/
+data/fisheye_game_rounds.json
