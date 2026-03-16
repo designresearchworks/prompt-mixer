@@ -1930,6 +1930,7 @@ body.fisheye-inline-mode .visualise-inline.preview-enabled {
 
   /* Taller mixer so chips have room */
   .mixer-wrap { height: 360px; }
+  body.fisheye-stacked-mode .mixer-wrap { height: 306px; }
   .mixer-top-row { flex-direction: column; }
   .visualise-output.active {
     order: -1;
@@ -2044,6 +2045,21 @@ body.fisheye-inline-mode .visualise-inline.preview-enabled {
     flex: 0 0 auto;
   }
   .trawl-input { font-size: 11px; }
+}
+
+@media (max-width: 900px) and (pointer: coarse) {
+  html, body {
+    min-height: 100%;
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .page {
+    min-height: 100%;
+    height: auto;
+    overflow: visible;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0) + 20px);
+  }
 }
 
 @media (max-width: 900px) {
@@ -2442,7 +2458,7 @@ body.fisheye-inline-mode .visualise-output.active {
   <div class="row row-prompt">
     <div class="row-label" title="What you see in this box is what is sent to the model">
       Generated prompt
-      <button class="collapse-btn" onclick="toggleCollapse('generated-prompt-body', this)">show</button>
+      <button class="collapse-btn" id="generated-prompt-toggle-btn" onclick="toggleCollapse('generated-prompt-body', this)">show</button>
     </div>
     <div class="collapsible-body collapsed" id="generated-prompt-body">
       <div class="prompt-block" id="generated-prompt">—</div>
@@ -2453,7 +2469,7 @@ body.fisheye-inline-mode .visualise-output.active {
   <div class="row row-base-prompt">
     <div class="row-label" title="You can edit the preamble and ending of the prompt, good for fine tuning towards particular outputs. When you save it will actually be saved to a file and come back if you refresh the page. Reset to hardcoded will overwrite that file">
       Base prompt template
-      <button class="collapse-btn" onclick="toggleCollapse('base-prompt-body', this)">show</button>
+      <button class="collapse-btn" id="base-prompt-toggle-btn" onclick="toggleCollapse('base-prompt-body', this)">show</button>
       <button class="collapse-btn" id="reset-hardcoded-prompts-btn" onclick="resetToHardcodedPrompts()" title="Overwrites any saved prompt files with the original hardcoded ones">reset to hardcoded prompt</button>
       <span id="prompt-template-status" style="font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:none;"></span>
     </div>
@@ -2481,7 +2497,7 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
   <div class="row row-history">
     <div class="row-label" style="margin-bottom:6px" title="Self explanatory, if you click one then that state should be loaded back in (if fish mode enabled then.. good luck)">
       Previous outputs
-      <button class="collapse-btn" onclick="toggleCollapse('history-body', this)">hide</button>
+      <button class="collapse-btn" id="history-toggle-btn" onclick="toggleCollapse('history-body', this)">hide</button>
     </div>
     <div class="collapsible-body" id="history-body">
       <div class="history-empty" id="history-empty">
@@ -2494,7 +2510,7 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
   <div class="row row-fishtails">
     <div class="row-label" title="Recent frontend-side API activity for text and image generation.">
       Fishtails (API access log)
-      <button class="collapse-btn" onclick="toggleCollapse('fishtails-body', this)">show</button>
+      <button class="collapse-btn" id="fishtails-toggle-btn" onclick="toggleCollapse('fishtails-body', this)">show</button>
     </div>
     <div class="collapsible-body collapsed" id="fishtails-body">
       <div class="api-log-grid">
@@ -2519,7 +2535,7 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
   <div class="row row-configuration">
     <div class="row-label" title="Quick access to the configuration page.">
       Configuration
-      <button class="collapse-btn" onclick="toggleCollapse('configuration-body', this)">show</button>
+      <button class="collapse-btn" id="configuration-toggle-btn" onclick="toggleCollapse('configuration-body', this)">show</button>
     </div>
     <div class="collapsible-body collapsed configuration-body" id="configuration-body">
       <div class="config-embed">
@@ -4898,6 +4914,14 @@ function onSlwToggleChange() {
   if (!cb.checked) stopSlwProgressDisplay();
 }
 
+function disableSlwForFishPhysics() {
+  var cb = document.getElementById('slw-toggle');
+  if (!cb || !cb.checked) return;
+  cb.checked = false;
+  cb.setAttribute('data-user-set', '1');
+  stopSlwProgressDisplay();
+}
+
 function syncSlwDefaultToVisualise() {
   var slwToggle = document.getElementById('slw-toggle');
   if (!slwToggle || slwToggle.hasAttribute('data-user-set')) return;
@@ -5052,6 +5076,35 @@ function bindControlButton(id, handler) {
     if (e.cancelable) e.preventDefault();
     markTouchUiActivity();
     handler();
+  }, { passive: false });
+
+  el.addEventListener('touchcancel', function() {
+    handledByTouch = false;
+    markTouchUiActivity();
+  }, { passive: true });
+}
+
+function bindTouchClickProxy(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  var handledByTouch = false;
+
+  el.addEventListener('click', function(e) {
+    if (handledByTouch) {
+      handledByTouch = false;
+      e.preventDefault();
+    }
+  });
+
+  el.addEventListener('touchstart', function() {
+    markTouchUiActivity();
+  }, { passive: true });
+
+  el.addEventListener('touchend', function(e) {
+    handledByTouch = true;
+    if (e.cancelable) e.preventDefault();
+    markTouchUiActivity();
+    el.click();
   }, { passive: false });
 
   el.addEventListener('touchcancel', function() {
@@ -5674,7 +5727,14 @@ function updateFisheyeInlineMode() {
   var inlineWrap = document.getElementById('visualise-inline');
   var resizeHandle = document.getElementById('fisheye-resize-handle');
   var inlineMode = isFisheyeInlineMode();
+  var stackedMode = !!(
+    isVisualiseAutoEnabled() &&
+    !feedbackModeEnabled &&
+    window.matchMedia &&
+    window.matchMedia('(max-width: 700px)').matches
+  );
   document.body.classList.toggle('fisheye-inline-mode', inlineMode);
+  document.body.classList.toggle('fisheye-stacked-mode', stackedMode);
   if (inlineWrap) {
     inlineWrap.classList.toggle('active', inlineMode);
   }
@@ -6065,6 +6125,7 @@ function stepChipPhysics(ts) {
 function toggleChipPhysics() {
   var wasEnabled = chipPhysicsEnabled;
   chipPhysicsEnabled = !chipPhysicsEnabled;
+  if (chipPhysicsEnabled) disableSlwForFishPhysics();
   if (!chipPhysicsEnabled) {
     words.forEach(function(w) { w.vx = 0; w.vy = 0; w.squishH = 0; w.squishV = 0; });
     stopChipPhysicsLoop();
@@ -6139,6 +6200,7 @@ function prepareTrajectoryLaunch() {
   if (!words.length) return false;
   if (!chipPhysicsEnabled) {
     chipPhysicsEnabled = true;
+    disableSlwForFishPhysics();
     updateChipPhysicsButtonState();
     refreshInactivityWatchState();
   }
@@ -7312,13 +7374,17 @@ function tagRender() {
     span.className = 'tag-token';
     span.innerHTML = escHtml(tok) +
       '<span class="tag-token-del" data-idx="' + idx + '" title="Remove">×</span>';
-    span.querySelector('.tag-token-del').addEventListener('mousedown', function(e) {
+    function removeToken(e) {
       e.preventDefault();
+      if (e.stopPropagation) e.stopPropagation();
+      markTouchUiActivity();
       tagTokens.splice(idx, 1);
       tagRender();
       tagSyncTextarea();
       syncWordsToTagTokens({ schedule: true });
-    });
+    }
+    span.querySelector('.tag-token-del').addEventListener('mousedown', removeToken);
+    span.querySelector('.tag-token-del').addEventListener('touchend', removeToken, { passive: false });
     wrap.insertBefore(span, field);
   });
 }
@@ -7349,6 +7415,12 @@ function tagCommit(raw) {
 
   // Click anywhere in wrap focuses the field
   wrap.addEventListener('click', function() { field.focus(); });
+  wrap.addEventListener('touchend', function(e) {
+    if (e.target && e.target.closest('.tag-token-del')) return;
+    if (e.cancelable) e.preventDefault();
+    markTouchUiActivity();
+    field.focus();
+  }, { passive: false });
 
   field.addEventListener('keydown', function(e) {
     if (e.key === 'Backspace' && field.value === '' && tagTokens.length) {
@@ -7419,6 +7491,29 @@ bindControlButton('chip-physics-btn', toggleChipPhysics);
 bindControlButton('rnd-btn', launchRandomTrajectories);
 bindControlButton('bmp-btn', toggleBmpMode);
 bindControlButton('trawl-haul-btn', haulTrawl);
+[
+  'output-collapse-btn',
+  'save-snapshot-btn',
+  'snapshots-toggle-btn',
+  'load-snapshot-btn',
+  'download-snapshot-current-outputs-btn',
+  'refresh-snapshot-btn',
+  'trawl-toggle-btn',
+  'generated-prompt-toggle-btn',
+  'base-prompt-toggle-btn',
+  'history-toggle-btn',
+  'fishtails-toggle-btn',
+  'configuration-toggle-btn',
+  'cfg-save-config-btn',
+  'cfg-reset-config-btn',
+  'cfg-save-preamble-btn',
+  'cfg-save-closing-btn',
+  'cfg-reset-prompt-btn',
+  'cfg-save-keys-btn',
+  'save-preamble-btn',
+  'save-closing-btn',
+  'reset-hardcoded-prompts-btn'
+].forEach(bindTouchClickProxy);
 setupMixerResizer();
 setupFisheyeResizer();
 setupSensibilityCombo('direction-1', 'direction-1-arrow', 'direction-1-list', 'direction-1-options');
