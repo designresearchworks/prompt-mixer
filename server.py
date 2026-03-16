@@ -1155,6 +1155,44 @@ def _build_replicate_input(
             "safety_filter_level": "block_medium_and_above",
         }
 
+    if model == "google/imagen-4-fast":
+        return {
+            "prompt": prompt,
+            "aspect_ratio": "1:1",
+            "output_format": "jpg",
+            "safety_filter_level": "block_medium_and_above",
+        }
+
+    if model.startswith("sdxl-based/epicrealismxl-lightning-hades"):
+        payload = {
+            "prompt": prompt,
+            "negative_prompt": "",
+            "width": 1024,
+            "height": 1024,
+            "num_outputs": 1,
+            "num_inference_steps": 4,
+            "guidance_scale": 1.0,
+            "scheduler": "K_EULER",
+        }
+        if isinstance(image_seed, int):
+            payload["seed"] = max(1, min(999999, image_seed))
+        return payload
+
+    if model.startswith("bytedance/sdxl-lightning-4step"):
+        payload = {
+            "prompt": prompt,
+            "negative_prompt": "",
+            "width": 1024,
+            "height": 1024,
+            "num_outputs": 1,
+            "num_inference_steps": 4,
+            "guidance_scale": 0,
+            "scheduler": "K_EULER",
+        }
+        if isinstance(image_seed, int):
+            payload["seed"] = max(1, min(999999, image_seed))
+        return payload
+
     if model.startswith("lucataco/ssd-1b"):
         strength_value = 0.8
         if isinstance(prompt_strength, (int, float)):
