@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Paragraph Adapter (Visualise Copy)</title>
+<title>PthinkTank</title>
 <!--
   Visualise build:
   - What: feedback build + fisheye image generation panel.
@@ -2775,6 +2775,7 @@ var snapshotStatusTimer = null;
 var snapshotButtonFxTimer = null;
 var snapshotRestoreInProgress = false;
 var snapshotListCache = [];
+var snapshotUrlLoadHandled = false;
 var fisheyeFixedSeed = 2110;
 var apiLogState = {
   llm: [],
@@ -6773,6 +6774,32 @@ function toggleSnapshotsRow() {
   btn.textContent = hidden ? 'hide' : 'show';
 }
 
+function getSnapshotIdFromUrl() {
+  try {
+    var params = new URLSearchParams(window.location.search || '');
+    return String(params.get('snapshot') || '').trim();
+  } catch (_) {
+    return '';
+  }
+}
+
+function setSnapshotIdInUrl(snapshotId, replace) {
+  try {
+    var url = new URL(window.location.href);
+    if (snapshotId) {
+      url.searchParams.set('snapshot', String(snapshotId));
+    } else {
+      url.searchParams.delete('snapshot');
+    }
+    var nextUrl = url.pathname + (url.search || '') + (url.hash || '');
+    if (replace) {
+      window.history.replaceState({}, '', nextUrl);
+    } else {
+      window.history.pushState({}, '', nextUrl);
+    }
+  } catch (_) {}
+}
+
 function clonePlain(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -7085,6 +7112,15 @@ async function refreshSnapshotList(selectIdToUse) {
     if (!res.ok || !data || !data.ok) throw new Error('load failed');
     snapshotListCache = Array.isArray(data.snapshots) ? data.snapshots : [];
     refreshSnapshotSelectors(selectIdToUse);
+    if (!snapshotUrlLoadHandled) {
+      var snapshotIdFromUrl = getSnapshotIdFromUrl();
+      if (snapshotIdFromUrl && snapshotListCache.some(function(item) { return String(item.id || '') === snapshotIdFromUrl; })) {
+        snapshotUrlLoadHandled = true;
+        await loadSnapshotById(snapshotIdFromUrl, { updateUrl: false, replaceUrl: true, syncSelectors: true });
+      } else {
+        snapshotUrlLoadHandled = true;
+      }
+    }
   } catch (_) {
     setSnapshotStatus('Snapshot list failed to load.', true);
   }
@@ -7117,13 +7153,19 @@ async function saveSnapshot() {
   }
 }
 
-async function loadSelectedSnapshot() {
+async function loadSnapshotById(snapshotId, options) {
+  options = options || {};
+  var resolvedId = String(snapshotId || '').trim();
   var select = document.getElementById('snapshot-select');
   var btn = document.getElementById('load-snapshot-btn');
-  if (!select || !select.value) return;
+  if (!resolvedId) return;
   if (isStreaming || visualiseInFlight) {
     setSnapshotStatus('Wait for active generation to finish before loading.', true);
     return;
+  }
+  if (options.syncSelectors !== false) {
+    refreshSnapshotSelectors(resolvedId);
+    if (select) select.value = resolvedId;
   }
   if (btn) {
     btn.disabled = true;
@@ -7131,10 +7173,13 @@ async function loadSelectedSnapshot() {
   }
   setSnapshotStatus('Loading snapshot...');
   try {
-    var res = await fetch('/api/snapshots/' + encodeURIComponent(select.value));
+    var res = await fetch('/api/snapshots/' + encodeURIComponent(resolvedId));
     var data = await res.json();
     if (!res.ok || !data || !data.ok || !data.snapshot || !data.snapshot.state) throw new Error('load failed');
     applySnapshotState(data.snapshot.state);
+    if (options.updateUrl !== false) {
+      setSnapshotIdInUrl(resolvedId, !!options.replaceUrl);
+    }
     setSnapshotStatus('Snapshot loaded.');
   } catch (_) {
     setSnapshotStatus('Snapshot load failed.', true);
@@ -7144,6 +7189,12 @@ async function loadSelectedSnapshot() {
       btn.textContent = 'Load';
     }
   }
+}
+
+async function loadSelectedSnapshot() {
+  var select = document.getElementById('snapshot-select');
+  if (!select || !select.value) return;
+  await loadSnapshotById(select.value, { updateUrl: true, replaceUrl: false, syncSelectors: true });
 }
 
 function downloadSnapshotCurrentOutputsZip() {
