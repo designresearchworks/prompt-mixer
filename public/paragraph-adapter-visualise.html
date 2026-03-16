@@ -1932,10 +1932,15 @@ body.fisheye-inline-mode .visualise-inline.preview-enabled {
   .mixer-wrap { height: 360px; }
   .mixer-top-row { flex-direction: column; }
   .visualise-output.active {
+    order: -1;
     width: 100% !important;
     min-width: 0;
     height: 280px !important;
     max-height: none !important;
+    margin-bottom: 8px;
+  }
+  body.fisheye-inline-mode .visualise-inline.active {
+    display: none;
   }
 
   /* Stack sensibility boxes vertically on narrow screens */
@@ -1948,7 +1953,10 @@ body.fisheye-inline-mode .visualise-inline.preview-enabled {
   .sensibility-box.right .sensibility-label { text-align: left; }
 
   /* Slightly more padding for fat fingers, but keep compact */
-  .chip-pill { padding: 4px 7px !important; }
+  .chip-pill {
+    padding: 4px 7px !important;
+    box-shadow: 0 3px 14px rgba(0,0,0,0.48);
+  }
   .word-chip { width: 80px; }
 
   /* Stack the output header on small screens */
@@ -3598,6 +3606,10 @@ function chipStyle(weight, xFrac, leftActive, rightActive) {
   // Background: dark base when neutral, fades to lean colour as intensity rises
   var bgAlpha    = leanInDead ? 0.12 : (0.10 + amount * 0.30);
   var borderAlpha= leanInDead ? 0.18 : (0.25 + amount * 0.60);
+  if (window.matchMedia && window.matchMedia('(max-width: 700px)').matches) {
+    bgAlpha = Math.min(0.62, bgAlpha + 0.12);
+    borderAlpha = Math.min(0.88, borderAlpha + 0.08);
+  }
 
   // In deadzone use a neutral dark bg; outside use the lean colour
   var bgColor, borderColor;
@@ -5485,7 +5497,9 @@ function isVisualiseAutoEnabled() {
 function isFisheyeInlineMode() {
   if (!isVisualiseAutoEnabled()) return false;
   if (feedbackModeEnabled) return false;
-  return !!(window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
+  if (!window.matchMedia) return false;
+  if (window.matchMedia('(max-width: 700px)').matches) return false;
+  return window.matchMedia('(max-width: 900px)').matches;
 }
 
 function setFisheyeImage(url) {
