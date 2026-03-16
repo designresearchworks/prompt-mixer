@@ -1451,19 +1451,6 @@ textarea:focus { border-color: var(--accent); }
 .fisheye-edit-upd-btn.hidden {
   display: none;
 }
-.cadence-wrap.paused-by-xsnc {
-  animation: xsncPausePulse 1.05s ease-in-out infinite;
-}
-@keyframes xsncPausePulse {
-  0%, 100% {
-    border-color: rgba(234, 179, 8, 0.35);
-    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.0);
-  }
-  50% {
-    border-color: rgba(234, 179, 8, 0.75);
-    box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.22);
-  }
-}
 .visualise-output {
   display: none;
   flex: 0 0 auto;
@@ -1834,6 +1821,10 @@ body.fisheye-inline-mode .visualise-inline.preview-enabled {
 .config-field textarea {
   min-height: 88px;
 }
+.config-field textarea[readonly] {
+  background: rgba(17, 17, 28, 0.72);
+  color: var(--muted);
+}
 [data-theme="dark"] .config-field input,
 [data-theme="dark"] .config-field select,
 [data-theme="dark"] .config-field textarea {
@@ -1855,12 +1846,21 @@ body.fisheye-inline-mode .visualise-inline.preview-enabled {
   border-color: #cfd6e6;
   color: #1f2937;
 }
+[data-theme="light"] .config-field textarea[readonly] {
+  background: #f4f6fb;
+  color: #4f5870;
+}
 .config-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 10px;
+}
+.config-help {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
 }
 .config-status {
   font-size: 11px;
@@ -2123,7 +2123,7 @@ body.fisheye-inline-mode .visualise-output.active {
       </label>
     </div>
     <div class="source-input-row" id="source-input-row">
-      <textarea id="mission" rows="3" oninput="scheduleUpdate(800)">deep thought</textarea>
+      <textarea id="mission" rows="3" oninput="scheduleUpdate(800)"></textarea>
       <div class="steer-wrap" id="steer-wrap">
         <textarea id="steer-input" rows="3" oninput="scheduleUpdate(800)" placeholder="Optional steering appended to the closing instruction."></textarea>
       </div>
@@ -2146,16 +2146,12 @@ body.fisheye-inline-mode .visualise-output.active {
       <div style="display:flex;align-items:center;gap:12px;">
         <div class="live-badge"><div class="live-dot" id="live-dot"></div><span id="current-io-label" title="This changes to say Current I/O (rather than Current Output) when in feedback mode">Current output</span></div>
         <label class="inline-toggle-label" title="The answers will be much longer if you don't tick this, maybe you like it long">
-          <input type="checkbox" id="keep-brief" checked onchange="scheduleUpdate(0)" style="width:12px;height:12px;cursor:pointer;">
+          <input type="checkbox" id="keep-brief" onchange="scheduleUpdate(0)" style="width:12px;height:12px;cursor:pointer;">
           Force short output
         </label>
         <label class="visualise-toggle-label" id="visualise-toggle-label" title="Toggle fisheye image rendering panel and automatic output visualisation">
           <input type="checkbox" id="visualise-auto" style="width:12px;height:12px;cursor:pointer;">
           Fisheye
-        </label>
-        <label class="visualise-toggle-label disabled" id="xsnc-toggle-label" title="When enabled, pauses LLM generation while fisheye image generation is in flight">
-          <input type="checkbox" id="xsnc-enabled" style="width:12px;height:12px;cursor:pointer;" disabled>
-          XSNC
         </label>
       </div>
       <div class="current-head-right" style="display:flex;align-items:center;gap:10px;">
@@ -2411,7 +2407,7 @@ body.fisheye-inline-mode .visualise-output.active {
     <div class="row-label" title="Trout, Salmon, Flouder, Frog.. etc">fish</div>
     <div class="sentence-row">
       <!-- Hidden real textarea keeps value in sync for buildPrompt -->
-      <textarea id="sentence-input">animal, vegetable, mineral</textarea>
+      <textarea id="sentence-input"></textarea>
       <!-- Visible tag input -->
       <div class="tag-input-wrap" id="tag-input-wrap">
         <input class="tag-input-field" id="tag-input-field" type="text" placeholder="type a concept, press comma…" autocomplete="off" spellcheck="false">
@@ -2554,7 +2550,15 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
               <input id="cfg-default_model" type="text">
             </div>
             <div class="config-field">
-              <label for="cfg-llm_deterministic_mode" title="Uses deterministic decoding settings by default to reduce run-to-run variation.">LLM deterministic mode</label>
+              <label for="cfg-default_fisheye_enabled" title="Turns fisheye on automatically when the page loads.">Fisheye on by default</label>
+              <input id="cfg-default_fisheye_enabled" type="checkbox">
+            </div>
+            <div class="config-field">
+              <label for="cfg-default_keep_brief" title="Starts the app with Force short output enabled or disabled.">Force short output by default</label>
+              <input id="cfg-default_keep_brief" type="checkbox">
+            </div>
+            <div class="config-field">
+              <label for="cfg-llm_deterministic_mode" title="Controls whether the main Deterministic toggle starts on or off when the page loads.">Deterministic on by default</label>
               <input id="cfg-llm_deterministic_mode" type="checkbox">
             </div>
             <div class="config-field">
@@ -2626,6 +2630,15 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
             <div class="config-field full">
               <label for="cfg-tpl-closing" title="The closing instruction block used when building prompts.">Closing instruction</label>
               <textarea id="cfg-tpl-closing" rows="6"></textarea>
+            </div>
+            <div class="config-field full">
+              <label for="cfg-tpl-token-preview" title="Shows how the saved templates are wrapped with the runtime prompt injections.">Prompt shape with {tokens}</label>
+              <textarea id="cfg-tpl-token-preview" rows="12" readonly></textarea>
+            </div>
+            <div class="config-field full">
+              <div class="config-help">
+                `{source_text}` = Thought, or Food for thought when `You are what you eat` is on. `{active_fish_lines}` = one line per active fish with weight and optional sensibility lean. `{steer_suffix}` = appended only when `Steer` is enabled and non-empty. `{brief_suffix}` = appended only when `Force short output` is on. `{feedback_food_suffix}` = appended only in feedback mode when `Food for thought` has content and `You are what you eat` is off.
+              </div>
             </div>
           </div>
           <div class="config-actions">
@@ -2803,6 +2816,8 @@ var slwProgressDelayMs = 0;
 var DEFAULT_APP_CONFIG = {
   default_theme: 'dark',
   default_model: 'groq:llama-3.3-70b-versatile',
+  default_fisheye_enabled: true,
+  default_keep_brief: false,
   llm_deterministic_mode: false,
   llm_deterministic_seed: 2110,
   slw_delay_ms: 800,
@@ -2830,6 +2845,7 @@ var DEFAULT_APP_CONFIG = {
 };
 var EMBEDDED_CONFIG_KEYS = [
   'default_theme',
+  'default_fisheye_enabled', 'default_keep_brief',
   'llm_deterministic_mode', 'llm_deterministic_seed',
   'default_model', 'default_thought', 'default_fish_concepts',
   'fisheye_image_history_limit', 'slw_delay_ms',
@@ -2849,6 +2865,11 @@ var EMBEDDED_NUMBER_KEYS = {
   chip_scale_base: true, chip_scale_weight_factor: true,
   rnd_base_min_factor: true, rnd_base_max_factor: true, rnd_launch_min_factor: true, rnd_launch_max_factor: true,
   deadzone_half: true, merge_hold_ms: true, join_glow_ms: true, model_progress_default_ms: true
+};
+var EMBEDDED_BOOLEAN_KEYS = {
+  default_fisheye_enabled: true,
+  default_keep_brief: true,
+  llm_deterministic_mode: true
 };
 var embeddedConfigAutosaveTimer = null;
 var embeddedConfigSaveInFlight = false;
@@ -2914,6 +2935,8 @@ function normalizeAppConfig(raw) {
   }
   cfg.default_model = String(cfg.default_model || DEFAULT_APP_CONFIG.default_model);
   cfg.default_theme = (String(cfg.default_theme || DEFAULT_APP_CONFIG.default_theme).toLowerCase() === 'light') ? 'light' : 'dark';
+  cfg.default_fisheye_enabled = !!cfg.default_fisheye_enabled;
+  cfg.default_keep_brief = !!cfg.default_keep_brief;
   cfg.llm_deterministic_mode = !!cfg.llm_deterministic_mode;
   cfg.llm_deterministic_seed = Math.max(0, Math.min(2147483647, intNum('llm_deterministic_seed', DEFAULT_APP_CONFIG.llm_deterministic_seed)));
   cfg.slw_delay_ms = Math.max(0, Math.min(5000, intNum('slw_delay_ms', DEFAULT_APP_CONFIG.slw_delay_ms)));
@@ -2991,6 +3014,10 @@ function applyAppConfig(raw) {
   if (modelSelect && Array.from(modelSelect.options).some(function(o) { return o.value === cfg.default_model; })) {
     modelSelect.value = cfg.default_model;
   }
+  var visualiseToggle = document.getElementById('visualise-auto');
+  if (visualiseToggle) visualiseToggle.checked = !!cfg.default_fisheye_enabled;
+  var keepBriefToggle = document.getElementById('keep-brief');
+  if (keepBriefToggle) keepBriefToggle.checked = !!cfg.default_keep_brief;
   var deterministicToggle = document.getElementById('llm-deterministic-toggle');
   if (deterministicToggle) deterministicToggle.checked = !!llmDeterministicMode;
   syncSlwDefaultToVisualise();
@@ -3008,6 +3035,8 @@ function applyAppConfig(raw) {
 
   updateCadenceLabel();
   updateFishScaleLabel();
+  updateFisheyeAvailability();
+  updateVisualiseOutputVisibility();
   renderChips();
   onModelChange(false);
 }
@@ -3033,7 +3062,7 @@ function fillEmbeddedConfigForm(config) {
     var el = document.getElementById('cfg-' + key);
     if (!el) return;
     var value = (config && Object.prototype.hasOwnProperty.call(config, key)) ? config[key] : '';
-    if (key === 'llm_deterministic_mode') {
+    if (EMBEDDED_BOOLEAN_KEYS[key]) {
       el.checked = !!value;
     } else {
       el.value = value;
@@ -3046,7 +3075,7 @@ function readEmbeddedConfigForm() {
   EMBEDDED_CONFIG_KEYS.forEach(function(key) {
     var el = document.getElementById('cfg-' + key);
     if (!el) return;
-    if (key === 'llm_deterministic_mode') {
+    if (EMBEDDED_BOOLEAN_KEYS[key]) {
       out[key] = !!el.checked;
       return;
     }
@@ -3174,6 +3203,28 @@ function onEmbeddedThemeChange() {
   try { localStorage.setItem('prompt_mixer_theme', theme); } catch (_) {}
 }
 
+function updateEmbeddedPromptTokenPreview() {
+  var pre = document.getElementById('cfg-tpl-preamble');
+  var clo = document.getElementById('cfg-tpl-closing');
+  var out = document.getElementById('cfg-tpl-token-preview');
+  if (!pre || !clo || !out) return;
+
+  var preamble = (pre.value || '').trim() || '{preamble_template}';
+  var closing = (clo.value || '').trim() || '{closing_template}';
+
+  out.value =
+    'Here is the original thought:\n\n' +
+    '"""\n' +
+    '{source_text}\n' +
+    '"""\n\n' +
+    preamble + '\n\n' +
+    '{active_fish_lines}\n\n' +
+    closing + '\n' +
+    '{steer_suffix}' +
+    '{brief_suffix}' +
+    '{feedback_food_suffix}';
+}
+
 function setupEmbeddedConfigAutosave() {
   EMBEDDED_CONFIG_KEYS.forEach(function(key) {
     var el = document.getElementById('cfg-' + key);
@@ -3206,6 +3257,7 @@ async function loadEmbeddedPromptTemplates() {
     var clo = document.getElementById('cfg-tpl-closing');
     if (pre) pre.value = preamble;
     if (clo) clo.value = closing;
+    updateEmbeddedPromptTokenPreview();
     setEmbeddedConfigStatus('cfg-prompt-status', 'Loaded.', 'ok');
   } catch (err) {
     setEmbeddedConfigStatus('cfg-prompt-status', (err && err.message) || 'Load failed', 'err');
@@ -3233,6 +3285,7 @@ async function saveEmbeddedPromptSection(section) {
       var pre = document.getElementById('base-preamble');
       if (pre) pre.value = field.value || '';
     }
+    updateEmbeddedPromptTokenPreview();
     scheduleUpdate(0);
     setEmbeddedConfigStatus('cfg-prompt-status', 'Saved ' + section + '.', 'ok');
   } catch (err) {
@@ -3258,6 +3311,7 @@ async function resetEmbeddedPromptTemplatesHardcoded() {
     var clo = document.getElementById('cfg-tpl-closing');
     if (pre) pre.value = hardcodedBasePreamble;
     if (clo) clo.value = hardcodedBaseClosing;
+    updateEmbeddedPromptTokenPreview();
     var livePre = document.getElementById('base-preamble');
     var liveClo = document.getElementById('base-closing');
     if (livePre) livePre.value = hardcodedBasePreamble;
@@ -4499,7 +4553,7 @@ async function generateOutput(promptOverride) {
     isStreaming = false;
     setStreamingState(false);
     inFlightPrompt = null;
-    var shouldAutoVisualise = completed && isVisualiseAutoEnabled() && !feedbackModeEnabled;
+    var shouldAutoVisualise = completed && isVisualiseAutoEnabled();
 
     if (shouldAutoVisualise && stateDirtyWhileStreaming) {
       stateDirtyWhileStreaming = false;
@@ -4509,8 +4563,14 @@ async function generateOutput(promptOverride) {
     if (infiniteFeedbackEnabled && completed) {
       stateDirtyWhileStreaming = false;
       if (!isYouAreWhatYouEatEnabled()) syncMissionToCurrentOutput();
-      var nextDelay = getInfiniteCadenceDelayMs();
-      startInfiniteCountdown(nextDelay);
+      if (shouldAutoVisualise) {
+        pendingGenerateAfterVisualise = true;
+        clearInfiniteCountdown();
+        pushApiLog('llm', 'info', 'Queued the next feedback text generation until fisheye image generation finishes.');
+      } else {
+        var nextDelay = getInfiniteCadenceDelayMs();
+        startInfiniteCountdown(nextDelay);
+      }
     } else if (stateDirtyWhileStreaming) {
       stateDirtyWhileStreaming = false;
       requestGenerate();
@@ -4643,12 +4703,12 @@ function restoreHistory(index) {
   currentFisheyeImageRef = item.fisheye_image_ref || null;
   currentFisheyeImageUrl = item.fisheye_image_url || '';
   var visualiseCb = document.getElementById('visualise-auto');
-  if (visualiseCb && !feedbackModeEnabled) {
+  if (visualiseCb) {
     visualiseCb.checked = !!currentFisheyeImageUrl;
   }
   updateFisheyeAvailability();
   updateVisualiseOutputVisibility();
-  setFisheyeImage((currentFisheyeImageUrl && !feedbackModeEnabled) ? currentFisheyeImageUrl : '');
+  setFisheyeImage(currentFisheyeImageUrl || '');
   updateFeedbackButtonState();
 
   document.getElementById('generated-prompt').textContent = buildPrompt();
@@ -4944,29 +5004,8 @@ function getInfiniteCadenceDelayMs() {
   return Math.max(0, Math.min(5000, infiniteCadenceValue));
 }
 
-function isXsncEnabled() {
-  var cb = document.getElementById('xsnc-enabled');
-  return !!(cb && cb.checked && !cb.disabled);
-}
-
 function shouldDeferTextGenerationForVisualise() {
   return !!visualiseInFlight;
-}
-
-function setCadencePausedByXsnc(active) {
-  var wrap = document.getElementById('cadence-wrap');
-  if (!wrap) return;
-  wrap.classList.toggle('paused-by-xsnc', !!active);
-}
-
-function onXsncChange() {
-  // When XSNC is switched off we clear any deferred request marker so no
-  // stale "catch-up" generation fires after the block is removed.
-  updateFisheyeAvailability();
-  if (!isXsncEnabled()) {
-    setCadencePausedByXsnc(false);
-    pendingGenerateAfterVisualise = false;
-  }
 }
 
 function requestGenerate() {
@@ -4984,20 +5023,17 @@ function requestGenerate() {
     return;
   }
   if (shouldDeferTextGenerationForVisualise()) {
-    pendingGenerateAfterVisualise = false;
+    pendingGenerateAfterVisualise = true;
     stopCadenceProgressDisplay();
-    setCadencePausedByXsnc(true);
-    pushApiLog('llm', 'warn', 'Skipped text generation because an image request is in flight.');
+    pushApiLog('llm', 'warn', 'Deferred text generation until the current image request finishes.');
     return;
   }
-  setCadencePausedByXsnc(false);
 
   function runGenerationNow() {
     if (generationSafetyPaused || isStreaming) return;
     if (shouldDeferTextGenerationForVisualise()) {
-      pendingGenerateAfterVisualise = false;
-      setCadencePausedByXsnc(true);
-      pushApiLog('llm', 'warn', 'Skipped delayed text generation because an image request is in flight.');
+      pendingGenerateAfterVisualise = true;
+      pushApiLog('llm', 'warn', 'Deferred delayed text generation until the current image request finishes.');
       return;
     }
     var prompt = buildPrompt();
@@ -5495,7 +5531,7 @@ function onFisheyeRdmxChange() {
   if (!cb.checked) {
     fisheyeFixedSeed = randomFisheyeSeed();
   }
-  if (isVisualiseAutoEnabled() && !feedbackModeEnabled && getCurrentOutputTextForVisualise()) {
+  if (isVisualiseAutoEnabled() && getCurrentOutputTextForVisualise()) {
     requestVisualiseRefresh();
   }
 }
@@ -5549,7 +5585,6 @@ function isVisualiseAutoEnabled() {
 
 function isFisheyeInlineMode() {
   if (!isVisualiseAutoEnabled()) return false;
-  if (feedbackModeEnabled) return false;
   if (!window.matchMedia) return false;
   if (window.matchMedia('(max-width: 700px)').matches) return false;
   return window.matchMedia('(max-width: 900px)').matches;
@@ -5645,7 +5680,7 @@ function updateFisheyeEditControls() {
   var editLabel = document.getElementById('fisheye-edit-toggle-label');
   var updBtn = document.getElementById('fisheye-edit-upd-btn');
   var ssdWrap = document.getElementById('fisheye-ssd-strength-wrap');
-  var available = !feedbackModeEnabled && isVisualiseAutoEnabled() && isFisheyeEditCapableModelSelected();
+  var available = isVisualiseAutoEnabled() && isFisheyeEditCapableModelSelected();
   var hasVisibleImage = hasLoadedCurrentFisheyeImage();
   var editActive = !!(editCb && editCb.checked && !editCb.disabled);
 
@@ -5677,8 +5712,6 @@ function updateFisheyeEditControls() {
 function updateFisheyeAvailability() {
   var cb = document.getElementById('visualise-auto');
   var label = document.getElementById('visualise-toggle-label');
-  var xsncCb = document.getElementById('xsnc-enabled');
-  var xsncLabel = document.getElementById('xsnc-toggle-label');
   var rdmxCb = document.getElementById('fisheye-rdmx');
   var rdmxLabel = document.getElementById('rdmx-toggle-label');
   var modelSelect = document.getElementById('fisheye-model-select');
@@ -5686,10 +5719,9 @@ function updateFisheyeAvailability() {
   var resizeHandle = document.getElementById('fisheye-resize-handle');
   if (!cb) return;
 
-  var blocked = !!feedbackModeEnabled;
+  var blocked = false;
   cb.disabled = blocked;
   if (label) label.classList.toggle('disabled', blocked);
-  if (blocked && cb.checked) cb.checked = false;
 
   if (modelSelect) {
     modelSelect.disabled = blocked || !cb.checked;
@@ -5704,20 +5736,8 @@ function updateFisheyeAvailability() {
   if (rdmxLabel) {
     rdmxLabel.classList.toggle('disabled', !rdmxAvailable);
   }
-  var xsncAvailable = !blocked && !!cb.checked;
-  if (xsncCb) {
-    xsncCb.disabled = !xsncAvailable;
-    if (!xsncAvailable) {
-      xsncCb.checked = false;
-      pendingGenerateAfterVisualise = false;
-      setCadencePausedByXsnc(false);
-    }
-  }
-  if (xsncLabel) {
-    xsncLabel.classList.toggle('disabled', !xsncAvailable);
-  }
   if (resizeHandle) {
-    resizeHandle.classList.toggle('active', !blocked && !!cb.checked && !isFisheyeInlineMode());
+    resizeHandle.classList.toggle('active', !!cb.checked && !isFisheyeInlineMode());
   }
   updateFisheyeEditControls();
   updateFisheyeInlineMode();
@@ -5729,7 +5749,6 @@ function updateFisheyeInlineMode() {
   var inlineMode = isFisheyeInlineMode();
   var stackedMode = !!(
     isVisualiseAutoEnabled() &&
-    !feedbackModeEnabled &&
     window.matchMedia &&
     window.matchMedia('(max-width: 700px)').matches
   );
@@ -5739,7 +5758,7 @@ function updateFisheyeInlineMode() {
     inlineWrap.classList.toggle('active', inlineMode);
   }
   if (resizeHandle) {
-    resizeHandle.classList.toggle('active', isVisualiseAutoEnabled() && !feedbackModeEnabled && !inlineMode);
+    resizeHandle.classList.toggle('active', isVisualiseAutoEnabled() && !inlineMode);
   }
 }
 
@@ -5811,7 +5830,6 @@ function updateVisualiseOutputVisibility() {
 
 function requestVisualiseRefresh() {
   if (snapshotRestoreInProgress) return;
-  if (feedbackModeEnabled) return;
   if (!isVisualiseAutoEnabled()) return;
   if (!getCurrentOutputTextForVisualise()) return;
   if (visualiseInFlight) {
@@ -5825,7 +5843,6 @@ function requestVisualiseRefresh() {
 
 async function visualiseCurrentOutput(retryCount) {
   if (retryCount === undefined) retryCount = 0;
-  if (feedbackModeEnabled) return;
   if (visualiseInFlight) return;
 
   var sourceText = getCurrentOutputTextForVisualise();
@@ -5860,7 +5877,6 @@ async function visualiseCurrentOutput(retryCount) {
     stopSlwProgressDisplay();
     pushApiLog('llm', 'info', 'Cleared pending text generation because image generation started.');
   }
-  pendingGenerateAfterVisualise = false;
   startFisheyeProgressDisplay();
   updateFisheyeEditControls();
   var requestStartedAt = performance.now();
@@ -5925,17 +5941,22 @@ async function visualiseCurrentOutput(retryCount) {
     }
     visualiseInFlight = false;
     stopFisheyeProgressDisplay();
-    setCadencePausedByXsnc(false);
-    pendingGenerateAfterVisualise = false;
     updateFisheyeEditControls();
     if (pendingSsdStrengthRefresh) {
       pendingSsdStrengthRefresh = false;
-      if (isSsd1bModelSelected() && isFisheyeEditModeEnabled() && isVisualiseAutoEnabled() && !feedbackModeEnabled) {
+      if (isSsd1bModelSelected() && isFisheyeEditModeEnabled() && isVisualiseAutoEnabled()) {
         requestVisualiseRefresh();
       }
+      return;
     }
     if (((currentOutput || '').trim() !== requestOutputText) || pendingVisualiseRefresh) {
       requestVisualiseRefresh();
+      return;
+    }
+    if (pendingGenerateAfterVisualise) {
+      pendingGenerateAfterVisualise = false;
+      pushApiLog('llm', 'info', 'Resuming deferred text generation after fisheye image generation completed.');
+      requestGenerate();
     }
   }
 }
@@ -5943,10 +5964,6 @@ async function visualiseCurrentOutput(retryCount) {
 function onVisualiseAutoChange() {
   syncSlwDefaultToVisualise();
   updateVisualiseOutputVisibility();
-  var xsncCb = document.getElementById('xsnc-enabled');
-  if (isVisualiseAutoEnabled() && xsncCb && !xsncCb.disabled) {
-    xsncCb.checked = true;
-  }
   if (isVisualiseAutoEnabled() && getCurrentOutputTextForVisualise()) {
     requestVisualiseRefresh();
   }
@@ -6380,7 +6397,7 @@ function onFisheyeModelChange(triggerRefresh) {
   updateFisheyeTimingHint();
   stopFisheyeProgressDisplay();
   updateFisheyeEditControls();
-  if (triggerRefresh && isVisualiseAutoEnabled() && !feedbackModeEnabled && getCurrentOutputTextForVisualise()) {
+  if (triggerRefresh && isVisualiseAutoEnabled() && getCurrentOutputTextForVisualise()) {
     requestVisualiseRefresh();
   }
 }
@@ -6906,7 +6923,6 @@ async function captureSnapshotState() {
     controls: {
       keep_brief: !!document.getElementById('keep-brief').checked,
       visualise_auto: !!document.getElementById('visualise-auto').checked,
-      xsnc_enabled: !!document.getElementById('xsnc-enabled').checked,
       llm_deterministic_toggle: !!document.getElementById('llm-deterministic-toggle').checked,
       slw_toggle: !!document.getElementById('slw-toggle').checked,
       steer_toggle: !!document.getElementById('steer-toggle').checked,
@@ -6964,7 +6980,6 @@ function applySnapshotState(state) {
 
     document.getElementById('keep-brief').checked = !!(state.controls && state.controls.keep_brief);
     document.getElementById('visualise-auto').checked = !!(state.controls && state.controls.visualise_auto);
-    document.getElementById('xsnc-enabled').checked = !!(state.controls && state.controls.xsnc_enabled);
     document.getElementById('llm-deterministic-toggle').checked = !!(state.controls && state.controls.llm_deterministic_toggle);
     document.getElementById('slw-toggle').checked = !!(state.controls && state.controls.slw_toggle);
     document.getElementById('steer-toggle').checked = !!(state.controls && state.controls.steer_toggle);
@@ -7042,7 +7057,7 @@ function applySnapshotState(state) {
     onFisheyeModelChange(false);
     renderChips();
     renderHistory();
-    setFisheyeImage((currentFisheyeImageUrl && !feedbackModeEnabled) ? currentFisheyeImageUrl : '');
+    setFisheyeImage(currentFisheyeImageUrl || '');
     updateFisheyeAvailability();
     updateVisualiseOutputVisibility();
     updateFisheyeOriginalPreview();
@@ -7534,6 +7549,11 @@ if (fisheyeSsdStrengthEl) fisheyeSsdStrengthEl.addEventListener('input', functio
   updateSsdPromptStrengthLabel();
   queueSsdPromptStrengthVisualise();
 });
+['cfg-tpl-preamble', 'cfg-tpl-closing'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', updateEmbeddedPromptTokenPreview);
+});
 var snapshotDaySelectEl = document.getElementById('snapshot-day-select');
 if (snapshotDaySelectEl) snapshotDaySelectEl.addEventListener('change', onSnapshotDayChange);
 var snapshotSelectEl = document.getElementById('snapshot-select');
@@ -7546,8 +7566,6 @@ var refreshSnapshotBtnEl = document.getElementById('refresh-snapshot-btn');
 if (refreshSnapshotBtnEl) refreshSnapshotBtnEl.addEventListener('click', function() {
   refreshSnapshotList();
 });
-var xsncEl = document.getElementById('xsnc-enabled');
-if (xsncEl) xsncEl.addEventListener('change', onXsncChange);
 ['visualise-image', 'visualise-image-inline'].forEach(function(id) {
   var visualiseImageEl = document.getElementById(id);
   if (!visualiseImageEl) return;

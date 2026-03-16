@@ -83,6 +83,8 @@ DEFAULT_APP_CONFIG = {
     "default_model": "groq:llama-3.3-70b-versatile",
     "default_thought": "deep thought",
     "default_fish_concepts": "animal, vegetable, mineral",
+    "default_fisheye_enabled": True,
+    "default_keep_brief": False,
     "fisheye_image_history_limit": 1000,
     "slw_delay_ms": 800,
     "cadence_min_ms": 0,
