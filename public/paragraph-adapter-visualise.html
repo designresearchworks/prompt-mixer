@@ -403,31 +403,6 @@ textarea:focus { border-color: var(--accent); }
       rgba(109,40,217,0.03) 100%),
     var(--surface);
 }
-.ascii-bg-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 180ms ease;
-}
-.ascii-bg-layer.active {
-  opacity: 0.26;
-}
-.ascii-bg-frame {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  display: block;
-  pointer-events: none;
-  background: transparent;
-}
-[data-theme="light"] .ascii-bg-layer.active {
-  opacity: 0.14;
-}
-[data-theme="light"] .ascii-bg-frame {
-  filter: invert(1) hue-rotate(180deg) saturate(0.72) contrast(0.9) brightness(1.08);
-}
 .pong-canvas {
   position: absolute;
   inset: 0;
@@ -1467,6 +1442,7 @@ textarea:focus { border-color: var(--accent); }
 .visualise-output.active {
   display: flex;
   flex-direction: column;
+  gap: 10px;
 }
 .visualise-image-stage {
   position: relative;
@@ -1539,6 +1515,42 @@ textarea:focus { border-color: var(--accent); }
   display: inline-flex;
   align-items: center;
   opacity: 0;
+}
+.fisheye-lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  background: rgba(6, 6, 12, 0.92);
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.fisheye-lightbox.active {
+  display: flex;
+}
+.fisheye-lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+}
+.fisheye-lightbox-inner {
+  position: relative;
+  z-index: 1;
+  width: min(94vw, 1400px);
+  height: min(90vh, 980px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fisheye-lightbox-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 16px 44px rgba(0,0,0,0.34);
+  background: rgba(8, 8, 14, 0.72);
 }
 .fisheye-progress-overlay {
   display: none;
@@ -1641,6 +1653,191 @@ textarea:focus { border-color: var(--accent); }
 .visualise-image-inline.active {
   display: block;
 }
+.fisheye-session-strip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  background: rgba(12, 12, 20, 0.52);
+}
+.fisheye-session-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 9px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.fisheye-session-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fisheye-session-list {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+.fisheye-session-scroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fisheye-session-scroll-btn {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+}
+.fisheye-session-scroll-btn[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+.fisheye-session-scroll .fisheye-session-list {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fisheye-session-empty {
+  font-size: 10px;
+  color: var(--muted);
+  padding: 2px 0 4px;
+}
+.fisheye-session-thumb {
+  flex: 0 0 auto;
+  width: 68px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  overflow: visible;
+  background: rgba(8, 8, 14, 0.74);
+  cursor: pointer;
+  transform: scale(1);
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+  opacity: 0.82;
+  position: relative;
+}
+.fisheye-session-thumb-media {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.fisheye-session-thumb:hover,
+.fisheye-session-thumb:focus-visible {
+  transform: scale(1.08);
+  border-color: rgba(96, 165, 250, 0.7);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.28);
+  opacity: 1;
+}
+.fisheye-session-thumb.active {
+  border-color: rgba(96, 165, 250, 0.9);
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.24), 0 10px 24px rgba(37, 99, 235, 0.18);
+  opacity: 1;
+}
+.fisheye-session-thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: rgba(8, 8, 14, 0.82);
+}
+.fisheye-session-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px 6px 6px;
+  background: linear-gradient(180deg, rgba(8, 8, 14, 0) 0%, rgba(8, 8, 14, 0.62) 72%, rgba(8, 8, 14, 0.84) 100%);
+  pointer-events: none;
+}
+.fisheye-session-meta {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  right: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+.fisheye-session-num {
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  color: #f8fafc;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+.fisheye-session-text {
+  font-size: 8px;
+  line-height: 1.35;
+  color: rgba(248, 250, 252, 0.82);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.fisheye-session-tooltip {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: 220px;
+  max-width: min(220px, 70vw);
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: rgba(8, 8, 14, 0.94);
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.24);
+  color: rgba(248, 250, 252, 0.92);
+  font-size: 10px;
+  line-height: 1.45;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  z-index: 12;
+  pointer-events: none;
+}
+.fisheye-session-tooltip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(8, 8, 14, 0.94);
+}
+.fisheye-session-thumb:hover .fisheye-session-tooltip,
+.fisheye-session-thumb:focus-visible .fisheye-session-tooltip {
+  display: block;
+}
+[data-theme="light"] .fisheye-session-strip {
+  background: rgba(255, 255, 255, 0.72);
+}
+[data-theme="light"] .fisheye-session-thumb {
+  background: #ffffff;
+  border-color: rgba(31, 41, 55, 0.12);
+}
+[data-theme="light"] .fisheye-session-tooltip {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(31, 41, 55, 0.14);
+  color: #1f2937;
+}
+[data-theme="light"] .fisheye-session-tooltip::after {
+  border-top-color: rgba(255, 255, 255, 0.96);
+}
 body.fisheye-inline-mode .visualise-inline.preview-enabled {
   pointer-events: auto;
 }
@@ -1680,6 +1877,34 @@ body.fisheye-inline-mode .visualise-inline.preview-enabled {
 .godmode-toast.visible {
   opacity: 1;
   transform: translateY(0);
+}
+.top-status-bar {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  z-index: 1300;
+  max-width: min(92vw, 820px);
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.24);
+  background: rgba(12, 12, 20, 0.9);
+  color: #eef2ff;
+  font-size: 10px;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.top-status-bar.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+[data-theme="light"] .top-status-bar {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(37, 99, 235, 0.16);
+  color: #1f2937;
 }
 
 /* ═══════════════════════════════
@@ -1918,15 +2143,16 @@ body.fisheye-inline-mode .visualise-inline.preview-enabled {
   .row-food         { order: 2; }
   .current-wrap      { order: 3; }
   .mixer-section     { order: 4; }
-  .row-concepts      { order: 5; }
-  .row-snapshots     { order: 6; }
-  .row-trawl         { order: 7; }
-  .row-prompt        { order: 8; }
-  .row-base-prompt   { order: 9; }
-  .row-history       { order: 10; }
-  .row-fishtails     { order: 11; }
-  .row-configuration { order: 12; }
-  .row-footer        { order: 13; }
+  .row-session-images { order: 5; }
+  .row-concepts       { order: 6; }
+  .row-snapshots      { order: 7; }
+  .row-trawl          { order: 8; }
+  .row-prompt         { order: 9; }
+  .row-base-prompt    { order: 10; }
+  .row-history        { order: 11; }
+  .row-fishtails      { order: 12; }
+  .row-configuration  { order: 13; }
+  .row-footer         { order: 14; }
 
   /* Taller mixer so chips have room */
   .mixer-wrap { height: 360px; }
@@ -2203,6 +2429,12 @@ body.fisheye-inline-mode .visualise-output.active {
       <button class="collapse-btn output-collapse-btn snapshot-save-btn" id="save-snapshot-btn" type="button" onclick="saveSnapshot()">snapshot</button>
     </div>
   </div>
+  <div class="fisheye-lightbox" id="fisheye-lightbox" aria-hidden="true">
+    <div class="fisheye-lightbox-backdrop" id="fisheye-lightbox-backdrop"></div>
+    <div class="fisheye-lightbox-inner">
+      <img class="fisheye-lightbox-image" id="fisheye-lightbox-image" alt="Expanded fisheye image view">
+    </div>
+  </div>
 
   <!-- 2. CONCEPT MIXER with sensibility boxes below -->
   <div class="mixer-section">
@@ -2249,9 +2481,6 @@ body.fisheye-inline-mode .visualise-output.active {
     <!-- Mixer canvas with optional fisheye pane -->
     <div class="mixer-top-row" id="mixer-top-row">
       <div class="mixer-wrap" id="mixer">
-      <div class="ascii-bg-layer" id="ascii-bg-layer">
-        <iframe class="ascii-bg-frame" id="ascii-bg-frame" title="Fish background animation" loading="lazy" tabindex="-1" aria-hidden="true"></iframe>
-      </div>
       <div class="guide" style="top:25%"></div>
       <div class="guide" style="top:50%"></div>
       <div class="guide" style="top:75%"></div>
@@ -2350,7 +2579,7 @@ body.fisheye-inline-mode .visualise-output.active {
         </datalist>
       </div>
       <div class="sensibility-box sensibility-controls">
-        <button class="feedback-btn" id="chip-physics-btn" title="The physics of fish, clearly">fish physics</button>
+        <button class="feedback-btn" id="chip-physics-btn" title="The physics of fish, clearly">fish phsyx</button>
         <button class="feedback-btn" id="rnd-btn" title="Makes the fish swim off in random directions">rnd</button>
         <button class="feedback-btn" id="bmp-btn" title="Fish either swim through each other, or bump off each other - this chooses which">bmp</button>
         <div class="cadence-wrap fish-scale-wrap" id="fish-scale-wrap" title="Scales the swimming speed of the fish">
@@ -2403,6 +2632,30 @@ body.fisheye-inline-mode .visualise-output.active {
   </div>
 
   <!-- 3. TRANSFORMATION CONCEPTS -->
+  <div class="row row-session-images">
+    <div class="row-label" title="Scrub through fisheye images generated in this browser session and click one to restore its full state.">
+      Session Images
+      <button class="collapse-btn" id="session-images-toggle-btn" onclick="toggleCollapse('session-images-body', this)">show</button>
+    </div>
+    <div class="collapsible-body collapsed" id="session-images-body">
+      <div class="fisheye-session-strip" id="fisheye-session-strip">
+        <div class="fisheye-session-head">
+          <span>Session Images</span>
+          <span class="fisheye-session-head-actions">
+            <span id="fisheye-session-count">0</span>
+            <button class="collapse-btn" id="clear-session-images-btn" type="button">clear</button>
+          </span>
+        </div>
+        <div class="fisheye-session-empty" id="fisheye-session-empty">Generated fisheye images appear here for scrubbing.</div>
+        <div class="fisheye-session-scroll">
+          <button class="collapse-btn fisheye-session-scroll-btn" id="fisheye-session-left-btn" type="button" aria-label="Scroll session images left">&larr;</button>
+          <div class="fisheye-session-list" id="fisheye-session-list"></div>
+          <button class="collapse-btn fisheye-session-scroll-btn" id="fisheye-session-right-btn" type="button" aria-label="Scroll session images right">&rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="row row-concepts">
     <div class="row-label" title="Trout, Salmon, Flouder, Frog.. etc">fish</div>
     <div class="sentence-row">
@@ -2676,6 +2929,7 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
 <!-- Floating history tooltip -->
 <div class="history-tooltip" id="history-tooltip"></div>
 <div class="godmode-toast" id="godmode-toast">god mode enabled</div>
+<div class="top-status-bar" id="top-status-bar" aria-live="polite"></div>
 
 <script>
 /* ═══════════════════════════════
@@ -2776,6 +3030,11 @@ var snapshotButtonFxTimer = null;
 var snapshotRestoreInProgress = false;
 var snapshotListCache = [];
 var snapshotUrlLoadHandled = false;
+var topStatusBarTimer = null;
+var fisheyeSessionFrames = [];
+var fisheyeSessionFrameCounter = 0;
+var activeFisheyeSessionFrameId = null;
+var fisheyeSessionPreviewFrameId = null;
 var fisheyeFixedSeed = 2110;
 var apiLogState = {
   llm: [],
@@ -2802,9 +3061,6 @@ var mergeHoldRaf = null;
 var dragPointerX = 0;
 var dragPointerY = 0;
 var sharkRunTimer = null;
-var asciiBgLoaded = false;
-var asciiBgDisabled = false;
-var fishAsciiBuffer = '';
 var uiTheme = 'dark';
 var uiDefaultTheme = 'dark';
 var appConfig = {};
@@ -3421,25 +3677,6 @@ function maybeTriggerGodmode(key) {
   }
 }
 
-function maybeTriggerFishAsciiToggle(key) {
-  if (!key || key.length !== 1 || !/[a-z]/i.test(key)) return;
-  fishAsciiBuffer += key.toLowerCase();
-  if (fishAsciiBuffer.length > 24) fishAsciiBuffer = fishAsciiBuffer.slice(-24);
-  if (fishAsciiBuffer.endsWith('fishoff')) {
-    fishAsciiBuffer = '';
-    asciiBgDisabled = true;
-    updateAsciiFishBackground();
-    showGodmodeToast('fish mode disabled');
-    return;
-  }
-  if (fishAsciiBuffer.endsWith('fishon')) {
-    fishAsciiBuffer = '';
-    asciiBgDisabled = false;
-    updateAsciiFishBackground();
-    showGodmodeToast(chipPhysicsEnabled ? 'fish mode enabled' : 'fish mode armed');
-  }
-}
-
 function showGodmodeToast(message) {
   var toast = document.getElementById('godmode-toast');
   if (!toast) return;
@@ -3449,6 +3686,25 @@ function showGodmodeToast(message) {
   godmodeToastTimer = setTimeout(function() {
     toast.classList.remove('visible');
   }, 1100);
+}
+
+function showTopStatusBar(message, durationMs) {
+  var el = document.getElementById('top-status-bar');
+  if (!el) return;
+  if (topStatusBarTimer) {
+    clearTimeout(topStatusBarTimer);
+    topStatusBarTimer = null;
+  }
+  el.textContent = String(message || '').trim();
+  if (!el.textContent) {
+    el.classList.remove('visible');
+    return;
+  }
+  el.classList.add('visible');
+  topStatusBarTimer = setTimeout(function() {
+    el.classList.remove('visible');
+    topStatusBarTimer = null;
+  }, Math.max(900, durationMs || 2200));
 }
 
 function startPongMode() {
@@ -4619,6 +4875,8 @@ function pushHistory(outputText) {
   currentFisheyeImageRef = null;
   currentFisheyeImageUrl = '';
   if (feedbackModeEnabled && !isYouAreWhatYouEatEnabled()) syncMissionToCurrentOutput();
+  syncActiveFisheyeSessionFrame();
+  renderFisheyeSessionGallery();
   renderHistory();
   updateFeedbackButtonState();
 }
@@ -4710,6 +4968,8 @@ function restoreHistory(index) {
   updateFisheyeAvailability();
   updateVisualiseOutputVisibility();
   setFisheyeImage(currentFisheyeImageUrl || '');
+  syncActiveFisheyeSessionFrame();
+  renderFisheyeSessionGallery();
   updateFeedbackButtonState();
 
   document.getElementById('generated-prompt').textContent = buildPrompt();
@@ -5346,7 +5606,7 @@ function updateChipPhysicsButtonState() {
   var btn = document.getElementById('chip-physics-btn');
   if (btn) {
     btn.classList.toggle('active', chipPhysicsEnabled);
-    btn.textContent = 'fish physics';
+    btn.textContent = 'fish phsyx';
   }
   var scaleWrap = document.getElementById('fish-scale-wrap');
   var scaleSlider = document.getElementById('fish-speed-scale');
@@ -5499,6 +5759,42 @@ function flashFisheyeBadge(text) {
       }, 520);
     })(badgeIds[i]);
   }
+}
+
+function isFisheyeLightboxOpen() {
+  var lightbox = document.getElementById('fisheye-lightbox');
+  return !!(lightbox && lightbox.classList.contains('active'));
+}
+
+function openFisheyeLightbox(imageUrl) {
+  var lightbox = document.getElementById('fisheye-lightbox');
+  var imageEl = document.getElementById('fisheye-lightbox-image');
+  if (!lightbox || !imageEl || !imageUrl) return;
+  imageEl.src = imageUrl;
+  lightbox.classList.add('active');
+  lightbox.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeFisheyeLightbox() {
+  var lightbox = document.getElementById('fisheye-lightbox');
+  var imageEl = document.getElementById('fisheye-lightbox-image');
+  if (!lightbox || !imageEl) return;
+  lightbox.classList.remove('active');
+  lightbox.setAttribute('aria-hidden', 'true');
+  imageEl.src = '';
+  document.body.style.overflow = '';
+}
+
+function onFisheyeImageActivate(e) {
+  if (e) {
+    if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+    if (e.cancelable) e.preventDefault();
+  }
+  if (isFisheyeEditModeEnabled()) return;
+  var imageUrl = getDisplayedFisheyeSrc() || currentFisheyeImageUrl || '';
+  if (!imageUrl) return;
+  openFisheyeLightbox(imageUrl);
 }
 
 function updateFisheyeOriginalPreview() {
@@ -5918,6 +6214,7 @@ async function visualiseCurrentOutput(retryCount) {
       updateMixerFisheyeLayout();
       renderChips();
       renderHistory();
+      addFisheyeSessionFrame(returnedRef, returnedUrl, requestOutputText);
       pushApiLog('fisheye', 'ok', 'Image ready and attached to current output' + (returnedRef ? ' (' + returnedRef + ').' : '.'));
       validateDisplayedFisheyeUpdate(returnedUrl, requestOutputText, retryCount);
       completed = !!returnedUrl;
@@ -6153,29 +6450,9 @@ function toggleChipPhysics() {
     startChipPhysicsLoop();
   }
   if (!wasEnabled && chipPhysicsEnabled) triggerSharkRun();
-  updateAsciiFishBackground();
   updateChipPhysicsButtonState();
   conceptLastMoveTs = Date.now();
   refreshInactivityWatchState();
-}
-
-function updateAsciiFishBackground() {
-  var layer = document.getElementById('ascii-bg-layer');
-  var frame = document.getElementById('ascii-bg-frame');
-  if (!layer || !frame) return;
-  if (chipPhysicsEnabled && !asciiBgDisabled) {
-    if (!asciiBgLoaded) {
-      frame.src = '/fishanimation.html';
-      asciiBgLoaded = true;
-    }
-    layer.classList.add('active');
-    return;
-  }
-  layer.classList.remove('active');
-  if (asciiBgLoaded) {
-    frame.src = 'about:blank';
-    asciiBgLoaded = false;
-  }
 }
 
 function toggleBmpMode() {
@@ -6804,6 +7081,239 @@ function clonePlain(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function captureFisheyeSessionState() {
+  var outputWrap = document.getElementById('output-with-controls');
+  return {
+    mission: document.getElementById('mission').value || '',
+    steer: document.getElementById('steer-input').value || '',
+    food_for_thought: document.getElementById('food-for-thought').value || '',
+    direction_1: document.getElementById('direction-1').value || '',
+    direction_2: document.getElementById('direction-2').value || '',
+    base_preamble: document.getElementById('base-preamble').value || '',
+    base_closing: document.getElementById('base-closing').value || '',
+    tag_tokens: clonePlain(tagTokens),
+    words: clonePlain(words),
+    current_output: currentOutput || '',
+    current_output_entry: currentOutputEntry ? clonePlain(currentOutputEntry) : null,
+    output_history: clonePlain(outputHistory),
+    ui: {
+      theme: document.documentElement.getAttribute('data-theme') || 'dark',
+      output_collapsed: !!(outputWrap && outputWrap.classList.contains('collapsed')),
+      mixer_height: (document.getElementById('mixer').clientHeight || 300),
+      fisheye_pane_manual_width: fisheyePaneManualWidth,
+    },
+    controls: {
+      keep_brief: !!document.getElementById('keep-brief').checked,
+      visualise_auto: !!document.getElementById('visualise-auto').checked,
+      llm_deterministic_toggle: !!document.getElementById('llm-deterministic-toggle').checked,
+      slw_toggle: !!document.getElementById('slw-toggle').checked,
+      steer_toggle: !!document.getElementById('steer-toggle').checked,
+      fisheye_rdmx: !!document.getElementById('fisheye-rdmx').checked,
+      fisheye_edit_mode: !!document.getElementById('fisheye-edit-mode').checked,
+      you_are_what_you_eat: !!document.getElementById('you-are-what-you-eat').checked,
+      feedback_mode_enabled: !!feedbackModeEnabled,
+      infinite_feedback_enabled: !!infiniteFeedbackEnabled,
+      chip_physics_enabled: !!chipPhysicsEnabled,
+      chip_physics_bmp_mode: !!chipPhysicsBmpMode,
+    },
+    models: {
+      text_model: document.getElementById('model-select').value || '',
+      image_model: document.getElementById('fisheye-model-select').value || '',
+    },
+    sliders: {
+      infinite_cadence: document.getElementById('infinite-cadence').value || '2500',
+      fish_speed_scale: document.getElementById('fish-speed-scale').value || '0',
+      fisheye_ssd_strength: document.getElementById('fisheye-ssd-strength').value || '0.8',
+    },
+    fisheye: {
+      current_image_ref: currentFisheyeImageRef,
+      current_image_url: currentFisheyeImageUrl || '',
+      edit_source_ref: fisheyeEditSourceRef,
+      edit_source_url: fisheyeEditSourceUrl || '',
+    },
+  };
+}
+
+function getCurrentFisheyeSessionFrame() {
+  if (!activeFisheyeSessionFrameId) return null;
+  for (var i = 0; i < fisheyeSessionFrames.length; i++) {
+    if (fisheyeSessionFrames[i].id === activeFisheyeSessionFrameId) return fisheyeSessionFrames[i];
+  }
+  return null;
+}
+
+function isDesktopHoverSessionGalleryMode() {
+  return !!(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+}
+
+function buildSessionFrameLoadState(frameState) {
+  var state = clonePlain(frameState || {});
+  if (!state.controls) state.controls = {};
+  if (!state.ui) state.ui = {};
+  state.controls.feedback_mode_enabled = false;
+  state.controls.infinite_feedback_enabled = false;
+  state.controls.chip_physics_enabled = false;
+  state.controls.chip_physics_bmp_mode = false;
+  state.ui.output_collapsed = false;
+  state.ui.mixer_height = 300;
+  state.ui.fisheye_pane_manual_width = null;
+  return state;
+}
+
+function loadFisheyeSessionFrame(frame, source) {
+  if (!frame || !frame.state) return;
+  if (activeFisheyeSessionFrameId === frame.id && source === 'hover') return;
+  fisheyeSessionPreviewFrameId = null;
+  activeFisheyeSessionFrameId = frame.id;
+  outputWindowHeightPx = 0;
+  applySnapshotState(buildSessionFrameLoadState(frame.state), { clearSessionImages: false });
+  syncOutputWindowHeightToThought();
+  syncActiveFisheyeSessionFrame();
+  renderFisheyeSessionGallery();
+  pushApiLog('fisheye', 'info', 'Restored session image state from gallery' + (source ? ' via ' + source : '') + '.');
+}
+
+function clearFisheyeSessionGallery() {
+  fisheyeSessionFrames = [];
+  fisheyeSessionFrameCounter = 0;
+  activeFisheyeSessionFrameId = null;
+  fisheyeSessionPreviewFrameId = null;
+  renderFisheyeSessionGallery();
+  pushApiLog('fisheye', 'info', 'Cleared session image gallery.');
+}
+
+function updateFisheyeSessionScrollButtons() {
+  var list = document.getElementById('fisheye-session-list');
+  var leftBtn = document.getElementById('fisheye-session-left-btn');
+  var rightBtn = document.getElementById('fisheye-session-right-btn');
+  if (!list || !leftBtn || !rightBtn) return;
+  var maxScroll = Math.max(0, list.scrollWidth - list.clientWidth);
+  var scrollLeft = Math.max(0, list.scrollLeft || 0);
+  leftBtn.disabled = scrollLeft <= 2;
+  rightBtn.disabled = scrollLeft >= (maxScroll - 2);
+}
+
+function scrollFisheyeSessionGallery(direction) {
+  var list = document.getElementById('fisheye-session-list');
+  if (!list) return;
+  var delta = Math.max(120, Math.round(list.clientWidth * 0.72));
+  list.scrollBy({
+    left: direction < 0 ? -delta : delta,
+    behavior: 'smooth',
+  });
+  setTimeout(updateFisheyeSessionScrollButtons, 220);
+}
+
+function syncActiveFisheyeSessionFrame() {
+  var matchedId = null;
+  for (var i = fisheyeSessionFrames.length - 1; i >= 0; i--) {
+    var frame = fisheyeSessionFrames[i];
+    if (!frame || !frame.state) continue;
+    var sameImage = ((frame.state.fisheye && frame.state.fisheye.current_image_url) || '') === (currentFisheyeImageUrl || '');
+    var sameOutput = (frame.state.current_output || '') === (currentOutput || '');
+    if (sameImage && sameOutput) {
+      matchedId = frame.id;
+      break;
+    }
+  }
+  activeFisheyeSessionFrameId = matchedId;
+}
+
+function renderFisheyeSessionGallery() {
+  var list = document.getElementById('fisheye-session-list');
+  var empty = document.getElementById('fisheye-session-empty');
+  var count = document.getElementById('fisheye-session-count');
+  if (!list || !empty || !count) return;
+
+  list.innerHTML = '';
+  count.textContent = String(fisheyeSessionFrames.length);
+  empty.style.display = fisheyeSessionFrames.length ? 'none' : '';
+  if (!fisheyeSessionFrames.length) {
+    updateFisheyeSessionScrollButtons();
+    return;
+  }
+
+  fisheyeSessionFrames.forEach(function(frame, index) {
+    if (!frame || !frame.image_url) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fisheye-session-thumb' + (frame.id === activeFisheyeSessionFrameId ? ' active' : '');
+    btn.title = 'Load session image ' + (index + 1);
+
+    var media = document.createElement('div');
+    media.className = 'fisheye-session-thumb-media';
+
+    var img = document.createElement('img');
+    img.src = frame.image_url;
+    img.alt = 'Session image ' + (index + 1);
+    media.appendChild(img);
+
+    var meta = document.createElement('div');
+    meta.className = 'fisheye-session-meta';
+    var num = document.createElement('div');
+    num.className = 'fisheye-session-num';
+    num.textContent = String(index + 1);
+    meta.appendChild(num);
+    media.appendChild(meta);
+
+    var overlay = document.createElement('div');
+    overlay.className = 'fisheye-session-overlay';
+    var txt = document.createElement('div');
+    txt.className = 'fisheye-session-text';
+    txt.textContent = frame.output_text || '(image)';
+    overlay.appendChild(txt);
+    media.appendChild(overlay);
+    btn.appendChild(media);
+
+    var tooltip = document.createElement('div');
+    tooltip.className = 'fisheye-session-tooltip';
+    tooltip.textContent = (frame.output_text || '(image prompt unavailable)').slice(0, 220);
+    btn.appendChild(tooltip);
+
+    if (isDesktopHoverSessionGalleryMode()) {
+      btn.addEventListener('mouseenter', function() {
+        loadFisheyeSessionFrame(frame, 'hover');
+      });
+      btn.addEventListener('focus', function() {
+        loadFisheyeSessionFrame(frame, 'focus');
+      });
+    }
+    btn.addEventListener('click', function() {
+      if (isDesktopHoverSessionGalleryMode()) return;
+      loadFisheyeSessionFrame(frame, 'click');
+    });
+
+    list.appendChild(btn);
+  });
+  updateFisheyeSessionScrollButtons();
+}
+
+function addFisheyeSessionFrame(imageRef, imageUrl, outputText) {
+  if (!imageUrl) return;
+  var state = captureFisheyeSessionState();
+  var stateImageUrl = (state.fisheye && state.fisheye.current_image_url) || '';
+  if (!stateImageUrl) return;
+  var latest = fisheyeSessionFrames.length ? fisheyeSessionFrames[fisheyeSessionFrames.length - 1] : null;
+  if (latest && latest.image_url === imageUrl && (latest.output_text || '') === (outputText || '')) {
+    latest.state = state;
+    activeFisheyeSessionFrameId = latest.id;
+    renderFisheyeSessionGallery();
+    return;
+  }
+  var frame = {
+    id: 'fs-' + (++fisheyeSessionFrameCounter),
+    image_ref: imageRef || null,
+    image_url: imageUrl,
+    output_text: outputText || '',
+    created_at: Date.now(),
+    state: state,
+  };
+  fisheyeSessionFrames.push(frame);
+  if (fisheyeSessionFrames.length > 120) fisheyeSessionFrames.shift();
+  activeFisheyeSessionFrameId = frame.id;
+  renderFisheyeSessionGallery();
+}
+
 function getSnapshotDayValue(createdAt) {
   var ts = Number(createdAt || 0);
   if (!isFinite(ts) || ts <= 0) return '';
@@ -6812,6 +7322,20 @@ function getSnapshotDayValue(createdAt) {
   var m = String(d.getMonth() + 1).padStart(2, '0');
   var day = String(d.getDate()).padStart(2, '0');
   return y + '-' + m + '-' + day;
+}
+
+function _coerceFisheyeRefFromUrl(imageUrl) {
+  var raw = String(imageUrl || '').trim();
+  if (!raw) return null;
+  var path = raw;
+  try {
+    path = new URL(raw, window.location.origin).pathname || raw;
+  } catch (_) {}
+  var marker = '/api/fisheye-images/';
+  if (path.indexOf(marker) === -1) return null;
+  var ref = path.split(marker).pop() || '';
+  ref = ref.replace(/^\/+|\/+$/g, '');
+  return ref || null;
 }
 
 function formatSnapshotDayLabel(dayValue) {
@@ -6924,10 +7448,36 @@ async function ensureSnapshotImageRef(imageRef, imageUrl) {
   };
 }
 
+function getVisibleSnapshotImageCandidate() {
+  var displayedUrl = getDisplayedFisheyeSrc();
+  if (displayedUrl) {
+    return {
+      image_ref: _coerceFisheyeRefFromUrl(displayedUrl),
+      image_url: displayedUrl,
+    };
+  }
+  if (currentOutputEntry && (currentOutputEntry.fisheye_image_url || currentOutputEntry.fisheye_image_ref)) {
+    return {
+      image_ref: currentOutputEntry.fisheye_image_ref || null,
+      image_url: currentOutputEntry.fisheye_image_url || '',
+    };
+  }
+  return {
+    image_ref: currentFisheyeImageRef,
+    image_url: currentFisheyeImageUrl || '',
+  };
+}
+
 async function captureSnapshotState() {
-  var currentImage = await ensureSnapshotImageRef(currentFisheyeImageRef, currentFisheyeImageUrl);
+  var currentImageCandidate = getVisibleSnapshotImageCandidate();
+  var currentImage = await ensureSnapshotImageRef(currentImageCandidate.image_ref, currentImageCandidate.image_url);
   var editImage = await ensureSnapshotImageRef(fisheyeEditSourceRef, fisheyeEditSourceUrl);
   var outputWrap = document.getElementById('output-with-controls');
+  var currentOutputEntrySnapshot = currentOutputEntry ? clonePlain(currentOutputEntry) : null;
+  if (currentOutputEntrySnapshot && currentImage.image_url) {
+    currentOutputEntrySnapshot.fisheye_image_ref = currentImage.image_ref;
+    currentOutputEntrySnapshot.fisheye_image_url = currentImage.image_url;
+  }
   return {
     mission: document.getElementById('mission').value || '',
     steer: document.getElementById('steer-input').value || '',
@@ -6939,7 +7489,7 @@ async function captureSnapshotState() {
     tag_tokens: clonePlain(tagTokens),
     words: clonePlain(words),
     current_output: currentOutput || '',
-    current_output_entry: currentOutputEntry ? clonePlain(currentOutputEntry) : null,
+    current_output_entry: currentOutputEntrySnapshot,
     output_history: clonePlain(outputHistory),
     ui: {
       theme: document.documentElement.getAttribute('data-theme') || 'dark',
@@ -6979,10 +7529,18 @@ async function captureSnapshotState() {
   };
 }
 
-function applySnapshotState(state) {
+function applySnapshotState(state, options) {
   if (!state || typeof state !== 'object') return;
+  options = options || {};
   snapshotRestoreInProgress = true;
   try {
+    if (options.clearSessionImages !== false) {
+      var hadSessionImages = !!fisheyeSessionFrames.length;
+      clearFisheyeSessionGallery();
+      if (hadSessionImages) {
+        showTopStatusBar('cleared session image cache when loading snapshot', 2600);
+      }
+    }
     clearInfiniteCountdown();
     stopCadenceProgressDisplay();
     stopRequestProgressDisplay();
@@ -7020,7 +7578,7 @@ function applySnapshotState(state) {
 
     feedbackModeEnabled = !!(state.controls && state.controls.feedback_mode_enabled);
     infiniteFeedbackEnabled = !!(state.controls && state.controls.infinite_feedback_enabled);
-    chipPhysicsEnabled = !!(state.controls && state.controls.chip_physics_enabled);
+    chipPhysicsEnabled = false;
     chipPhysicsBmpMode = !!(state.controls && state.controls.chip_physics_bmp_mode);
 
     tagTokens = Array.isArray(state.tag_tokens) ? clonePlain(state.tag_tokens) : [];
@@ -7085,6 +7643,8 @@ function applySnapshotState(state) {
     renderChips();
     renderHistory();
     setFisheyeImage(currentFisheyeImageUrl || '');
+    syncActiveFisheyeSessionFrame();
+    renderFisheyeSessionGallery();
     updateFisheyeAvailability();
     updateVisualiseOutputVisibility();
     updateFisheyeOriginalPreview();
@@ -7557,9 +8117,13 @@ bindControlButton('chip-physics-btn', toggleChipPhysics);
 bindControlButton('rnd-btn', launchRandomTrajectories);
 bindControlButton('bmp-btn', toggleBmpMode);
 bindControlButton('trawl-haul-btn', haulTrawl);
+bindControlButton('clear-session-images-btn', clearFisheyeSessionGallery);
+bindControlButton('fisheye-session-left-btn', function() { scrollFisheyeSessionGallery(-1); });
+bindControlButton('fisheye-session-right-btn', function() { scrollFisheyeSessionGallery(1); });
 [
   'output-collapse-btn',
   'save-snapshot-btn',
+  'session-images-toggle-btn',
   'snapshots-toggle-btn',
   'load-snapshot-btn',
   'download-snapshot-current-outputs-btn',
@@ -7617,14 +8181,23 @@ var refreshSnapshotBtnEl = document.getElementById('refresh-snapshot-btn');
 if (refreshSnapshotBtnEl) refreshSnapshotBtnEl.addEventListener('click', function() {
   refreshSnapshotList();
 });
+var fisheyeSessionListEl = document.getElementById('fisheye-session-list');
+if (fisheyeSessionListEl) fisheyeSessionListEl.addEventListener('scroll', updateFisheyeSessionScrollButtons, { passive: true });
 ['visualise-image', 'visualise-image-inline'].forEach(function(id) {
   var visualiseImageEl = document.getElementById(id);
   if (!visualiseImageEl) return;
+  visualiseImageEl.tabIndex = 0;
+  visualiseImageEl.addEventListener('click', onFisheyeImageActivate);
+  visualiseImageEl.addEventListener('keydown', onFisheyeImageActivate);
   visualiseImageEl.addEventListener('load', function() {
     updateMixerFisheyeLayout();
     renderChips();
   });
 });
+var fisheyeLightboxBackdropEl = document.getElementById('fisheye-lightbox-backdrop');
+if (fisheyeLightboxBackdropEl) fisheyeLightboxBackdropEl.addEventListener('click', closeFisheyeLightbox);
+var fisheyeLightboxEl = document.getElementById('fisheye-lightbox');
+if (fisheyeLightboxEl) fisheyeLightboxEl.addEventListener('click', closeFisheyeLightbox);
 updateFisheyeAvailability();
 updateVisualiseOutputVisibility();
 updateSteerVisibility();
@@ -7693,10 +8266,14 @@ document.addEventListener('touchstart', markTouchUiActivity, { passive: true });
 document.addEventListener('touchmove', markTouchUiActivity, { passive: true });
 document.addEventListener('touchend', markTouchUiActivity, { passive: true });
 document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && isFisheyeLightboxOpen()) {
+    e.preventDefault();
+    closeFisheyeLightbox();
+    return;
+  }
   markUserActivity();
   maybeTriggerPongEasterEgg(e.key);
   maybeTriggerGodmode(e.key);
-  maybeTriggerFishAsciiToggle(e.key);
 });
 document.addEventListener('input', markUserActivity);
 document.addEventListener('mousedown', function() {
@@ -7710,7 +8287,6 @@ loadAppConfig().finally(function() {
   updateFeedbackButtonState();
   updateInfiniteFeedbackButtonState();
   updateChipPhysicsButtonState();
-  updateAsciiFishBackground();
   updateBmpButtonState();
   updateCadenceLabel();
   updateFishScaleLabel();
