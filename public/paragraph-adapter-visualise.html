@@ -2746,9 +2746,9 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
   <div class="row row-history">
     <div class="row-label" style="margin-bottom:6px" title="Self explanatory, if you click one then that state should be loaded back in (if fish mode enabled then.. good luck)">
       Previous outputs
-      <button class="collapse-btn" id="history-toggle-btn" onclick="toggleCollapse('history-body', this)">hide</button>
+      <button class="collapse-btn" id="history-toggle-btn" onclick="toggleCollapse('history-body', this)">show</button>
     </div>
-    <div class="collapsible-body" id="history-body">
+    <div class="collapsible-body collapsed" id="history-body">
       <div class="history-empty" id="history-empty">
         Previous outputs will appear here as you adjust the mixer.
       </div>
@@ -3030,6 +3030,7 @@ var snapshotButtonFxTimer = null;
 var snapshotRestoreInProgress = false;
 var snapshotListCache = [];
 var snapshotUrlLoadHandled = false;
+var pendingSnapshotLoadRequest = null;
 var topStatusBarTimer = null;
 var fisheyeSessionFrames = [];
 var fisheyeSessionFrameCounter = 0;
@@ -4836,6 +4837,7 @@ async function generateOutput(promptOverride) {
     if (shouldAutoVisualise) {
       requestVisualiseRefresh();
     }
+    maybeRunPendingSnapshotLoad();
   }
 }
 
@@ -4856,7 +4858,7 @@ function pushHistory(outputText) {
 
   if (currentOutputEntry && currentOutputEntry.output) {
     outputHistory.unshift(currentOutputEntry);
-    if (outputHistory.length > 20) outputHistory.pop();
+    if (outputHistory.length > 50) outputHistory.pop();
   }
 
   currentOutputEntry = {
@@ -4939,7 +4941,7 @@ function restoreHistory(index) {
       outputHistory.splice(index, 1);
     }
     currentOutputEntry = item;
-    if (outputHistory.length > 20) outputHistory.pop();
+    if (outputHistory.length > 50) outputHistory.pop();
   }
 
   document.getElementById('mission').value = item.source || '';
@@ -6262,6 +6264,7 @@ async function visualiseCurrentOutput(retryCount) {
       pushApiLog('llm', 'info', 'Resuming deferred text generation after fisheye image generation completed.');
       requestGenerate();
     }
+    maybeRunPendingSnapshotLoad();
   }
 }
 
@@ -7010,6 +7013,14 @@ function setSnapshotStatus(text, isError) {
   }
 }
 
+function maybeRunPendingSnapshotLoad() {
+  if (!pendingSnapshotLoadRequest) return;
+  if (isStreaming || visualiseInFlight) return;
+  var pending = pendingSnapshotLoadRequest;
+  pendingSnapshotLoadRequest = null;
+  loadSnapshotById(pending.snapshotId, pending.options || {});
+}
+
 function clearSnapshotButtonFxTimer() {
   if (snapshotButtonFxTimer) {
     clearTimeout(snapshotButtonFxTimer);
@@ -7726,7 +7737,11 @@ async function loadSnapshotById(snapshotId, options) {
   var btn = document.getElementById('load-snapshot-btn');
   if (!resolvedId) return;
   if (isStreaming || visualiseInFlight) {
-    setSnapshotStatus('Wait for active generation to finish before loading.', true);
+    pendingSnapshotLoadRequest = {
+      snapshotId: resolvedId,
+      options: options,
+    };
+    setSnapshotStatus('Waiting for active generation to finish, then loading snapshot...');
     return;
   }
   if (options.syncSelectors !== false) {
