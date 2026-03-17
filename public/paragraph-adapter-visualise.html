@@ -3035,6 +3035,7 @@ var fisheyeSessionFrames = [];
 var fisheyeSessionFrameCounter = 0;
 var activeFisheyeSessionFrameId = null;
 var fisheyeSessionPreviewFrameId = null;
+var lastDisplayedFisheyeImageUrl = '';
 var fisheyeFixedSeed = 2110;
 var apiLogState = {
   llm: [],
@@ -5792,7 +5793,7 @@ function onFisheyeImageActivate(e) {
     if (e.cancelable) e.preventDefault();
   }
   if (isFisheyeEditModeEnabled()) return;
-  var imageUrl = getDisplayedFisheyeSrc() || currentFisheyeImageUrl || '';
+  var imageUrl = getDisplayedFisheyeSrc() || lastDisplayedFisheyeImageUrl || currentFisheyeImageUrl || '';
   if (!imageUrl) return;
   openFisheyeLightbox(imageUrl);
 }
@@ -5889,6 +5890,7 @@ function isFisheyeInlineMode() {
 
 function setFisheyeImage(url) {
   var imageIds = ['visualise-image', 'visualise-image-inline'];
+  if (url) lastDisplayedFisheyeImageUrl = url;
   for (var i = 0; i < imageIds.length; i++) {
     var imageEl = document.getElementById(imageIds[i]);
     if (!imageEl) continue;
@@ -5899,6 +5901,10 @@ function setFisheyeImage(url) {
       imageEl.classList.remove('active');
       imageEl.src = '';
     }
+  }
+  if (isFisheyeLightboxOpen() && url) {
+    var lightboxImageEl = document.getElementById('fisheye-lightbox-image');
+    if (lightboxImageEl) lightboxImageEl.src = url;
   }
   updateFisheyeEditControls();
 }
