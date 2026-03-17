@@ -29,12 +29,13 @@ import urllib.parse
 import base64
 from typing import Optional
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 from openai import OpenAI
+from PIL import Image, PngImagePlugin
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_PATH = os.path.join(BASE_DIR, ".env")
@@ -78,6 +79,8 @@ SNAPSHOT_DIR = os.path.join(PROMPT_STORE_DIR, "snapshots")
 SNAPSHOT_IMAGE_DIR = os.path.join(SNAPSHOT_DIR, "images")
 API_COUNTER_LOCK = threading.Lock()
 FISHEYE_GAME_LOCK = threading.Lock()
+EMBEDDED_IMAGE_METADATA_KEY = "pthinktank_state"
+EMBEDDED_IMAGE_METADATA_VERSION = 1
 DEFAULT_APP_CONFIG = {
     "default_theme": "dark",
     "default_model": "groq:llama-3.3-70b-versatile",
@@ -148,6 +151,7 @@ class VisualisePayload(BaseModel):
     use_input_image: Optional[bool] = False
     input_image_ref: Optional[str] = None
     input_image_url: Optional[str] = None
+    creation_state: Optional[dict] = None
 
 
 class FisheyeImageImportPayload(BaseModel):
@@ -229,6 +233,7 @@ def _upsert_env_values(path: str, updates: dict[str, str]) -> None:
         f.write("\n".join(result).rstrip() + "\n")
 
 
+# Reads a UTF-8 text file and returns None when the file does not exist.
 def _read_text(path: str) -> Optional[str]:
     if not os.path.exists(path):
         return None
@@ -236,12 +241,14 @@ def _read_text(path: str) -> Optional[str]:
         return f.read()
 
 
+# Writes UTF-8 text to disk, creating parent directories when needed.
 def _write_text(path: str, value: str) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(value)
 
 
+# Reads a JSON object from disk and returns None on missing or invalid data.
 def _read_json(path: str) -> Optional[dict]:
     if not os.path.exists(path):
         return None
@@ -253,6 +260,7 @@ def _read_json(path: str) -> Optional[dict]:
         return None
 
 
+# Writes a JSON object to disk with stable formatting.
 def _write_json(path: str, value: dict) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -260,6 +268,7 @@ def _write_json(path: str, value: dict) -> None:
         f.write("\n")
 
 
+# Reads a list of JSON objects from disk, accepting either a bare list or an items wrapper.
 def _read_json_list(path: str) -> list[dict]:
     if not os.path.exists(path):
         return []
@@ -275,6 +284,7 @@ def _read_json_list(path: str) -> list[dict]:
     return []
 
 
+# Writes a list of JSON objects using the app's items wrapper format.
 def _write_json_list(path: str, items: list[dict]) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -382,6 +392,7 @@ def _normalize_app_config(raw: Optional[dict]) -> dict:
     return out
 
 
+# Returns the current app configuration merged over defaults.
 def _get_current_app_config() -> dict:
     saved = _normalize_app_config(_read_json(APP_CONFIG_PATH))
     merged = dict(DEFAULT_APP_CONFIG)
@@ -410,6 +421,7 @@ def _get_current_app_config() -> dict:
     return merged
 
 
+# Reads the persisted API call counter from disk.
 def _read_api_call_count() -> int:
     data = _read_json(API_COUNTER_PATH)
     if not isinstance(data, dict):
@@ -421,6 +433,7 @@ def _read_api_call_count() -> int:
     return max(0, n)
 
 
+# Increments the API call counter and returns the new value.
 def _increment_api_call_count() -> int:
     with API_COUNTER_LOCK:
         current = _read_api_call_count()
@@ -429,6 +442,7 @@ def _increment_api_call_count() -> int:
         return next_value
 
 
+# Creates the API counter file if it does not exist yet.
 def _ensure_api_counter_file() -> None:
     if os.path.exists(API_COUNTER_PATH):
         return
@@ -454,6 +468,7 @@ def _build_model_client(model: str) -> tuple[OpenAI, str]:
     )
 
 
+# Attempts to coerce a loose value into a boolean.
 def _coerce_bool(value) -> Optional[bool]:
     if isinstance(value, bool):
         return value
@@ -468,6 +483,7 @@ def _coerce_bool(value) -> Optional[bool]:
     return None
 
 
+# Normalizes a seed value and falls back when the provided value is invalid.
 def _coerce_seed(value, fallback: int) -> int:
     try:
         parsed = int(value)
@@ -476,6 +492,7 @@ def _coerce_seed(value, fallback: int) -> int:
     return max(0, min(2147483647, parsed))
 
 
+# Determines the final seed and temperature settings for a text generation request.
 def _resolve_text_determinism(
     deterministic_override=None,
     seed_override=None,
@@ -490,6 +507,7 @@ def _resolve_text_determinism(
     return deterministic, seed
 
 
+# Executes a chat completion request against the selected model provider.
 def _chat_completion_create(
     client: OpenAI,
     deterministic: bool,
@@ -513,6 +531,7 @@ def _chat_completion_create(
         raise
 
 
+# Calls the Replicate HTTP API and returns the parsed JSON response.
 def _replicate_http_json(
     url: str,
     method: str = "GET",
@@ -566,6 +585,7 @@ def _download_binary(url: str) -> tuple[bytes, str]:
     return payload, content_type
 
 
+# Calls the Daydream API and returns the parsed JSON response.
 def _daydream_http_json(
     path_or_url: str,
     method: str = "GET",
@@ -635,6 +655,7 @@ def _daydream_attempt(
         attempt["elapsed_ms"] = int((time.perf_counter() - started) * 1000)
 
 
+# Extracts a Daydream stream id from a response payload.
 def _extract_daydream_stream_id(payload: dict) -> Optional[str]:
     candidates = [
         payload.get("stream_id"),
@@ -648,6 +669,7 @@ def _extract_daydream_stream_id(payload: dict) -> Optional[str]:
     return None
 
 
+# Builds a stream-specific file path from a template path.
 def _path_to_template(path: str, stream_id: str) -> str:
     stream = (stream_id or "").strip()
     if not stream:
@@ -655,6 +677,7 @@ def _path_to_template(path: str, stream_id: str) -> str:
     return path.replace(stream, "{id}", 1)
 
 
+# Infers a file extension for an image from its URL and content type.
 def _infer_image_extension(source_url: str, content_type: str) -> str:
     ct = (content_type or "").split(";", 1)[0].strip().lower()
     ext = mimetypes.guess_extension(ct) if ct else None
@@ -669,16 +692,128 @@ def _infer_image_extension(source_url: str, content_type: str) -> str:
     return ".jpg"
 
 
-def _store_fisheye_image(source_url: str) -> tuple[str, str]:
-    os.makedirs(FISHEYE_IMAGE_DIR, exist_ok=True)
-    payload, content_type = _download_binary(source_url)
-    ext = _infer_image_extension(source_url, content_type)
-    image_ref = uuid.uuid4().hex[:20]
-    filename = f"{image_ref}{ext}"
-    file_path = os.path.join(FISHEYE_IMAGE_DIR, filename)
+# Normalizes embedded image metadata into a JSON-safe dict.
+def _sanitize_embedded_image_metadata(metadata: Optional[dict]) -> Optional[dict]:
+    if not isinstance(metadata, dict):
+        return None
+    try:
+        safe = json.loads(json.dumps(metadata))
+    except Exception:
+        return None
+    return safe if isinstance(safe, dict) else None
 
-    with open(file_path, "wb") as f:
-        f.write(payload)
+
+# Merges existing embedded image metadata with new values and app metadata fields.
+def _merge_embedded_image_metadata(existing: Optional[dict], updates: Optional[dict]) -> Optional[dict]:
+    merged: dict = {}
+    safe_existing = _sanitize_embedded_image_metadata(existing)
+    safe_updates = _sanitize_embedded_image_metadata(updates)
+    if isinstance(safe_existing, dict):
+        merged.update(safe_existing)
+    if isinstance(safe_updates, dict):
+        merged.update(safe_updates)
+    if not merged:
+        return None
+    merged["app"] = "PThinkTank"
+    merged["schema_version"] = EMBEDDED_IMAGE_METADATA_VERSION
+    merged["saved_at"] = int(time.time())
+    return merged
+
+
+# Reads embedded PThinkTank metadata from raw image bytes when present.
+def _extract_embedded_image_metadata_from_bytes(payload: bytes) -> Optional[dict]:
+    if not payload:
+        return None
+    try:
+        with Image.open(io.BytesIO(payload)) as img:
+            raw = None
+            if hasattr(img, "text") and isinstance(getattr(img, "text"), dict):
+                raw = img.text.get(EMBEDDED_IMAGE_METADATA_KEY)
+            if raw is None and isinstance(getattr(img, "info", None), dict):
+                raw = img.info.get(EMBEDDED_IMAGE_METADATA_KEY)
+            if not isinstance(raw, str) or not raw.strip():
+                return None
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else None
+    except Exception:
+        return None
+
+
+# Reads embedded PThinkTank metadata from a locally stored image file.
+def _read_embedded_image_metadata(file_path: str) -> Optional[dict]:
+    if not file_path or not os.path.exists(file_path):
+        return None
+    try:
+        with open(file_path, "rb") as f:
+            return _extract_embedded_image_metadata_from_bytes(f.read())
+    except Exception:
+        return None
+
+
+# Converts an image into a PNG file with embedded PThinkTank metadata.
+def _write_png_with_embedded_metadata(payload: bytes, file_path: str, metadata: Optional[dict]) -> None:
+    pnginfo = None
+    safe_metadata = _sanitize_embedded_image_metadata(metadata)
+    if safe_metadata:
+        pnginfo = PngImagePlugin.PngInfo()
+        pnginfo.add_text(
+            EMBEDDED_IMAGE_METADATA_KEY,
+            json.dumps(safe_metadata, separators=(",", ":"), ensure_ascii=True),
+        )
+
+    with Image.open(io.BytesIO(payload)) as img:
+        img.load()
+        has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
+        converted = img.convert("RGBA" if has_alpha else "RGB")
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        converted.save(file_path, format="PNG", pnginfo=pnginfo, optimize=True)
+
+
+# Extracts a restorable UI state payload from embedded image metadata when present.
+def _extract_restorable_state_from_embedded_metadata(metadata: Optional[dict]) -> Optional[dict]:
+    safe = _sanitize_embedded_image_metadata(metadata)
+    if not safe:
+        return None
+    for key in ("snapshot_state", "creation_state", "state"):
+        value = safe.get(key)
+        if isinstance(value, dict):
+            return value
+    return None
+
+
+# Downloads and stores a fisheye image as a PNG with embedded metadata.
+def _store_fisheye_image(source_url: str, embedded_metadata: Optional[dict] = None) -> tuple[str, str]:
+    payload, content_type = _download_binary(source_url)
+    return _store_fisheye_image_payload(
+        payload=payload,
+        content_type=content_type,
+        source_url=source_url,
+        embedded_metadata=embedded_metadata,
+    )
+
+
+# Stores image bytes as a fisheye image PNG with embedded metadata.
+def _store_fisheye_image_payload(
+    payload: bytes,
+    content_type: str = "",
+    source_url: str = "",
+    embedded_metadata: Optional[dict] = None,
+) -> tuple[str, str]:
+    os.makedirs(FISHEYE_IMAGE_DIR, exist_ok=True)
+    source_ext = _infer_image_extension(source_url, content_type)
+    existing_metadata = _extract_embedded_image_metadata_from_bytes(payload)
+    merged_metadata = _merge_embedded_image_metadata(
+        existing_metadata,
+        {
+            "source_url": source_url,
+            "source_extension": source_ext,
+            **(_sanitize_embedded_image_metadata(embedded_metadata) or {}),
+        },
+    )
+    image_ref = uuid.uuid4().hex[:20]
+    filename = f"{image_ref}.png"
+    file_path = os.path.join(FISHEYE_IMAGE_DIR, filename)
+    _write_png_with_embedded_metadata(payload, file_path, merged_metadata)
 
     items = _read_json_list(FISHEYE_IMAGE_INDEX_PATH)
     items.append(
@@ -687,6 +822,7 @@ def _store_fisheye_image(source_url: str) -> tuple[str, str]:
             "filename": filename,
             "created_at": int(time.time()),
             "source_url": source_url,
+            "embedded_metadata": bool(merged_metadata),
         }
     )
 
@@ -712,6 +848,7 @@ def _store_fisheye_image(source_url: str) -> tuple[str, str]:
     return image_ref, f"/api/fisheye-images/{image_ref}"
 
 
+# Looks up a stored fisheye image record by its ref.
 def _find_fisheye_image_record(image_ref: str) -> Optional[dict]:
     ref = (image_ref or "").strip()
     if not ref:
@@ -720,11 +857,13 @@ def _find_fisheye_image_record(image_ref: str) -> Optional[dict]:
     return next((x for x in items if str(x.get("ref", "")).strip() == ref), None)
 
 
+# Builds the JSON path for a snapshot id.
 def _snapshot_path(snapshot_id: str) -> str:
     safe_id = (snapshot_id or "").strip()
     return os.path.join(SNAPSHOT_DIR, f"{safe_id}.json")
 
 
+# Builds the lightweight snapshot summary returned to the UI.
 def _snapshot_summary(record: dict) -> dict:
     return {
         "id": str(record.get("id") or "").strip(),
@@ -733,11 +872,13 @@ def _snapshot_summary(record: dict) -> dict:
     }
 
 
+# Reads a full snapshot record from disk.
 def _read_snapshot(snapshot_id: str) -> Optional[dict]:
     data = _read_json(_snapshot_path(snapshot_id))
     return data if isinstance(data, dict) else None
 
 
+# Loads and sorts all stored snapshots for the snapshot picker.
 def _list_snapshots() -> list[dict]:
     os.makedirs(SNAPSHOT_DIR, exist_ok=True)
     items: list[dict] = []
@@ -761,6 +902,7 @@ def _list_snapshots() -> list[dict]:
     return items
 
 
+# Resolves the local file path for a stored fisheye image ref.
 def _local_fisheye_file_path(image_ref: str) -> Optional[str]:
     record = _find_fisheye_image_record(image_ref)
     if not record:
@@ -774,6 +916,7 @@ def _local_fisheye_file_path(image_ref: str) -> Optional[str]:
     return file_path
 
 
+# Extracts a fisheye image ref from one of the app's served image URLs.
 def _coerce_fisheye_ref_from_url(image_url: Optional[str]) -> Optional[str]:
     raw = (image_url or "").strip()
     if not raw:
@@ -786,6 +929,7 @@ def _coerce_fisheye_ref_from_url(image_url: Optional[str]) -> Optional[str]:
     return path.rsplit("/", 1)[-1].strip() or None
 
 
+# Parses a snapshot-owned image URL into its snapshot id and filename.
 def _parse_snapshot_image_url(image_url: Optional[str]) -> tuple[Optional[str], Optional[str]]:
     raw = (image_url or "").strip()
     if not raw:
@@ -803,12 +947,14 @@ def _parse_snapshot_image_url(image_url: Optional[str]) -> tuple[Optional[str], 
     return snapshot_id, image_name
 
 
+# Builds the on-disk path for a snapshot-owned image file.
 def _snapshot_image_path(snapshot_id: str, image_name: str) -> str:
     safe_snapshot_id = (snapshot_id or "").strip()
     safe_image_name = os.path.basename((image_name or "").strip())
     return os.path.join(SNAPSHOT_IMAGE_DIR, safe_snapshot_id, safe_image_name)
 
 
+# Resolves a locally available image file from the supported ref or URL forms.
 def _resolve_local_image_file(
     image_ref: Optional[str] = None,
     image_url: Optional[str] = None,
@@ -827,43 +973,44 @@ def _resolve_local_image_file(
     return None
 
 
+# Copies one referenced image into snapshot-owned storage and returns its served URL.
 def _copy_snapshot_image(
     snapshot_id: str,
     slot_name: str,
     image_ref: Optional[str] = None,
     image_url: Optional[str] = None,
+    embedded_metadata: Optional[dict] = None,
 ) -> Optional[dict]:
     slot = (slot_name or "").strip() or "image"
     source_file = _resolve_local_image_file(image_ref=image_ref, image_url=image_url)
     source_url = (image_url or "").strip()
+    source_payload: Optional[bytes] = None
+    source_metadata: Optional[dict] = None
 
     if source_file and os.path.exists(source_file):
-        ext = os.path.splitext(source_file)[1].lower() or ".jpg"
-        image_name = f"{slot}{ext}"
-        dest_path = _snapshot_image_path(snapshot_id, image_name)
-        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-        shutil.copyfile(source_file, dest_path)
-        return {
-            "image_ref": None,
-            "image_url": f"/api/snapshots/{snapshot_id}/images/{image_name}",
-        }
+        with open(source_file, "rb") as f:
+            source_payload = f.read()
+        source_metadata = _read_embedded_image_metadata(source_file)
+    elif source_url.startswith(("http://", "https://")):
+        source_payload, _ = _download_binary(source_url)
+        source_metadata = _extract_embedded_image_metadata_from_bytes(source_payload)
+    else:
+        return None
 
-    if source_url.startswith(("http://", "https://")):
-        payload, content_type = _download_binary(source_url)
-        ext = _infer_image_extension(source_url, content_type)
-        image_name = f"{slot}{ext}"
-        dest_path = _snapshot_image_path(snapshot_id, image_name)
-        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-        with open(dest_path, "wb") as f:
-            f.write(payload)
-        return {
-            "image_ref": None,
-            "image_url": f"/api/snapshots/{snapshot_id}/images/{image_name}",
-        }
+    if not source_payload:
+        return None
 
-    return None
+    image_name = f"{slot}.png"
+    dest_path = _snapshot_image_path(snapshot_id, image_name)
+    merged_metadata = _merge_embedded_image_metadata(source_metadata, embedded_metadata)
+    _write_png_with_embedded_metadata(source_payload, dest_path, merged_metadata)
+    return {
+        "image_ref": None,
+        "image_url": f"/api/snapshots/{snapshot_id}/images/{image_name}",
+    }
 
 
+# Copies all snapshot-related images into snapshot-owned storage and rewrites the saved state.
 def _copy_snapshot_images_into_state(snapshot_id: str, state: dict) -> dict:
     snapshot_state = json.loads(json.dumps(state))
 
@@ -899,6 +1046,35 @@ def _copy_snapshot_images_into_state(snapshot_id: str, state: dict) -> dict:
     return snapshot_state
 
 
+# Rewrites snapshot-owned images so each one embeds the final snapshot state payload.
+def _embed_snapshot_state_into_snapshot_images(snapshot_id: str, snapshot_name: str, snapshot_state: dict) -> None:
+    snapshot_dir = os.path.join(SNAPSHOT_IMAGE_DIR, (snapshot_id or "").strip())
+    if not os.path.isdir(snapshot_dir):
+        return
+    for image_name in os.listdir(snapshot_dir):
+        file_path = os.path.join(snapshot_dir, image_name)
+        if not os.path.isfile(file_path):
+            continue
+        try:
+            with open(file_path, "rb") as f:
+                payload = f.read()
+            existing_metadata = _extract_embedded_image_metadata_from_bytes(payload)
+            merged_metadata = _merge_embedded_image_metadata(
+                existing_metadata,
+                {
+                    "kind": "snapshot_image",
+                    "snapshot_id": snapshot_id,
+                    "snapshot_name": snapshot_name,
+                    "slot_name": os.path.splitext(image_name)[0],
+                    "snapshot_state": snapshot_state,
+                },
+            )
+            _write_png_with_embedded_metadata(payload, file_path, merged_metadata)
+        except Exception:
+            continue
+
+
+# Encodes a local image file as a data URI for upstream image-edit requests.
 def _build_data_uri_from_file(file_path: str) -> str:
     mime = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
     with open(file_path, "rb") as f:
@@ -906,6 +1082,7 @@ def _build_data_uri_from_file(file_path: str) -> str:
     return f"data:{mime};base64,{encoded}"
 
 
+# Resolves the best available URI for an image-edit input image.
 def _resolve_fisheye_input_image_uri(
     image_ref: Optional[str] = None,
     image_url: Optional[str] = None,
@@ -928,6 +1105,7 @@ def _resolve_fisheye_input_image_uri(
     return None
 
 
+# Extracts a single image URL from a Replicate output payload.
 def _extract_replicate_image_url(output: object) -> Optional[str]:
     if isinstance(output, str) and output.strip():
         return output.strip()
@@ -946,6 +1124,7 @@ def _extract_replicate_image_url(output: object) -> Optional[str]:
     return None
 
 
+# Clamps a numeric value into the inclusive 0 to 1 range.
 def _clamp01(value: float) -> float:
     try:
         n = float(value)
@@ -954,6 +1133,7 @@ def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, n))
 
 
+# Normalizes fisheye game fish payloads into the stored game format.
 def _normalize_game_fish(items: list[FisheyeGameFishPayload]) -> list[dict]:
     out: list[dict] = []
     for i, item in enumerate(items):
@@ -968,14 +1148,17 @@ def _normalize_game_fish(items: list[FisheyeGameFishPayload]) -> list[dict]:
     return out
 
 
+# Reads persisted fisheye game rounds from disk.
 def _read_game_rounds() -> list[dict]:
     return _read_json_list(FISHEYE_GAME_ROUNDS_PATH)
 
 
+# Writes fisheye game rounds back to disk.
 def _write_game_rounds(items: list[dict]) -> None:
     _write_json_list(FISHEYE_GAME_ROUNDS_PATH, items)
 
 
+# Generates a new unique round code for the fisheye game.
 def _new_round_code(existing_codes: set[str]) -> str:
     alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
     for _ in range(64):
@@ -985,6 +1168,7 @@ def _new_round_code(existing_codes: set[str]) -> str:
     return uuid.uuid4().hex[:6].upper()
 
 
+# Computes the best average distance between target fish and guessed fish positions.
 def _best_avg_distance(target_fish: list[dict], guess_fish: list[dict]) -> float:
     n = len(target_fish)
     if n <= 0 or len(guess_fish) != n:
@@ -1009,12 +1193,14 @@ def _best_avg_distance(target_fish: list[dict], guess_fish: list[dict]) -> float
     return 1.0
 
 
+# Checks whether a fish x-position falls inside the central deadzone.
 def _game_in_deadzone(x_frac: float, deadzone_half: float = 0.10) -> bool:
     x = _clamp01(x_frac)
     half = max(0.0, min(0.49, float(deadzone_half)))
     return abs(x - 0.5) <= half
 
 
+# Computes how strongly a fish should lean based on its x-position.
 def _game_lean_intensity(x_frac: float, deadzone_half: float = 0.10) -> float:
     x = _clamp01(x_frac)
     half = max(0.0, min(0.49, float(deadzone_half)))
@@ -1030,6 +1216,7 @@ def _game_lean_intensity(x_frac: float, deadzone_half: float = 0.10) -> float:
     return min_pct + (1.0 - min_pct) * eased
 
 
+# Builds the generated prompt text used for a fisheye game round.
 def _build_fisheye_game_generated_prompt(
     thought: str,
     fish_items: list[dict],
@@ -1078,6 +1265,7 @@ def _build_fisheye_game_generated_prompt(
     )
 
 
+# Runs a single non-streaming text generation request.
 def _generate_text_once(prompt: str, model: str) -> str:
     client, actual_model = _build_model_client(model or DEFAULT_MODEL)
     deterministic, seed = _resolve_text_determinism()
@@ -1259,6 +1447,7 @@ def _build_replicate_input(
     }
 
 
+# Generates an image through Replicate and stores the returned result.
 def _replicate_generate_image(
     prompt: str,
     model_slug: str,
@@ -1342,6 +1531,7 @@ def _replicate_generate_image(
 _ensure_api_counter_file()
 
 
+# Streams a text generation response back to the frontend.
 @app.post("/api/generate")
 async def generate(request: Request):
     # Main text generation endpoint: streams tokens so UI can render progressively.
@@ -1397,6 +1587,7 @@ async def generate(request: Request):
     return StreamingResponse(stream_tokens(), media_type="text/event-stream")
 
 
+# Generates a fisheye image for the current output text and returns its stored metadata.
 @app.post("/api/visualise")
 def visualise(payload: VisualisePayload):
     # Fisheye endpoint: turns current output text into an image and stores local reference.
@@ -1420,6 +1611,7 @@ def visualise(payload: VisualisePayload):
         prompt_strength = max(0.0, min(1.0, float(prompt_strength)))
     else:
         prompt_strength = None
+    creation_state = _sanitize_embedded_image_metadata(payload.creation_state)
     use_input_image = bool(payload.use_input_image)
     input_image_uri = None
     endpoint_model = image_model.split("|", 1)[0].strip().lower()
@@ -1449,7 +1641,22 @@ def visualise(payload: VisualisePayload):
             input_image_uri=input_image_uri,
             prompt_strength=prompt_strength,
         )
-        image_ref, local_image_url = _store_fisheye_image(image_url)
+        image_ref, local_image_url = _store_fisheye_image(
+            image_url,
+            embedded_metadata={
+                "kind": "fisheye_generated_image",
+                "output_text": output_text,
+                "prompt_model": (payload.prompt_model or "").strip(),
+                "image_model": image_model,
+                "image_seed": image_seed,
+                "prompt_strength": prompt_strength,
+                "use_input_image": use_input_image,
+                "input_image_ref": (payload.input_image_ref or "").strip() or None,
+                "input_image_url": (payload.input_image_url or "").strip() or None,
+                "source_image_url": image_url,
+                "creation_state": creation_state,
+            },
+        )
     except Exception as exc:
         return {"ok": False, "message": f"Failed to generate image via Replicate: {exc}"}
 
@@ -1464,18 +1671,22 @@ def visualise(payload: VisualisePayload):
     }
 
 
+# Imports an existing image into fisheye storage so the frontend can reference it later.
 @app.post("/api/fisheye-images/import")
 def import_fisheye_image(payload: FisheyeImageImportPayload):
     image_ref = (payload.image_ref or "").strip()
     if image_ref:
         record = _find_fisheye_image_record(image_ref)
         file_path = _local_fisheye_file_path(image_ref)
+        embedded_metadata = _read_embedded_image_metadata(file_path) if file_path else None
         if record and file_path:
             return {
                 "ok": True,
                 "image_ref": image_ref,
                 "image_url": f"/api/fisheye-images/{image_ref}",
                 "source_url": str(record.get("source_url") or "").strip(),
+                "embedded_metadata": embedded_metadata,
+                "embedded_state": _extract_restorable_state_from_embedded_metadata(embedded_metadata),
             }
 
     source_url = (payload.source_url or "").strip()
@@ -1483,12 +1694,15 @@ def import_fisheye_image(payload: FisheyeImageImportPayload):
     if inferred_ref:
         record = _find_fisheye_image_record(inferred_ref)
         file_path = _local_fisheye_file_path(inferred_ref)
+        embedded_metadata = _read_embedded_image_metadata(file_path) if file_path else None
         if record and file_path:
             return {
                 "ok": True,
                 "image_ref": inferred_ref,
                 "image_url": f"/api/fisheye-images/{inferred_ref}",
                 "source_url": str(record.get("source_url") or "").strip(),
+                "embedded_metadata": embedded_metadata,
+                "embedded_state": _extract_restorable_state_from_embedded_metadata(embedded_metadata),
             }
 
     if not source_url:
@@ -1500,19 +1714,60 @@ def import_fisheye_image(payload: FisheyeImageImportPayload):
         return {"ok": False, "message": f"Failed to store fisheye image: {exc}"}
 
     record = _find_fisheye_image_record(image_ref) or {}
+    file_path = _local_fisheye_file_path(image_ref)
+    embedded_metadata = _read_embedded_image_metadata(file_path) if file_path else None
     return {
         "ok": True,
         "image_ref": image_ref,
         "image_url": local_image_url,
         "source_url": str(record.get("source_url") or "").strip(),
+        "embedded_metadata": embedded_metadata,
+        "embedded_state": _extract_restorable_state_from_embedded_metadata(embedded_metadata),
     }
 
 
+# Imports an uploaded image file into fisheye storage and returns any embedded state.
+@app.post("/api/fisheye-images/upload")
+async def upload_fisheye_image(file: UploadFile = File(...)):
+    filename = os.path.basename((file.filename or "").strip()) or "upload"
+    content_type = str(file.content_type or "").strip()
+    try:
+        payload = await file.read()
+    except Exception as exc:
+        return {"ok": False, "message": f"Failed to read uploaded file: {exc}"}
+
+    if not payload:
+        return {"ok": False, "message": "Uploaded image is empty"}
+
+    try:
+        image_ref, local_image_url = _store_fisheye_image_payload(
+            payload=payload,
+            content_type=content_type,
+            source_url=filename,
+        )
+    except Exception as exc:
+        return {"ok": False, "message": f"Failed to store uploaded image: {exc}"}
+
+    record = _find_fisheye_image_record(image_ref) or {}
+    file_path = _local_fisheye_file_path(image_ref)
+    embedded_metadata = _read_embedded_image_metadata(file_path) if file_path else None
+    return {
+        "ok": True,
+        "image_ref": image_ref,
+        "image_url": local_image_url,
+        "source_url": str(record.get("source_url") or filename).strip(),
+        "embedded_metadata": embedded_metadata,
+        "embedded_state": _extract_restorable_state_from_embedded_metadata(embedded_metadata),
+    }
+
+
+# Returns the list of saved snapshots.
 @app.get("/api/snapshots")
 def list_snapshots():
     return {"ok": True, "snapshots": _list_snapshots()}
 
 
+# Returns one saved snapshot record by id.
 @app.get("/api/snapshots/{snapshot_id}")
 def get_snapshot(snapshot_id: str):
     record = _read_snapshot(snapshot_id)
@@ -1529,6 +1784,7 @@ def get_snapshot(snapshot_id: str):
     }
 
 
+# Serves an image file owned by a stored snapshot.
 @app.get("/api/snapshots/{snapshot_id}/images/{image_name}")
 def get_snapshot_image(snapshot_id: str, image_name: str):
     file_path = _snapshot_image_path(snapshot_id, image_name)
@@ -1538,6 +1794,7 @@ def get_snapshot_image(snapshot_id: str, image_name: str):
     return FileResponse(path=file_path, media_type=media_type, filename=os.path.basename(file_path))
 
 
+# Creates a snapshot record and copies any referenced images into snapshot storage.
 @app.post("/api/snapshots")
 def create_snapshot(payload: SnapshotCreatePayload):
     if not isinstance(payload.state, dict):
@@ -1550,6 +1807,7 @@ def create_snapshot(payload: SnapshotCreatePayload):
     provided_name = (payload.name or "").strip()
     display_name = provided_name or time.strftime("Snapshot %Y-%m-%d %H:%M:%S", time.localtime(created_at))
     snapshot_state = _copy_snapshot_images_into_state(snapshot_id, payload.state)
+    _embed_snapshot_state_into_snapshot_images(snapshot_id, display_name, snapshot_state)
     record = {
         "id": snapshot_id,
         "name": display_name,
@@ -1560,6 +1818,7 @@ def create_snapshot(payload: SnapshotCreatePayload):
     return {"ok": True, "snapshot": _snapshot_summary(record)}
 
 
+# Builds a zip of snapshot current-output images, optionally filtered by day.
 @app.get("/api/snapshots-current-output-images.zip")
 def download_snapshot_current_output_images_zip(day: Optional[str] = None):
     snapshots = _list_snapshots()
@@ -1613,6 +1872,7 @@ def download_snapshot_current_output_images_zip(day: Optional[str] = None):
     )
 
 
+# Creates and stores a new fisheye game round.
 @app.post("/api/fisheye-game/rounds")
 def create_fisheye_game_round(payload: FisheyeGameRoundCreatePayload):
     # Creates one multiplayer round and generates its reference image once.
@@ -1715,6 +1975,7 @@ def create_fisheye_game_round(payload: FisheyeGameRoundCreatePayload):
     }
 
 
+# Returns one fisheye game round for play.
 @app.get("/api/fisheye-game/rounds/{round_code}")
 def get_fisheye_game_round(round_code: str):
     code = (round_code or "").strip().upper()
@@ -1739,6 +2000,7 @@ def get_fisheye_game_round(round_code: str):
     }
 
 
+# Scores a fisheye game guess and returns round feedback.
 @app.post("/api/fisheye-game/rounds/{round_code}/guess")
 def submit_fisheye_game_guess(round_code: str, payload: FisheyeGameGuessPayload):
     code = (round_code or "").strip().upper()
@@ -1794,6 +2056,7 @@ def submit_fisheye_game_guess(round_code: str, payload: FisheyeGameGuessPayload)
     }
 
 
+# Creates a new Daydream stream and seeds its local file state.
 @app.post("/api/daydream/stream/create")
 def daydream_create_stream(payload: DaydreamCreatePayload):
     # Daydream has route variance; this endpoint probes and stores working route hints.
@@ -1841,6 +2104,7 @@ def daydream_create_stream(payload: DaydreamCreatePayload):
     }
 
 
+# Sends an update to an existing Daydream stream.
 @app.post("/api/daydream/stream/update")
 def daydream_update_stream(payload: DaydreamUpdatePayload):
     # Reuses discovered Daydream route hints where possible to reduce failed attempts.
@@ -1906,6 +2170,7 @@ def daydream_update_stream(payload: DaydreamUpdatePayload):
     }
 
 
+# Returns current status and local file metadata for a Daydream stream.
 @app.get("/api/daydream/stream/{stream_id}/status")
 def daydream_stream_status(stream_id: str):
     # Poll endpoint used by UI to track stream state.
@@ -1959,6 +2224,7 @@ def daydream_stream_status(stream_id: str):
     }
 
 
+# Stops a Daydream stream and reports the final state.
 @app.post("/api/daydream/stream/stop")
 def daydream_stop_stream(payload: DaydreamStopPayload):
     # Stop endpoint with fallback route probing for compatibility.
@@ -2011,6 +2277,7 @@ def daydream_stop_stream(payload: DaydreamStopPayload):
     }
 
 
+# Serves a stored fisheye image by ref.
 @app.get("/api/fisheye-images/{image_ref}")
 async def get_fisheye_image(image_ref: str):
     # Serves locally cached fisheye image files by short reference id.
@@ -2031,6 +2298,7 @@ async def get_fisheye_image(image_ref: str):
     return FileResponse(path=file_path, media_type=media_type, filename=filename)
 
 
+# Persists API keys from the UI into the local env file.
 @app.post("/api/save-keys")
 async def save_keys(payload: EnvKeysPayload):
     # Saves only provided keys; blank fields are intentionally ignored.
@@ -2060,6 +2328,7 @@ async def save_keys(payload: EnvKeysPayload):
     return {"ok": True, "message": "Saved keys to .env", "saved": list(updates.keys())}
 
 
+# Returns the saved prompt template sections.
 @app.get("/api/prompt-templates")
 async def get_prompt_templates():
     return {
@@ -2069,6 +2338,7 @@ async def get_prompt_templates():
     }
 
 
+# Persists an updated prompt template section.
 @app.post("/api/prompt-templates/save")
 async def save_prompt_section(payload: PromptSectionPayload):
     section = (payload.section or "").strip().lower()
@@ -2081,6 +2351,7 @@ async def save_prompt_section(payload: PromptSectionPayload):
     return {"ok": True, "saved": section}
 
 
+# Resets the prompt template files back to defaults.
 @app.post("/api/prompt-templates/reset")
 async def reset_prompt_templates(payload: PromptTemplatesResetPayload):
     _write_text(PROMPT_PREAMBLE_PATH, payload.preamble or "")
@@ -2088,6 +2359,7 @@ async def reset_prompt_templates(payload: PromptTemplatesResetPayload):
     return {"ok": True, "saved": ["preamble", "closing"]}
 
 
+# Returns the current normalized app configuration.
 @app.get("/api/app-config")
 async def get_app_config():
     return {
@@ -2097,6 +2369,7 @@ async def get_app_config():
     }
 
 
+# Validates and saves updated app configuration values.
 @app.post("/api/app-config/save")
 async def save_app_config(request: Request):
     body = await request.json()
@@ -2114,12 +2387,14 @@ async def save_app_config(request: Request):
     return {"ok": True, "config": _get_current_app_config()}
 
 
+# Resets the app configuration file back to defaults.
 @app.post("/api/app-config/reset")
 async def reset_app_config():
     _write_json(APP_CONFIG_PATH, dict(DEFAULT_APP_CONFIG))
     return {"ok": True, "config": dict(DEFAULT_APP_CONFIG)}
 
 
+# Returns lightweight usage stats for the menu and UI.
 @app.get("/api/stats")
 async def get_stats():
     return {

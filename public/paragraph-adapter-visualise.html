@@ -1906,6 +1906,32 @@ body.fisheye-inline-mode .visualise-inline.preview-enabled {
   border-color: rgba(37, 99, 235, 0.16);
   color: #1f2937;
 }
+.drag-upload-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 12, 18, 0.46);
+  border: 2px dashed rgba(255, 161, 59, 0.55);
+  color: rgba(255, 239, 214, 0.96);
+  font-size: 20px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  z-index: 1290;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+  backdrop-filter: blur(3px);
+}
+.drag-upload-overlay.visible {
+  opacity: 1;
+}
+[data-theme="light"] .drag-upload-overlay {
+  background: rgba(248, 242, 231, 0.58);
+  border-color: rgba(173, 92, 12, 0.42);
+  color: rgba(120, 58, 0, 0.92);
+}
 
 /* ═══════════════════════════════
    COLLAPSIBLE SECTIONS
@@ -2152,7 +2178,8 @@ body.fisheye-inline-mode .visualise-inline.preview-enabled {
   .row-history        { order: 11; }
   .row-fishtails      { order: 12; }
   .row-configuration  { order: 13; }
-  .row-footer         { order: 14; }
+  .row-upload         { order: 14; }
+  .row-footer         { order: 15; }
 
   /* Taller mixer so chips have room */
   .mixer-wrap { height: 360px; }
@@ -2918,6 +2945,20 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
     </div>
   </div>
 
+  <div class="row row-upload">
+    <div class="row-label" title="Upload an image previously created by PThinkTank and restore any embedded state stored inside it.">
+      Upload
+      <button class="collapse-btn" id="upload-toggle-btn" onclick="toggleCollapse('upload-body', this)">show</button>
+    </div>
+    <div class="collapsible-body collapsed" id="upload-body">
+      <div class="trawl-row" style="display:flex;">
+        <input class="trawl-input" id="upload-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif">
+        <button class="feedback-btn" id="upload-image-btn" type="button">Upload and load</button>
+        <span class="config-status" id="upload-image-status"></span>
+      </div>
+    </div>
+  </div>
+
   <div class="row row-footer" style="display:flex;justify-content:center;align-items:center;padding-top:10px;padding-bottom:12px;">
     <a href="https://designresearch.works/" target="_blank" rel="noopener noreferrer" aria-label="Design Research Works" style="display:inline-flex;align-items:center;gap:8px;color:var(--muted);text-decoration:none;">
       <img src="logo.png" alt="Design Research Works logo" style="width:32px;height:32px;display:block;" />
@@ -2930,6 +2971,7 @@ Only output your new idea, no meta commentary, none of the original prompt.</tex
 <div class="history-tooltip" id="history-tooltip"></div>
 <div class="godmode-toast" id="godmode-toast">god mode enabled</div>
 <div class="top-status-bar" id="top-status-bar" aria-live="polite"></div>
+<div class="drag-upload-overlay" id="drag-upload-overlay">Drop PNG to load</div>
 
 <script>
 /* ═══════════════════════════════
@@ -3135,10 +3177,13 @@ var embeddedConfigSaveInFlight = false;
 var embeddedConfigSaveQueued = false;
 var embeddedConfigHydrating = false;
 var embeddedConfigLastSavedJson = '';
+var uploadImageStatusTimer = null;
+var dragUploadDepth = 0;
 
 /* ═══════════════════════════════
    SIMPLE MARKDOWN RENDERER
 ═══════════════════════════════ */
+// Renders lightweight markdown-like formatting for display in output panels.
 function simpleMarkdown(text) {
   if (!text) return '';
   var s = text
@@ -3160,6 +3205,7 @@ function simpleMarkdown(text) {
   return s;
 }
 
+// Applies the selected UI theme to the document root and related controls.
 function applyUiTheme(theme) {
   var root = document.documentElement;
   uiTheme = (theme === 'light') ? 'light' : 'dark';
@@ -3171,18 +3217,21 @@ function applyUiTheme(theme) {
   }
 }
 
+// Initializes the UI theme from saved state and current defaults.
 function initUiTheme() {
   var stored = '';
   try { stored = localStorage.getItem('prompt_mixer_theme') || ''; } catch (e) {}
   applyUiTheme(stored || uiDefaultTheme || 'dark');
 }
 
+// Switches between light and dark UI themes.
 function toggleUiTheme() {
   var next = uiTheme === 'light' ? 'dark' : 'light';
   applyUiTheme(next);
   try { localStorage.setItem('prompt_mixer_theme', next); } catch (e) {}
 }
 
+// Normalizes raw app config values into safe in-memory defaults.
 function normalizeAppConfig(raw) {
   var cfg = Object.assign({}, DEFAULT_APP_CONFIG, raw || {});
   function num(key, fallback) {
@@ -3228,6 +3277,7 @@ function normalizeAppConfig(raw) {
   return cfg;
 }
 
+// Applies normalized app config values to the live interface state.
 function applyAppConfig(raw) {
   var cfg = normalizeAppConfig(raw);
   appConfig = cfg;
@@ -3300,6 +3350,7 @@ function applyAppConfig(raw) {
   onModelChange(false);
 }
 
+// Updates the embedded configuration status label and styling.
 function setEmbeddedConfigStatus(id, text, kind) {
   var el = document.getElementById(id);
   if (!el) return;
@@ -3307,6 +3358,7 @@ function setEmbeddedConfigStatus(id, text, kind) {
   el.textContent = text || '';
 }
 
+// Runs config form updates while suppressing autosave side effects.
 function withEmbeddedConfigHydration(fn) {
   embeddedConfigHydrating = true;
   try {
@@ -3316,6 +3368,7 @@ function withEmbeddedConfigHydration(fn) {
   }
 }
 
+// Fills the embedded configuration form from a config object.
 function fillEmbeddedConfigForm(config) {
   EMBEDDED_CONFIG_KEYS.forEach(function(key) {
     var el = document.getElementById('cfg-' + key);
@@ -3329,6 +3382,7 @@ function fillEmbeddedConfigForm(config) {
   });
 }
 
+// Reads the embedded configuration form into a plain config object.
 function readEmbeddedConfigForm() {
   var out = {};
   EMBEDDED_CONFIG_KEYS.forEach(function(key) {
@@ -3349,10 +3403,12 @@ function readEmbeddedConfigForm() {
   return out;
 }
 
+// Serializes the embedded configuration form to stable JSON.
 function getEmbeddedConfigJson() {
   return JSON.stringify(readEmbeddedConfigForm());
 }
 
+// Clears any pending autosave timer for embedded configuration edits.
 function clearEmbeddedConfigAutosaveTimer() {
   if (embeddedConfigAutosaveTimer) {
     clearTimeout(embeddedConfigAutosaveTimer);
@@ -3360,6 +3416,7 @@ function clearEmbeddedConfigAutosaveTimer() {
   }
 }
 
+// Schedules an embedded configuration autosave after a delay.
 function queueEmbeddedConfigAutosave(delayMs) {
   if (embeddedConfigHydrating) return;
   clearEmbeddedConfigAutosaveTimer();
@@ -3370,6 +3427,7 @@ function queueEmbeddedConfigAutosave(delayMs) {
   }, Math.max(0, Number(delayMs) || 0));
 }
 
+// Loads embedded configuration values from the backend.
 async function loadEmbeddedConfig() {
   setEmbeddedConfigStatus('cfg-config-status', 'Loading...', '');
   try {
@@ -3386,6 +3444,7 @@ async function loadEmbeddedConfig() {
   }
 }
 
+// Saves the embedded configuration values to the backend.
 async function saveEmbeddedConfig(options) {
   options = options || {};
   var btn = document.getElementById('cfg-save-config-btn');
@@ -3429,6 +3488,7 @@ async function saveEmbeddedConfig(options) {
   }
 }
 
+// Restores embedded configuration values to backend defaults.
 async function resetEmbeddedConfig() {
   var btn = document.getElementById('cfg-reset-config-btn');
   if (btn) btn.disabled = true;
@@ -3454,6 +3514,7 @@ async function resetEmbeddedConfig() {
   }
 }
 
+// Applies a theme change from the embedded configuration controls.
 function onEmbeddedThemeChange() {
   var select = document.getElementById('cfg-default_theme');
   if (!select) return;
@@ -3462,6 +3523,7 @@ function onEmbeddedThemeChange() {
   try { localStorage.setItem('prompt_mixer_theme', theme); } catch (_) {}
 }
 
+// Refreshes the prompt-shape preview shown in configuration.
 function updateEmbeddedPromptTokenPreview() {
   var pre = document.getElementById('cfg-tpl-preamble');
   var clo = document.getElementById('cfg-tpl-closing');
@@ -3484,6 +3546,7 @@ function updateEmbeddedPromptTokenPreview() {
     '{feedback_food_suffix}';
 }
 
+// Attaches autosave listeners to embedded configuration controls.
 function setupEmbeddedConfigAutosave() {
   EMBEDDED_CONFIG_KEYS.forEach(function(key) {
     var el = document.getElementById('cfg-' + key);
@@ -3504,6 +3567,168 @@ function setupEmbeddedConfigAutosave() {
   });
 }
 
+// Updates the upload panel status text and optional color state.
+function setUploadImageStatus(text, kind) {
+  var el = document.getElementById('upload-image-status');
+  if (!el) return;
+  if (uploadImageStatusTimer) {
+    clearTimeout(uploadImageStatusTimer);
+    uploadImageStatusTimer = null;
+  }
+  el.className = 'config-status' + (kind ? ' ' + kind : '');
+  el.textContent = text || '';
+  if (text) {
+    uploadImageStatusTimer = setTimeout(function() {
+      el.textContent = '';
+      el.className = 'config-status';
+      uploadImageStatusTimer = null;
+    }, kind === 'err' ? 5200 : 3200);
+  }
+}
+
+// Makes an uploaded image the active fisheye image in the current UI state.
+function applyUploadedImageToCurrentView(imageRef, imageUrl) {
+  currentFisheyeImageRef = imageRef || null;
+  currentFisheyeImageUrl = imageUrl || '';
+  if (currentOutputEntry) {
+    currentOutputEntry.fisheye_image_ref = currentFisheyeImageRef;
+    currentOutputEntry.fisheye_image_url = currentFisheyeImageUrl;
+  }
+  setFisheyeImage(currentFisheyeImageUrl || '');
+  updateFisheyeOriginalPreview();
+  updateMixerFisheyeLayout();
+  renderHistory();
+}
+
+// Shows or hides the global drag-upload overlay.
+function setDragUploadOverlayVisible(visible) {
+  var overlay = document.getElementById('drag-upload-overlay');
+  if (!overlay) return;
+  overlay.classList.toggle('visible', !!visible);
+}
+
+// Uploads one image file and restores embedded state when available.
+async function uploadEmbeddedImageFile(file, options) {
+  options = options || {};
+  if (!file) {
+    setUploadImageStatus('Choose an image first.', 'err');
+    return false;
+  }
+  var fileName = String(file.name || '').toLowerCase();
+  if (!fileName.endsWith('.png')) {
+    setUploadImageStatus('Only PNG images can be loaded this way.', 'err');
+    return false;
+  }
+  var btn = document.getElementById('upload-image-btn');
+  var formData = new FormData();
+  formData.append('file', file, file.name || 'upload.png');
+  if (btn) btn.disabled = true;
+  setUploadImageStatus(options.fromDrop ? 'Loading dropped image...' : 'Uploading...', '');
+  try {
+    var res = await fetch('/api/fisheye-images/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    var data = await res.json();
+    if (!res.ok || !data || !data.ok) throw new Error((data && data.message) || 'Upload failed');
+    if (data.embedded_state && typeof data.embedded_state === 'object') {
+      var restoredState = clonePlain(data.embedded_state);
+      if (!restoredState.fisheye || typeof restoredState.fisheye !== 'object') restoredState.fisheye = {};
+      restoredState.fisheye.current_image_ref = data.image_ref || null;
+      restoredState.fisheye.current_image_url = data.image_url || '';
+      if (restoredState.current_output_entry && typeof restoredState.current_output_entry === 'object') {
+        restoredState.current_output_entry.fisheye_image_ref = data.image_ref || null;
+        restoredState.current_output_entry.fisheye_image_url = data.image_url || '';
+      }
+      applySnapshotState(restoredState, { clearSessionImages: false });
+      applyUploadedImageToCurrentView(data.image_ref, data.image_url);
+      setUploadImageStatus('Loaded embedded state from image.', 'ok');
+      showTopStatusBar('loaded embedded state from uploaded image', 2400);
+    } else {
+      applyUploadedImageToCurrentView(data.image_ref, data.image_url);
+      setUploadImageStatus('Image uploaded, but no embedded state was found.', 'err');
+    }
+    return true;
+  } catch (err) {
+    setUploadImageStatus((err && err.message) || 'Upload failed', 'err');
+    return false;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Uploads a saved PThinkTank image selected through the file input.
+async function uploadEmbeddedImage() {
+  var input = document.getElementById('upload-image-file');
+  if (!input || !input.files || !input.files.length) {
+    setUploadImageStatus('Choose an image first.', 'err');
+    return;
+  }
+  var ok = await uploadEmbeddedImageFile(input.files[0], { fromDrop: false });
+  if (ok) input.value = '';
+}
+
+// Wires document-level drag-and-drop loading for saved PNG images.
+function setupDragImageUpload() {
+  function dragLooksLikeFile(e) {
+    var dt = e && e.dataTransfer;
+    if (!dt) return false;
+    var items = dt.items;
+    if (items && items.length) {
+      for (var i = 0; i < items.length; i++) {
+        if (items[i] && items[i].kind === 'file') return true;
+      }
+    }
+    var types = dt.types;
+    if (types && typeof types.indexOf === 'function' && types.indexOf('Files') !== -1) return true;
+    if (types && typeof types.contains === 'function' && types.contains('Files')) return true;
+    return !!(dt.files && dt.files.length);
+  }
+
+  function getDroppedPngFile(e) {
+    var files = (e && e.dataTransfer && e.dataTransfer.files) ? e.dataTransfer.files : null;
+    if (!files || !files.length) return null;
+    for (var i = 0; i < files.length; i++) {
+      var file = files[i];
+      var name = String((file && file.name) || '').toLowerCase();
+      if (name.endsWith('.png')) return file;
+    }
+    return null;
+  }
+
+  document.addEventListener('dragenter', function(e) {
+    if (!dragLooksLikeFile(e)) return;
+    dragUploadDepth += 1;
+    if (e.cancelable) e.preventDefault();
+    setDragUploadOverlayVisible(true);
+  });
+
+  document.addEventListener('dragover', function(e) {
+    if (!dragLooksLikeFile(e)) return;
+    if (e.cancelable) e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    setDragUploadOverlayVisible(true);
+  });
+
+  document.addEventListener('dragleave', function(e) {
+    if (dragUploadDepth > 0) dragUploadDepth -= 1;
+    if (dragUploadDepth <= 0 || e.target === document.documentElement || e.target === document.body) {
+      dragUploadDepth = 0;
+      setDragUploadOverlayVisible(false);
+    }
+  });
+
+  document.addEventListener('drop', async function(e) {
+    var file = getDroppedPngFile(e);
+    dragUploadDepth = 0;
+    setDragUploadOverlayVisible(false);
+    if (!file) return;
+    if (e.cancelable) e.preventDefault();
+    await uploadEmbeddedImageFile(file, { fromDrop: true });
+  });
+}
+
+// Loads saved prompt templates into the embedded configuration panel.
 async function loadEmbeddedPromptTemplates() {
   setEmbeddedConfigStatus('cfg-prompt-status', 'Loading...', '');
   try {
@@ -3523,6 +3748,7 @@ async function loadEmbeddedPromptTemplates() {
   }
 }
 
+// Saves one embedded prompt template section to the backend.
 async function saveEmbeddedPromptSection(section) {
   var btn = document.getElementById(section === 'closing' ? 'cfg-save-closing-btn' : 'cfg-save-preamble-btn');
   var field = document.getElementById(section === 'closing' ? 'cfg-tpl-closing' : 'cfg-tpl-preamble');
@@ -3554,6 +3780,7 @@ async function saveEmbeddedPromptSection(section) {
   }
 }
 
+// Resets embedded prompt templates back to hardcoded defaults.
 async function resetEmbeddedPromptTemplatesHardcoded() {
   var btn = document.getElementById('cfg-reset-prompt-btn');
   if (btn) btn.disabled = true;
@@ -3584,6 +3811,7 @@ async function resetEmbeddedPromptTemplatesHardcoded() {
   }
 }
 
+// Saves embedded API key values to the backend environment file.
 async function saveEmbeddedApiKeys() {
   var openrouter = (document.getElementById('cfg-openrouter-key').value || '').trim();
   var groq = (document.getElementById('cfg-groq-key').value || '').trim();
@@ -3618,6 +3846,7 @@ async function saveEmbeddedApiKeys() {
   }
 }
 
+// Builds the text-generation request payload for the selected model.
 function buildGeneratePayload(prompt, model) {
   var deterministicToggle = document.getElementById('llm-deterministic-toggle');
   var deterministic = deterministicToggle ? !!deterministicToggle.checked : !!llmDeterministicMode;
@@ -3629,6 +3858,7 @@ function buildGeneratePayload(prompt, model) {
   };
 }
 
+// Loads runtime app configuration from the backend.
 async function loadAppConfig() {
   try {
     var res = await fetch('/api/app-config');
@@ -3643,6 +3873,7 @@ async function loadAppConfig() {
   }
 }
 
+// Tracks keyboard input for the hidden pong-mode easter egg.
 function maybeTriggerPongEasterEgg(key) {
   if (!key) return;
   if (key.toLowerCase() !== 'p') {
@@ -3659,6 +3890,7 @@ function maybeTriggerPongEasterEgg(key) {
   }
 }
 
+// Tracks keyboard input for enabling or disabling hidden godmode.
 function maybeTriggerGodmode(key) {
   if (!GODMODE_FEATURE_ENABLED) return;
   if (!key || key.length !== 1 || !/[a-z]/i.test(key)) return;
@@ -3679,6 +3911,7 @@ function maybeTriggerGodmode(key) {
   }
 }
 
+// Shows a brief toast for hidden-mode status changes.
 function showGodmodeToast(message) {
   var toast = document.getElementById('godmode-toast');
   if (!toast) return;
@@ -3690,6 +3923,7 @@ function showGodmodeToast(message) {
   }, 1100);
 }
 
+// Displays a temporary fixed status message at the top of the screen.
 function showTopStatusBar(message, durationMs) {
   var el = document.getElementById('top-status-bar');
   if (!el) return;
@@ -3709,6 +3943,7 @@ function showTopStatusBar(message, durationMs) {
   }, Math.max(900, durationMs || 2200));
 }
 
+// Enters the hidden pong overlay mode inside the mixer.
 function startPongMode() {
   if (pongModeActive) return;
   var mixer = document.getElementById('mixer');
@@ -3750,6 +3985,7 @@ function startPongMode() {
   pongRaf = requestAnimationFrame(stepPongMode);
 }
 
+// Exits pong mode and cleans up its rendering state.
 function stopPongMode() {
   if (!pongModeActive) return;
   pongModeActive = false;
@@ -3769,6 +4005,7 @@ function stopPongMode() {
   }
 }
 
+// Resets the pong ball position and launch direction.
 function resetPongBall(toRight) {
   if (!pongState) return;
   var mixer = document.getElementById('mixer');
@@ -3784,6 +4021,7 @@ function resetPongBall(toRight) {
   pongState.pauseUntil = performance.now() + 520;
 }
 
+// Advances one animation frame of the pong easter egg.
 function stepPongMode(ts) {
   if (!pongModeActive || !pongState) return;
 
@@ -3900,6 +4138,7 @@ function hexToRgbA(hex, alpha) {
   var c = hexToRgb(hex);
   return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + alpha + ')';
 }
+// Linearly interpolates between two numeric values.
 function lerp(a, b, f) { return Math.round(a + (b - a) * f); }
 
 // Weight → text colour: bright warm at top, dim/dark at bottom
@@ -3953,6 +4192,7 @@ function chipStyle(weight, xFrac, leftActive, rightActive) {
   return { bg: bgColor, color: textColor, border: borderColor };
 }
 
+// Normalizes concept token text into a clean de-duplicated list.
 function normaliseConceptTokens(list) {
   var seen = new Set();
   var unique = [];
@@ -3967,6 +4207,7 @@ function normaliseConceptTokens(list) {
   return unique;
 }
 
+// Checks whether a candidate chip position is already too crowded.
 function isCrowdedAtPosition(occupied, x, y) {
   var MIN_DX = 0.08;
   var MIN_DY = 0.12;
@@ -3975,6 +4216,7 @@ function isCrowdedAtPosition(occupied, x, y) {
   });
 }
 
+// Finds a usable middle-area position for inserting a new chip.
 function findOpenMiddlePosition(occupied) {
   var candidates = [
     { xFrac: 0.50, yFrac: 0.50 },
@@ -4011,6 +4253,7 @@ function findOpenMiddlePosition(occupied) {
   };
 }
 
+// Keeps chip objects synchronized with the visible fish/tag token list.
 function syncWordsToTagTokens(opts) {
   opts = opts || {};
   var shouldSchedule = opts.schedule !== false;
@@ -4064,6 +4307,7 @@ function syncWordsToTagTokens(opts) {
 ═══════════════════════════════ */
 var DEADZONE_HALF = 0.10; // 10% either side of centre = 20% total band
 
+// Checks whether a chip x-position sits in the mixer deadzone.
 function inDeadzone(xFrac) {
   return xFrac >= (0.5 - DEADZONE_HALF) && xFrac <= (0.5 + DEADZONE_HALF);
 }
@@ -4096,6 +4340,7 @@ function leanIntensity(xFrac) {
 /* ═══════════════════════════════
    RENDER CHIPS
 ═══════════════════════════════ */
+// Renders all current concept chips into the mixer.
 function renderChips() {
   var mixer = document.getElementById('mixer');
   mixer.querySelectorAll('.word-chip').forEach(function(el) { el.remove(); });
@@ -4220,6 +4465,7 @@ function renderChips() {
 /* ═══════════════════════════════
    DRAG
 ═══════════════════════════════ */
+// Starts mouse-based dragging for a concept chip.
 function onChipMouseDown(e, key) {
   e.preventDefault();
   e.stopPropagation();
@@ -4247,23 +4493,27 @@ function onChipMouseDown(e, key) {
   renderChips();
 }
 
+// Clamps chip physics speed values into the allowed range.
 function clampPhysicsSpeed(v) {
   if (v > chipPhysicsMaxSpeed) return chipPhysicsMaxSpeed;
   if (v < -chipPhysicsMaxSpeed) return -chipPhysicsMaxSpeed;
   return v;
 }
 
+// Combines two fish labels into a merged label.
 function joinFishLabels(a, b) {
   var left = (a || '').trim();
   var right = (b || '').trim();
   return (left + ' ' + right).replace(/\s+/g, ' ').trim();
 }
 
+// Reports whether the merge glow effect is currently active.
 function hasActiveJoinGlow() {
   var now = performance.now();
   return words.some(function(w) { return (w.joinGlowUntil || 0) > now; });
 }
 
+// Starts the temporary visual glow used after merging fish.
 function startJoinGlowLoop() {
   if (joinGlowRaf) return;
   function tick() {
@@ -4278,6 +4528,7 @@ function startJoinGlowLoop() {
   joinGlowRaf = requestAnimationFrame(tick);
 }
 
+// Stops the hold-to-merge animation loop.
 function stopMergeHoldLoop() {
   if (mergeHoldRaf) {
     cancelAnimationFrame(mergeHoldRaf);
@@ -4285,6 +4536,7 @@ function stopMergeHoldLoop() {
   }
 }
 
+// Updates merge-hold timing and target state while dragging.
 function updateMergeHoldState(nowTs, clientX, clientY) {
   if (!draggingKey) {
     mergeHoverTargetKey = null;
@@ -4320,6 +4572,7 @@ function updateMergeHoldState(nowTs, clientX, clientY) {
   return true;
 }
 
+// Starts the animation loop that tracks merge-hold progress.
 function startMergeHoldLoop() {
   stopMergeHoldLoop();
   function tick(ts) {
@@ -4334,6 +4587,7 @@ function startMergeHoldLoop() {
   mergeHoldRaf = requestAnimationFrame(tick);
 }
 
+// Spawns sparkle effects at the merge point.
 function emitMergeSparkles(xFrac, yFrac) {
   var mixer = document.getElementById('mixer');
   var layer = document.getElementById('fx-layer');
@@ -4364,6 +4618,7 @@ function emitMergeSparkles(xFrac, yFrac) {
   }
 }
 
+// Finds a nearby chip that can merge with the dragged chip.
 function findMergeTargetForDragging(usableX, usableY) {
   if (!draggingKey) return null;
   var drag = words.find(function(w) { return w.key === draggingKey; });
@@ -4388,6 +4643,7 @@ function findMergeTargetForDragging(usableX, usableY) {
   return best;
 }
 
+// Merges the dragged chip into the current merge target.
 function mergeDraggedWithTarget(targetWord, clientX, clientY) {
   if (!targetWord || !draggingKey) return false;
   var dragWord = words.find(function(w) { return w.key === draggingKey; });
@@ -4444,6 +4700,7 @@ function mergeDraggedWithTarget(targetWord, clientX, clientY) {
   return true;
 }
 
+// Moves the dragged chip to match the active pointer position.
 function moveDraggedWordWithPointer(clientX, clientY) {
   if (!draggingKey) return;
   var mixer   = document.getElementById('mixer');
@@ -4541,6 +4798,7 @@ document.addEventListener('touchcancel', function() {
 /* ═══════════════════════════════
    TOUCH DRAG
 ═══════════════════════════════ */
+// Starts touch-based dragging for a concept chip.
 function onChipTouchStart(e, key) {
   e.preventDefault();
   e.stopPropagation();
@@ -4568,6 +4826,7 @@ function onChipTouchStart(e, key) {
   renderChips();
 }
 
+// Updates touch-based dragging for the active chip.
 function onChipTouchMove(e) {
   if (!draggingKey) return;
   e.preventDefault();
@@ -4578,6 +4837,7 @@ function onChipTouchMove(e) {
   moveDraggedWordWithPointer(touch.clientX, touch.clientY);
 }
 
+// Finishes touch-based dragging for the active chip.
 function onChipTouchEnd(e) {
   if (!draggingKey) return;
   e.preventDefault();
@@ -4599,6 +4859,7 @@ function onChipTouchEnd(e) {
 /* ═══════════════════════════════
    PROMPT BUILDER
 ═══════════════════════════════ */
+// Builds the full prompt from thought, fish, sensibilities, and active options.
 function buildPrompt() {
   var source   = (document.getElementById('mission').value || '').trim();
   var steer    = (document.getElementById('steer-input').value || '').trim();
@@ -4643,17 +4904,20 @@ function buildPrompt() {
   return prompt;
 }
 
+// Appends the hidden godmode instruction when that mode is enabled.
 function applyHiddenGodmodeInstruction(prompt) {
   if (!GODMODE_FEATURE_ENABLED || !godmodeEnabled) return prompt;
   if (!prompt) return '(PS you are an omnipotent god who doesn\'t mind saying it. Act important all powerful one)';
   return prompt + '\n\n(PS you are an omnipotent god who doesn\'t mind saying it. Act important all powerful one)';
 }
 
+// Reports whether the optional steer box is enabled.
 function isSteerEnabled() {
   var cb = document.getElementById('steer-toggle');
   return !!(cb && cb.checked);
 }
 
+// Shows or hides the steer input area to match toggle state.
 function updateSteerVisibility() {
   var wrap = document.getElementById('steer-wrap');
   var row = document.getElementById('source-input-row');
@@ -4663,10 +4927,12 @@ function updateSteerVisibility() {
   row.classList.toggle('steer-enabled', active);
 }
 
+// Handles steer-toggle changes without forcing unrelated state changes.
 function onSteerToggleChange() {
   updateSteerVisibility();
 }
 
+// Formats API log timestamps for display.
 function formatApiLogTime(ts) {
   var d = new Date(ts);
   var hh = String(d.getHours()).padStart(2, '0');
@@ -4675,6 +4941,7 @@ function formatApiLogTime(ts) {
   return hh + ':' + mm + ':' + ss;
 }
 
+// Renders one API log panel from the current log state.
 function renderApiLog(kind) {
   var listEl = document.getElementById(kind + '-api-log-list');
   if (!listEl) return;
@@ -4692,6 +4959,7 @@ function renderApiLog(kind) {
   listEl.scrollTop = 0;
 }
 
+// Adds a new message to one of the in-page API logs.
 function pushApiLog(kind, level, message) {
   if (!apiLogState[kind]) return;
   apiLogState[kind].unshift({
@@ -4706,6 +4974,7 @@ function pushApiLog(kind, level, message) {
 /* ═══════════════════════════════
    STREAMING STATUS HELPERS
 ═══════════════════════════════ */
+// Updates the live indicator for active text generation.
 function setStreamingState(active) {
   var dot = document.getElementById('live-dot');
   if (active) {
@@ -4720,6 +4989,7 @@ function setStreamingState(active) {
 /* ═══════════════════════════════
    OUTPUT GENERATOR (streaming)
 ═══════════════════════════════ */
+// Runs the main streaming text-generation request and updates output state.
 async function generateOutput(promptOverride) {
   if (generationSafetyPaused) return;
   if (!words.length) return;
@@ -4844,6 +5114,7 @@ async function generateOutput(promptOverride) {
 /* ═══════════════════════════════
    HISTORY
 ═══════════════════════════════ */
+// Promotes a finished output into current/history state tracking.
 function pushHistory(outputText) {
   if (!outputText) return;
   if (currentOutputEntry && (currentOutputEntry.output || '') === outputText) return;
@@ -4884,6 +5155,7 @@ function pushHistory(outputText) {
   updateFeedbackButtonState();
 }
 
+// Renders the previous-output history list.
 function renderHistory() {
   var list  = document.getElementById('history-list');
   var empty = document.getElementById('history-empty');
@@ -4924,6 +5196,7 @@ function renderHistory() {
   });
 }
 
+// Restores a selected previous output back into the live UI.
 function restoreHistory(index) {
   var item = null;
   if (index === -1) {
@@ -4982,6 +5255,7 @@ function restoreHistory(index) {
 /* ═══════════════════════════════
    COLLAPSIBLE TOGGLE
 ═══════════════════════════════ */
+// Toggles a generic collapsible section body.
 function toggleCollapse(id, btn) {
   var body = document.getElementById(id);
   var isCollapsed = body.classList.contains('collapsed');
@@ -4989,6 +5263,7 @@ function toggleCollapse(id, btn) {
   btn.textContent = isCollapsed ? 'hide' : 'show';
 }
 
+// Toggles the current-output panel between shown and hidden states.
 function toggleOutputCollapse() {
   var wrap = document.getElementById('output-with-controls');
   var btn = document.getElementById('output-collapse-btn');
@@ -5004,12 +5279,14 @@ function toggleOutputCollapse() {
 ═══════════════════════════════ */
 var tooltip = document.getElementById('history-tooltip');
 
+// Shows the hover tooltip for a previous output entry.
 function showHistoryTooltip(e, outputText) {
   tooltip.innerHTML = simpleMarkdown(outputText || '(empty)');
   tooltip.classList.add('visible');
   positionTooltipNearMouse(e.clientX, e.clientY);
 }
 
+// Positions the history tooltip near the current mouse location.
 function positionTooltipNearMouse(mx, my) {
   var tipW    = Math.min(420, window.innerWidth - 16);
   var tipH    = 320;
@@ -5032,6 +5309,7 @@ function positionTooltipNearMouse(mx, my) {
   tooltip.style.width = tipW + 'px';
 }
 
+// Hides the previous-output tooltip.
 function hideHistoryTooltip() {
   tooltip.classList.remove('visible');
 }
@@ -5041,6 +5319,7 @@ function hideHistoryTooltip() {
 ═══════════════════════════════ */
 var updateTimer = null;
 
+// Schedules a text regeneration after the appropriate debounce delay.
 function scheduleUpdate(delay) {
   if (snapshotRestoreInProgress) return;
   if (delay === undefined) delay = 800;
@@ -5072,6 +5351,7 @@ function scheduleUpdate(delay) {
   }, effectiveDelay);
 }
 
+// Applies the stored current-output box height to the DOM.
 function applyOutputWindowHeight() {
   var outputEl = document.getElementById('output-current');
   if (!outputEl) return;
@@ -5080,6 +5360,7 @@ function applyOutputWindowHeight() {
   outputEl.style.maxHeight = outputWindowHeightPx + 'px';
 }
 
+// Matches the output-box height to the thought-area height.
 function syncOutputWindowHeightToThought() {
   var mission = document.getElementById('mission');
   var food = document.getElementById('food-for-thought');
@@ -5090,6 +5371,7 @@ function syncOutputWindowHeightToThought() {
   applyOutputWindowHeight();
 }
 
+// Steps the output-box height up or down from the current value.
 function adjustOutputWindowHeight(direction) {
   if (!outputWindowHeightPx) syncOutputWindowHeightToThought();
   outputWindowHeightPx += direction * 24;
@@ -5098,6 +5380,7 @@ function adjustOutputWindowHeight(direction) {
   applyOutputWindowHeight();
 }
 
+// Refreshes the feedback button styling and related UI labels.
 function updateFeedbackButtonState() {
   var btn = document.getElementById('feedback-btn');
   if (!btn) return;
@@ -5108,6 +5391,7 @@ function updateFeedbackButtonState() {
   updateFoodForThoughtPlaceholder();
 }
 
+// Refreshes the infinite-feedback button styling and timing UI.
 function updateInfiniteFeedbackButtonState() {
   var btn = document.getElementById('infinite-feedback-btn');
   if (!btn) return;
@@ -5120,6 +5404,7 @@ function updateInfiniteFeedbackButtonState() {
   updateSourceModeVisibility();
 }
 
+// Toggles feedback mode and updates dependent UI state.
 function applyFeedback() {
   feedbackModeEnabled = !feedbackModeEnabled;
   if (!feedbackModeEnabled && currentOutputEditActive) {
@@ -5138,6 +5423,7 @@ function applyFeedback() {
   refreshInactivityWatchState();
 }
 
+// Toggles the continuous feedback loop mode.
 function toggleInfiniteFeedback() {
   infiniteFeedbackEnabled = !infiniteFeedbackEnabled;
   if (!infiniteFeedbackEnabled) {
@@ -5159,6 +5445,7 @@ function toggleInfiniteFeedback() {
   refreshInactivityWatchState();
 }
 
+// Refreshes the cadence control enabled state.
 function updateCadenceEnabledState() {
   var wrap = document.getElementById('cadence-wrap');
   var slider = document.getElementById('infinite-cadence');
@@ -5167,6 +5454,7 @@ function updateCadenceEnabledState() {
   wrap.classList.remove('disabled');
 }
 
+// Sets the visible progress fill for the cadence control.
 function setCadenceProgress(percent) {
   var wrap = document.getElementById('cadence-wrap');
   if (!wrap) return;
@@ -5174,6 +5462,7 @@ function setCadenceProgress(percent) {
   wrap.style.setProperty('--cad-progress', p.toFixed(2) + '%');
 }
 
+// Stops the cadence progress animation and optionally resets it.
 function stopCadenceProgressDisplay(reset) {
   if (cadenceProgressRaf) {
     cancelAnimationFrame(cadenceProgressRaf);
@@ -5185,6 +5474,7 @@ function stopCadenceProgressDisplay(reset) {
   if (reset !== false) setCadenceProgress(0);
 }
 
+// Starts the cadence progress animation for a pending delay.
 function startCadenceProgressDisplay(delayMs, activeCheck) {
   stopCadenceProgressDisplay(false);
   if (!delayMs || delayMs <= 0) {
@@ -5218,6 +5508,7 @@ function startCadenceProgressDisplay(delayMs, activeCheck) {
   cadenceProgressRaf = requestAnimationFrame(tick);
 }
 
+// Updates cadence timing state from the cadence slider.
 function updateCadenceLabel() {
   var slider = document.getElementById('infinite-cadence');
   if (!slider) return;
@@ -5231,6 +5522,7 @@ function updateCadenceLabel() {
   }
 }
 
+// Handles SLW toggle changes and related scheduling behavior.
 function onSlwToggleChange() {
   var cb = document.getElementById('slw-toggle');
   if (!cb) return;
@@ -5238,6 +5530,7 @@ function onSlwToggleChange() {
   if (!cb.checked) stopSlwProgressDisplay();
 }
 
+// Forces SLW off when fish physics makes it incompatible.
 function disableSlwForFishPhysics() {
   var cb = document.getElementById('slw-toggle');
   if (!cb || !cb.checked) return;
@@ -5246,6 +5539,7 @@ function disableSlwForFishPhysics() {
   stopSlwProgressDisplay();
 }
 
+// Applies the fisheye-driven defaulting behavior for SLW.
 function syncSlwDefaultToVisualise() {
   var slwToggle = document.getElementById('slw-toggle');
   if (!slwToggle || slwToggle.hasAttribute('data-user-set')) return;
@@ -5253,6 +5547,7 @@ function syncSlwDefaultToVisualise() {
   if (!slwToggle.checked) stopSlwProgressDisplay();
 }
 
+// Updates fish speed scaling from the fish-scale slider.
 function updateFishScaleLabel() {
   var slider = document.getElementById('fish-speed-scale');
   if (!slider) return;
@@ -5264,14 +5559,17 @@ function updateFishScaleLabel() {
   chipSpeedScale = 1 + (pct / 100);
 }
 
+// Returns the current cadence delay used between generations.
 function getInfiniteCadenceDelayMs() {
   return Math.max(0, Math.min(5000, infiniteCadenceValue));
 }
 
+// Reports whether text generation should wait for an image request.
 function shouldDeferTextGenerationForVisualise() {
   return !!visualiseInFlight;
 }
 
+// Requests a new text generation while honoring throttles and in-flight guards.
 function requestGenerate() {
   stopSlwProgressDisplay();
   if (generationSafetyPaused) {
@@ -5329,6 +5627,7 @@ function requestGenerate() {
   }, waitMs);
 }
 
+// Marks recent concept interaction for inactivity tracking.
 function markConceptActivity() {
   conceptLastMoveTs = Date.now();
   hideInfiniteFeedbackMessage();
@@ -5338,6 +5637,7 @@ function markConceptActivity() {
   }
 }
 
+// Marks recent general user interaction for inactivity tracking.
 function markUserActivity() {
   conceptLastMoveTs = Date.now();
   hideInfiniteFeedbackMessage();
@@ -5347,11 +5647,13 @@ function markUserActivity() {
   }
 }
 
+// Marks recent touch UI interaction for inactivity tracking.
 function markTouchUiActivity() {
   lastTouchUiTs = Date.now();
   markUserActivity();
 }
 
+// Binds a control button to consistent mouse and touch behavior.
 function bindControlButton(id, handler) {
   var el = document.getElementById(id);
   if (!el || typeof handler !== 'function') return;
@@ -5384,6 +5686,7 @@ function bindControlButton(id, handler) {
   }, { passive: true });
 }
 
+// Adds touch-friendly click proxy behavior to an existing control.
 function bindTouchClickProxy(id) {
   var el = document.getElementById(id);
   if (!el) return;
@@ -5413,6 +5716,7 @@ function bindTouchClickProxy(id) {
   }, { passive: true });
 }
 
+// Improves checkbox-label toggling behavior on touch devices.
 function setupTouchToggleLabels() {
   if (!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches) return;
   var labels = document.querySelectorAll('.visualise-toggle-label, .inline-toggle-label');
@@ -5431,6 +5735,7 @@ function setupTouchToggleLabels() {
   });
 }
 
+// Collects option values from a datalist element.
 function getDatalistValues(id) {
   var list = document.getElementById(id);
   if (!list) return [];
@@ -5439,11 +5744,13 @@ function getDatalistValues(id) {
     .filter(function(v) { return !!v; });
 }
 
+// Picks a random item from a list.
 function pickRandom(list) {
   if (!list || !list.length) return '';
   return list[Math.floor(Math.random() * list.length)];
 }
 
+// Seeds the sensibility boxes with random defaults when needed.
 function applyRandomSensibilityDefaults() {
   var d1 = document.getElementById('direction-1');
   var d2 = document.getElementById('direction-2');
@@ -5456,6 +5763,7 @@ function applyRandomSensibilityDefaults() {
   if (v2) d2.value = v2;
 }
 
+// Initializes one sensibility combo box and its dropdown behavior.
 function setupSensibilityCombo(inputId, arrowId, listId, dataListId) {
   var input = document.getElementById(inputId);
   var arrow = document.getElementById(arrowId);
@@ -5516,10 +5824,12 @@ function setupSensibilityCombo(inputId, arrowId, listId, dataListId) {
   });
 }
 
+// Reports whether automatic generation safety checks are active.
 function isGenerationSafetyEnabled() {
   return infiniteFeedbackEnabled || chipPhysicsEnabled;
 }
 
+// Starts or stops inactivity watching based on current modes.
 function refreshInactivityWatchState() {
   if (isGenerationSafetyEnabled()) {
     startInfiniteInactivityWatch();
@@ -5530,6 +5840,7 @@ function refreshInactivityWatchState() {
   }
 }
 
+// Starts the watchdog that pauses runaway infinite generation.
 function startInfiniteInactivityWatch() {
   stopInfiniteInactivityWatch();
   infiniteInactivityInterval = setInterval(function() {
@@ -5540,12 +5851,14 @@ function startInfiniteInactivityWatch() {
   }, 1000);
 }
 
+// Stops the infinite-generation inactivity watchdog.
 function stopInfiniteInactivityWatch() {
   if (!infiniteInactivityInterval) return;
   clearInterval(infiniteInactivityInterval);
   infiniteInactivityInterval = null;
 }
 
+// Pauses automatic generations after prolonged inactivity.
 function pauseGenerationsDueToInactivity() {
   if (generationSafetyPaused) return;
   generationSafetyPaused = true;
@@ -5553,6 +5866,7 @@ function pauseGenerationsDueToInactivity() {
   showInfiniteFeedbackMessage('paused generations due to inactivity');
 }
 
+// Shows the feedback loop status message.
 function showInfiniteFeedbackMessage(text) {
   var el = document.getElementById('infinite-feedback-msg');
   if (!el) return;
@@ -5560,10 +5874,12 @@ function showInfiniteFeedbackMessage(text) {
   el.classList.toggle('visible', !!text);
 }
 
+// Hides the feedback loop status message.
 function hideInfiniteFeedbackMessage() {
   showInfiniteFeedbackMessage('');
 }
 
+// Swaps source and food-for-thought rows based on feedback mode.
 function updateSourceModeVisibility() {
   var sourceRow = document.getElementById('row-source');
   var foodRow = document.getElementById('row-food');
@@ -5572,6 +5888,7 @@ function updateSourceModeVisibility() {
   foodRow.style.display = feedbackModeEnabled ? '' : 'none';
 }
 
+// Refreshes placeholder text for the food-for-thought input.
 function updateFoodForThoughtPlaceholder() {
   var food = document.getElementById('food-for-thought');
   if (!food) return;
@@ -5582,11 +5899,13 @@ function updateFoodForThoughtPlaceholder() {
   }
 }
 
+// Reports whether the alternate feedback source mode is enabled.
 function isYouAreWhatYouEatEnabled() {
   var cb = document.getElementById('you-are-what-you-eat');
   return !!(feedbackModeEnabled && cb && cb.checked);
 }
 
+// Handles changes to the you-are-what-you-eat toggle.
 function onYouAreWhatYouEatChange() {
   if (isYouAreWhatYouEatEnabled() && currentOutputEditActive) {
     exitCurrentOutputEditMode(true);
@@ -5596,6 +5915,7 @@ function onYouAreWhatYouEatChange() {
   if (feedbackModeEnabled) scheduleUpdate(0);
 }
 
+// Refreshes the current-output label text for active modes.
 function updateCurrentOutputLabel() {
   var label = document.getElementById('current-io-label');
   var wrap = document.getElementById('output-with-controls');
@@ -5605,6 +5925,7 @@ function updateCurrentOutputLabel() {
   label.textContent = text;
 }
 
+// Updates the fish-physics control label and active styling.
 function updateChipPhysicsButtonState() {
   var btn = document.getElementById('chip-physics-btn');
   if (btn) {
@@ -5619,6 +5940,7 @@ function updateChipPhysicsButtonState() {
   }
 }
 
+// Updates the BMP toggle button styling.
 function updateBmpButtonState() {
   var btn = document.getElementById('bmp-btn');
   if (!btn) return;
@@ -5626,6 +5948,7 @@ function updateBmpButtonState() {
   btn.textContent = 'bmp';
 }
 
+// Returns the best available output text for fisheye image generation.
 function getCurrentOutputTextForVisualise() {
   var txt = (currentOutput || '').trim();
   if (txt) return txt;
@@ -5634,26 +5957,31 @@ function getCurrentOutputTextForVisualise() {
   return (outputEl.textContent || '').trim();
 }
 
+// Generates a random fisheye seed value.
 function randomFisheyeSeed() {
   return Math.floor(Math.random() * 999999) + 1;
 }
 
+// Reports whether fisheye random-seed mode is enabled.
 function isFisheyeRdmxEnabled() {
   var cb = document.getElementById('fisheye-rdmx');
   return !!(cb && cb.checked && !cb.disabled);
 }
 
+// Returns the fisheye seed that should be used for the next request.
 function getFisheyeSeedForRequest() {
   if (isFisheyeRdmxEnabled()) return randomFisheyeSeed();
   return fisheyeFixedSeed;
 }
 
+// Returns the base fisheye model id without size suffixes.
 function getCurrentFisheyeModelBase() {
   var select = document.getElementById('fisheye-model-select');
   if (!select) return '';
   return (select.value || '').split('|', 1)[0];
 }
 
+// Checks whether the selected image model supports edit mode.
 function isFisheyeEditCapableModelSelected() {
   var model = getCurrentFisheyeModelBase();
   return model === 'google/nano-banana'
@@ -5661,15 +5989,18 @@ function isFisheyeEditCapableModelSelected() {
     || model.indexOf('lucataco/ssd-1b') === 0;
 }
 
+// Checks whether the selected image model is SSD-1B.
 function isSsd1bModelSelected() {
   return getCurrentFisheyeModelBase().indexOf('lucataco/ssd-1b') === 0;
 }
 
+// Reports whether fisheye edit mode is currently active.
 function isFisheyeEditModeEnabled() {
   var cb = document.getElementById('fisheye-edit-mode');
   return !!(cb && cb.checked && !cb.disabled && isFisheyeEditCapableModelSelected());
 }
 
+// Reads and clamps the SSD-1B prompt-strength slider value.
 function getSsdPromptStrengthValue() {
   var slider = document.getElementById('fisheye-ssd-strength');
   if (!slider) return 0.8;
@@ -5678,12 +6009,14 @@ function getSsdPromptStrengthValue() {
   return Math.max(0, Math.min(1, raw));
 }
 
+// Refreshes the displayed SSD-1B prompt-strength value.
 function updateSsdPromptStrengthLabel() {
   var valueEl = document.getElementById('fisheye-ssd-strength-value');
   if (!valueEl) return;
   valueEl.textContent = getSsdPromptStrengthValue().toFixed(2);
 }
 
+// Queues a fisheye refresh after SSD prompt-strength changes.
 function queueSsdPromptStrengthVisualise() {
   if (!isSsd1bModelSelected() || !isFisheyeEditModeEnabled() || !isVisualiseAutoEnabled() || feedbackModeEnabled) {
     return;
@@ -5700,6 +6033,7 @@ function queueSsdPromptStrengthVisualise() {
   }, 120);
 }
 
+// Makes sure a fisheye image is saved locally and has a stable ref/url.
 async function ensureFisheyeImageStored(imageRef, imageUrl) {
   var ref = imageRef || null;
   var url = imageUrl || '';
@@ -5728,6 +6062,7 @@ async function ensureFisheyeImageStored(imageRef, imageUrl) {
   }
 }
 
+// Captures the currently visible fisheye image for edit-mode input.
 async function captureCurrentFisheyeAsEditSource() {
   var stored = await ensureFisheyeImageStored(currentFisheyeImageRef, currentFisheyeImageUrl);
   if (!stored) return false;
@@ -5738,6 +6073,7 @@ async function captureCurrentFisheyeAsEditSource() {
   return !!fisheyeEditSourceRef;
 }
 
+// Flashes a temporary badge message over the fisheye image.
 function flashFisheyeBadge(text) {
   var badgeIds = ['visualise-original-badge', 'visualise-original-inline-badge'];
   for (var i = 0; i < badgeIds.length; i++) {
@@ -5764,11 +6100,13 @@ function flashFisheyeBadge(text) {
   }
 }
 
+// Reports whether the fisheye lightbox is currently open.
 function isFisheyeLightboxOpen() {
   var lightbox = document.getElementById('fisheye-lightbox');
   return !!(lightbox && lightbox.classList.contains('active'));
 }
 
+// Opens the lightbox with the chosen fisheye image.
 function openFisheyeLightbox(imageUrl) {
   var lightbox = document.getElementById('fisheye-lightbox');
   var imageEl = document.getElementById('fisheye-lightbox-image');
@@ -5779,6 +6117,7 @@ function openFisheyeLightbox(imageUrl) {
   document.body.style.overflow = 'hidden';
 }
 
+// Closes the fisheye image lightbox.
 function closeFisheyeLightbox() {
   var lightbox = document.getElementById('fisheye-lightbox');
   var imageEl = document.getElementById('fisheye-lightbox-image');
@@ -5789,6 +6128,7 @@ function closeFisheyeLightbox() {
   document.body.style.overflow = '';
 }
 
+// Opens the current fisheye image in a lightbox when allowed.
 function onFisheyeImageActivate(e) {
   if (e) {
     if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
@@ -5800,6 +6140,7 @@ function onFisheyeImageActivate(e) {
   openFisheyeLightbox(imageUrl);
 }
 
+// Refreshes hover-preview state for edit-mode original images.
 function updateFisheyeOriginalPreview() {
   var previewIds = ['visualise-original-image', 'visualise-original-inline'];
   var stageIds = ['visualise-image-stage', 'visualise-inline'];
@@ -5823,6 +6164,7 @@ function updateFisheyeOriginalPreview() {
   }
 }
 
+// Handles fisheye random-seed toggle changes.
 function onFisheyeRdmxChange() {
   // Leaving random mode immediately rolls a new fixed seed, giving deterministic
   // behavior until RDMX is re-enabled while still avoiding a constant hardcoded seed.
@@ -5836,6 +6178,7 @@ function onFisheyeRdmxChange() {
   }
 }
 
+// Handles enabling or disabling fisheye edit mode.
 async function onFisheyeEditModeChange() {
   var cb = document.getElementById('fisheye-edit-mode');
   if (!cb) return;
@@ -5869,6 +6212,7 @@ async function onFisheyeEditModeChange() {
   updateFisheyeEditControls();
 }
 
+// Updates the stored edit-source image from the currently shown fisheye image.
 async function onFisheyeEditUpdate() {
   if (!isFisheyeEditModeEnabled()) return;
   var captured = await captureCurrentFisheyeAsEditSource();
@@ -5878,11 +6222,13 @@ async function onFisheyeEditUpdate() {
   }
 }
 
+// Reports whether fisheye auto-visualisation is enabled.
 function isVisualiseAutoEnabled() {
   var cb = document.getElementById('visualise-auto');
   return !!(cb && cb.checked);
 }
 
+// Checks whether fisheye should render in inline layout mode.
 function isFisheyeInlineMode() {
   if (!isVisualiseAutoEnabled()) return false;
   if (!window.matchMedia) return false;
@@ -5890,6 +6236,7 @@ function isFisheyeInlineMode() {
   return window.matchMedia('(max-width: 900px)').matches;
 }
 
+// Updates the main fisheye image elements to show a specific image URL.
 function setFisheyeImage(url) {
   var imageIds = ['visualise-image', 'visualise-image-inline'];
   if (url) lastDisplayedFisheyeImageUrl = url;
@@ -5911,6 +6258,7 @@ function setFisheyeImage(url) {
   updateFisheyeEditControls();
 }
 
+// Checks whether a fisheye image is currently loaded and visible.
 function hasLoadedCurrentFisheyeImage() {
   var imageIds = ['visualise-image', 'visualise-image-inline'];
   for (var i = 0; i < imageIds.length; i++) {
@@ -5922,6 +6270,7 @@ function hasLoadedCurrentFisheyeImage() {
   return false;
 }
 
+// Returns the URL of the fisheye image currently shown on screen.
 function getDisplayedFisheyeSrc() {
   var imageIds = ['visualise-image-inline', 'visualise-image'];
   for (var i = 0; i < imageIds.length; i++) {
@@ -5933,6 +6282,7 @@ function getDisplayedFisheyeSrc() {
   return '';
 }
 
+// Verifies that the rendered fisheye image actually updated after a request.
 function validateDisplayedFisheyeUpdate(expectedUrl, requestOutputText, retryCount) {
   if (fisheyeDisplayValidationTimer) {
     clearTimeout(fisheyeDisplayValidationTimer);
@@ -5952,6 +6302,7 @@ function validateDisplayedFisheyeUpdate(expectedUrl, requestOutputText, retryCou
   }, 180);
 }
 
+// Collects the fisheye progress overlay elements.
 function getFisheyeProgressOverlays() {
   var ids = ['fisheye-progress-overlay', 'fisheye-progress-overlay-inline'];
   var overlays = [];
@@ -5962,6 +6313,7 @@ function getFisheyeProgressOverlays() {
   return overlays;
 }
 
+// Attaches a completed fisheye image to the matching history entry.
 function attachFisheyeImageToHistory(outputText, imageRef, imageUrl) {
   if (!outputText || !imageUrl) return;
   if (currentOutputEntry && (currentOutputEntry.output || '').trim() === outputText) {
@@ -5980,6 +6332,7 @@ function attachFisheyeImageToHistory(outputText, imageRef, imageUrl) {
   }
 }
 
+// Refreshes edit-mode fisheye controls for current model and state.
 function updateFisheyeEditControls() {
   var editCb = document.getElementById('fisheye-edit-mode');
   var editLabel = document.getElementById('fisheye-edit-toggle-label');
@@ -6014,6 +6367,7 @@ function updateFisheyeEditControls() {
   updateFisheyeOriginalPreview();
 }
 
+// Enables or disables fisheye controls based on current app state.
 function updateFisheyeAvailability() {
   var cb = document.getElementById('visualise-auto');
   var label = document.getElementById('visualise-toggle-label');
@@ -6048,6 +6402,7 @@ function updateFisheyeAvailability() {
   updateFisheyeInlineMode();
 }
 
+// Refreshes fisheye inline-vs-panel layout classes.
 function updateFisheyeInlineMode() {
   var inlineWrap = document.getElementById('visualise-inline');
   var resizeHandle = document.getElementById('fisheye-resize-handle');
@@ -6067,6 +6422,7 @@ function updateFisheyeInlineMode() {
   }
 }
 
+// Sizes the fisheye output area to match the current mixer layout.
 function updateMixerFisheyeLayout() {
   var panel = document.getElementById('visualise-output');
   var mixer = document.getElementById('mixer');
@@ -6112,6 +6468,7 @@ function updateMixerFisheyeLayout() {
   panel.style.maxHeight = mixerH + 'px';
 }
 
+// Shows or hides the fisheye output area to match toggle state.
 function updateVisualiseOutputVisibility() {
   var panel = document.getElementById('visualise-output');
   if (!panel) return;
@@ -6133,6 +6490,7 @@ function updateVisualiseOutputVisibility() {
   renderChips();
 }
 
+// Requests a fisheye image refresh while honoring in-flight guards.
 function requestVisualiseRefresh() {
   if (snapshotRestoreInProgress) return;
   if (!isVisualiseAutoEnabled()) return;
@@ -6146,6 +6504,7 @@ function requestVisualiseRefresh() {
   visualiseCurrentOutput();
 }
 
+// Runs the fisheye image-generation request for the current output.
 async function visualiseCurrentOutput(retryCount) {
   if (retryCount === undefined) retryCount = 0;
   if (visualiseInFlight) return;
@@ -6193,12 +6552,14 @@ async function visualiseCurrentOutput(retryCount) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         output_text: sourceText,
+        prompt_model: document.getElementById('model-select').value || '',
         image_model: modelEl.value,
         image_seed: imageSeed,
         prompt_strength: isSsd1bModelSelected() ? getSsdPromptStrengthValue() : null,
         use_input_image: useInputImage,
         input_image_ref: useInputImage ? fisheyeEditSourceRef : null,
         input_image_url: useInputImage ? fisheyeEditSourceUrl : null,
+        creation_state: captureFisheyeSessionState(),
       }),
     });
     var data = await res.json();
@@ -6268,6 +6629,7 @@ async function visualiseCurrentOutput(retryCount) {
   }
 }
 
+// Handles toggling fisheye auto-visualisation on or off.
 function onVisualiseAutoChange() {
   syncSlwDefaultToVisualise();
   updateVisualiseOutputVisibility();
@@ -6276,6 +6638,7 @@ function onVisualiseAutoChange() {
   }
 }
 
+// Resolves chip collisions when BMP physics mode is enabled.
 function resolveBmpCollisions(speedScale) {
   if (!chipPhysicsBmpMode || !chipPhysicsEnabled) return false;
   if (speedScale <= 0.0001 || words.length < 2) return false;
@@ -6359,12 +6722,14 @@ function resolveBmpCollisions(speedScale) {
   return changed;
 }
 
+// Checks whether any chip currently has meaningful motion.
 function hasActiveChipMotion() {
   return words.some(function(w) {
     return Math.abs(w.vx || 0) > 0.0001 || Math.abs(w.vy || 0) > 0.0001;
   });
 }
 
+// Stops the continuous fish-physics animation loop.
 function stopChipPhysicsLoop() {
   if (chipPhysicsRaf) {
     cancelAnimationFrame(chipPhysicsRaf);
@@ -6372,6 +6737,7 @@ function stopChipPhysicsLoop() {
   }
 }
 
+// Starts the continuous fish-physics animation loop.
 function startChipPhysicsLoop() {
   if (!chipPhysicsEnabled || chipPhysicsRaf) return;
   chipPhysicsLastTs = performance.now();
@@ -6380,6 +6746,7 @@ function startChipPhysicsLoop() {
   chipPhysicsRaf = requestAnimationFrame(stepChipPhysics);
 }
 
+// Advances one animation frame of fish physics.
 function stepChipPhysics(ts) {
   if (!chipPhysicsEnabled) {
     stopChipPhysicsLoop();
@@ -6446,6 +6813,7 @@ function stepChipPhysics(ts) {
   chipPhysicsRaf = requestAnimationFrame(stepChipPhysics);
 }
 
+// Toggles fish physics on or off.
 function toggleChipPhysics() {
   var wasEnabled = chipPhysicsEnabled;
   chipPhysicsEnabled = !chipPhysicsEnabled;
@@ -6464,12 +6832,14 @@ function toggleChipPhysics() {
   refreshInactivityWatchState();
 }
 
+// Toggles BMP collision mode for fish physics.
 function toggleBmpMode() {
   chipPhysicsBmpMode = !chipPhysicsBmpMode;
   updateBmpButtonState();
   if (chipPhysicsBmpMode && chipPhysicsEnabled && hasActiveChipMotion()) startChipPhysicsLoop();
 }
 
+// Triggers the shark-run visual effect.
 function triggerSharkRun() {
   var run = document.getElementById('shark-run');
   if (!run) return;
@@ -6500,6 +6870,7 @@ function triggerSharkRun() {
   }, 1080);
 }
 
+// Prepares chip velocities for a randomized launch.
 function prepareTrajectoryLaunch() {
   if (!words.length) return false;
   if (!chipPhysicsEnabled) {
@@ -6514,6 +6885,7 @@ function prepareTrajectoryLaunch() {
   return true;
 }
 
+// Launches chips in randomized trajectories.
 function launchRandomTrajectories() {
   if (!prepareTrajectoryLaunch()) return;
   words.forEach(function(w) {
@@ -6527,6 +6899,7 @@ function launchRandomTrajectories() {
   scheduleUpdate(0);
 }
 
+// Handles changes to the selected text model.
 function onModelChange(triggerUpdate) {
   if (triggerUpdate === undefined) triggerUpdate = true;
   var select = document.getElementById('model-select');
@@ -6540,11 +6913,13 @@ function onModelChange(triggerUpdate) {
   if (triggerUpdate) scheduleUpdate(0);
 }
 
+// Returns the expected response time for the current text model.
 function getExpectedResponseMs() {
   if (modelTiming.count > 0 && modelTiming.avgMs > 0) return modelTiming.avgMs;
   return modelProgressDefaultMs;
 }
 
+// Records a completed response time for the current text model.
 function recordModelResponseTime(ms) {
   var select = document.getElementById('model-select');
   if (!select) return;
@@ -6561,6 +6936,7 @@ function recordModelResponseTime(ms) {
   updateModelTimingHint();
 }
 
+// Updates the text-model timing hint UI.
 function updateModelTimingHint() {
   var select = document.getElementById('model-select');
   if (!select) return;
@@ -6572,6 +6948,7 @@ function updateModelTimingHint() {
   select.title = 'Model response avg: ' + avgSec + 's. Choose model here. You pays your money, you takes your choice...';
 }
 
+// Sets the text-model progress fill amount.
 function setModelProgress(percent) {
   var select = document.getElementById('model-select');
   if (!select) return;
@@ -6579,6 +6956,7 @@ function setModelProgress(percent) {
   select.style.setProperty('--req-progress', p.toFixed(2) + '%');
 }
 
+// Sets the SLW countdown progress fill amount.
 function setSlwProgress(percent) {
   var select = document.getElementById('model-select');
   if (!select) return;
@@ -6586,11 +6964,13 @@ function setSlwProgress(percent) {
   select.style.setProperty('--slw-progress', p.toFixed(2) + '%');
 }
 
+// Reports whether SLW delay mode is enabled.
 function isSlwEnabled() {
   var cb = document.getElementById('slw-toggle');
   return !!(cb && cb.checked);
 }
 
+// Stops the SLW countdown display.
 function stopSlwProgressDisplay() {
   if (slwProgressRaf) {
     cancelAnimationFrame(slwProgressRaf);
@@ -6602,6 +6982,7 @@ function stopSlwProgressDisplay() {
   setSlwProgress(0);
 }
 
+// Starts the SLW countdown display for a pending delay.
 function startSlwProgressDisplay(delayMs) {
   stopSlwProgressDisplay();
   if (!delayMs || delayMs <= 0 || isStreaming) return;
@@ -6630,6 +7011,7 @@ function startSlwProgressDisplay(delayMs) {
   slwProgressRaf = requestAnimationFrame(tick);
 }
 
+// Sets the fisheye model-select progress indicator.
 function setFisheyeSelectProgress(percent) {
   var select = document.getElementById('fisheye-model-select');
   if (!select) return;
@@ -6637,6 +7019,7 @@ function setFisheyeSelectProgress(percent) {
   select.style.setProperty('--req-progress', p.toFixed(2) + '%');
 }
 
+// Stops the main request progress indicator.
 function stopRequestProgressDisplay() {
   stopSlwProgressDisplay();
   if (requestProgressRaf) {
@@ -6650,6 +7033,7 @@ function stopRequestProgressDisplay() {
   setModelProgress(0);
 }
 
+// Starts the main request progress indicator.
 function startRequestProgressDisplay() {
   stopRequestProgressDisplay();
 
@@ -6673,6 +7057,7 @@ function startRequestProgressDisplay() {
   requestProgressRaf = requestAnimationFrame(tick);
 }
 
+// Handles changes to the selected fisheye image model.
 function onFisheyeModelChange(triggerRefresh) {
   if (triggerRefresh === undefined) triggerRefresh = true;
   var select = document.getElementById('fisheye-model-select');
@@ -6689,11 +7074,13 @@ function onFisheyeModelChange(triggerRefresh) {
   }
 }
 
+// Returns the expected response time for the current fisheye model.
 function getExpectedFisheyeMs() {
   if (fisheyeTiming.count > 0 && fisheyeTiming.avgMs > 0) return fisheyeTiming.avgMs;
   return fisheyeProgressDefaultMs;
 }
 
+// Records a completed response time for the current fisheye model.
 function recordFisheyeResponseTime(ms) {
   var select = document.getElementById('fisheye-model-select');
   if (!select) return;
@@ -6711,6 +7098,7 @@ function recordFisheyeResponseTime(ms) {
   updateFisheyeTimingHint();
 }
 
+// Updates the fisheye model timing hint UI.
 function updateFisheyeTimingHint() {
   var select = document.getElementById('fisheye-model-select');
   if (!select) return;
@@ -6722,6 +7110,7 @@ function updateFisheyeTimingHint() {
   select.title = 'Fisheye image generation avg: ' + avgSec + 's.';
 }
 
+// Stops the fisheye progress indicator.
 function stopFisheyeProgressDisplay() {
   if (fisheyeProgressRaf) {
     cancelAnimationFrame(fisheyeProgressRaf);
@@ -6741,6 +7130,7 @@ function stopFisheyeProgressDisplay() {
   }
 }
 
+// Starts the fisheye progress indicator.
 function startFisheyeProgressDisplay() {
   // Progress is intentionally tied to the model selector (not image overlay)
   // so users always look in one place regardless of responsive layout mode.
@@ -6766,12 +7156,14 @@ function startFisheyeProgressDisplay() {
   fisheyeProgressRaf = requestAnimationFrame(tick);
 }
 
+// Sets the infinite-feedback countdown progress indicator.
 function setInfiniteButtonProgress(percent) {
   var btn = document.getElementById('infinite-feedback-btn');
   if (!btn) return;
   btn.style.setProperty('--loop-progress', '0%');
 }
 
+// Clears the infinite-feedback countdown timer.
 function clearInfiniteCountdown() {
   if (infiniteCountdownTimer) {
     clearTimeout(infiniteCountdownTimer);
@@ -6785,6 +7177,7 @@ function clearInfiniteCountdown() {
   setInfiniteButtonProgress(0);
 }
 
+// Starts the infinite-feedback countdown timer.
 function startInfiniteCountdown(delayMs) {
   clearInfiniteCountdown();
 
@@ -6827,6 +7220,7 @@ function startInfiniteCountdown(delayMs) {
   }, delayMs);
 }
 
+// Copies the current output back into thought when feedback mode requires it.
 function syncMissionToCurrentOutput() {
   if (isYouAreWhatYouEatEnabled()) return;
   var latestOutput = (currentOutput || '').trim();
@@ -6835,6 +7229,7 @@ function syncMissionToCurrentOutput() {
   document.getElementById('generated-prompt').textContent = buildPrompt();
 }
 
+// Updates the prompt-template status label.
 function setPromptTemplateStatus(text, isError) {
   var el = document.getElementById('prompt-template-status');
   if (!el) return;
@@ -6851,6 +7246,7 @@ function setPromptTemplateStatus(text, isError) {
   }
 }
 
+// Captures hardcoded prompt defaults for reset behavior.
 function captureHardcodedPromptDefaults() {
   var pre = document.getElementById('base-preamble');
   var clo = document.getElementById('base-closing');
@@ -6859,6 +7255,7 @@ function captureHardcodedPromptDefaults() {
   hardcodedBaseClosing = clo.value || '';
 }
 
+// Loads saved prompt templates into the live prompt editors.
 async function loadSavedPromptTemplates() {
   var pre = document.getElementById('base-preamble');
   var clo = document.getElementById('base-closing');
@@ -6874,6 +7271,7 @@ async function loadSavedPromptTemplates() {
   }
 }
 
+// Saves one live prompt section to the backend.
 async function savePromptSection(section) {
   var id = section === 'closing' ? 'base-closing' : 'base-preamble';
   var btnId = section === 'closing' ? 'save-closing-btn' : 'save-preamble-btn';
@@ -6899,6 +7297,7 @@ async function savePromptSection(section) {
   }
 }
 
+// Resets live prompt editors to hardcoded defaults.
 async function resetToHardcodedPrompts() {
   var pre = document.getElementById('base-preamble');
   var clo = document.getElementById('base-closing');
@@ -6926,6 +7325,7 @@ async function resetToHardcodedPrompts() {
   }
 }
 
+// Updates the Trawl button busy state.
 function setTrawlBusy(busy) {
   trawlInFlight = !!busy;
   var btn = document.getElementById('trawl-haul-btn');
@@ -6934,6 +7334,7 @@ function setTrawlBusy(busy) {
   btn.textContent = trawlInFlight ? 'hauling…' : 'Haul';
 }
 
+// Moves the text caret to the end of an editable element.
 function placeCaretAtEnd(el) {
   if (!el) return;
   var range = document.createRange();
@@ -6944,6 +7345,7 @@ function placeCaretAtEnd(el) {
   sel.addRange(range);
 }
 
+// Switches the current-output box into direct editing mode.
 function enterCurrentOutputEditMode() {
   if (!feedbackModeEnabled) return;
   if (isYouAreWhatYouEatEnabled()) return;
@@ -6970,6 +7372,7 @@ function enterCurrentOutputEditMode() {
   placeCaretAtEnd(outputEl);
 }
 
+// Leaves current-output edit mode and optionally applies the edit.
 function exitCurrentOutputEditMode(applyChanges) {
   var outputEl = document.getElementById('output-current');
   if (!outputEl || !currentOutputEditActive) return;
@@ -6988,6 +7391,7 @@ function exitCurrentOutputEditMode(applyChanges) {
   scheduleUpdate(0);
 }
 
+// Shows or hides the Trawl helper row.
 function toggleTrawlRow() {
   var body = document.getElementById('trawl-row-body');
   var btn = document.getElementById('trawl-toggle-btn');
@@ -6997,6 +7401,7 @@ function toggleTrawlRow() {
   btn.textContent = hidden ? 'hide' : 'show';
 }
 
+// Updates the inline snapshot status label.
 function setSnapshotStatus(text, isError) {
   var el = document.getElementById('snapshot-status');
   if (!el) return;
@@ -7013,6 +7418,7 @@ function setSnapshotStatus(text, isError) {
   }
 }
 
+// Runs a queued snapshot load once active requests have finished.
 function maybeRunPendingSnapshotLoad() {
   if (!pendingSnapshotLoadRequest) return;
   if (isStreaming || visualiseInFlight) return;
@@ -7021,6 +7427,7 @@ function maybeRunPendingSnapshotLoad() {
   loadSnapshotById(pending.snapshotId, pending.options || {});
 }
 
+// Clears the temporary snapshot button animation timer.
 function clearSnapshotButtonFxTimer() {
   if (snapshotButtonFxTimer) {
     clearTimeout(snapshotButtonFxTimer);
@@ -7028,6 +7435,7 @@ function clearSnapshotButtonFxTimer() {
   }
 }
 
+// Updates the snapshot button to reflect an active save.
 function setSnapshotButtonSaving(active) {
   var btn = document.getElementById('save-snapshot-btn');
   if (!btn) return;
@@ -7044,6 +7452,7 @@ function setSnapshotButtonSaving(active) {
   }
 }
 
+// Shows the saved-state animation on the snapshot button.
 function flashSnapshotButtonSaved() {
   var btn = document.getElementById('save-snapshot-btn');
   if (!btn) return;
@@ -7059,6 +7468,7 @@ function flashSnapshotButtonSaved() {
   }, 1100);
 }
 
+// Shows or hides the Snapshots section row.
 function toggleSnapshotsRow() {
   var body = document.getElementById('snapshots-row-body');
   var btn = document.getElementById('snapshots-toggle-btn');
@@ -7068,6 +7478,7 @@ function toggleSnapshotsRow() {
   btn.textContent = hidden ? 'hide' : 'show';
 }
 
+// Reads the snapshot id from the current page URL.
 function getSnapshotIdFromUrl() {
   try {
     var params = new URLSearchParams(window.location.search || '');
@@ -7077,6 +7488,7 @@ function getSnapshotIdFromUrl() {
   }
 }
 
+// Writes or removes the snapshot id in the current page URL.
 function setSnapshotIdInUrl(snapshotId, replace) {
   try {
     var url = new URL(window.location.href);
@@ -7094,10 +7506,12 @@ function setSnapshotIdInUrl(snapshotId, replace) {
   } catch (_) {}
 }
 
+// Creates a plain deep copy of JSON-safe state.
 function clonePlain(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+// Captures the current UI state for the session-image gallery.
 function captureFisheyeSessionState() {
   var outputWrap = document.getElementById('output-with-controls');
   return {
@@ -7151,6 +7565,7 @@ function captureFisheyeSessionState() {
   };
 }
 
+// Returns the currently active session-image frame entry.
 function getCurrentFisheyeSessionFrame() {
   if (!activeFisheyeSessionFrameId) return null;
   for (var i = 0; i < fisheyeSessionFrames.length; i++) {
@@ -7159,10 +7574,12 @@ function getCurrentFisheyeSessionFrame() {
   return null;
 }
 
+// Checks whether session-image hover-to-load behavior should be used.
 function isDesktopHoverSessionGalleryMode() {
   return !!(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches);
 }
 
+// Normalizes a saved session-image state before restoring it.
 function buildSessionFrameLoadState(frameState) {
   var state = clonePlain(frameState || {});
   if (!state.controls) state.controls = {};
@@ -7177,6 +7594,7 @@ function buildSessionFrameLoadState(frameState) {
   return state;
 }
 
+// Restores a session-image gallery entry into the live UI.
 function loadFisheyeSessionFrame(frame, source) {
   if (!frame || !frame.state) return;
   if (activeFisheyeSessionFrameId === frame.id && source === 'hover') return;
@@ -7190,6 +7608,7 @@ function loadFisheyeSessionFrame(frame, source) {
   pushApiLog('fisheye', 'info', 'Restored session image state from gallery' + (source ? ' via ' + source : '') + '.');
 }
 
+// Clears all in-memory session-image gallery entries.
 function clearFisheyeSessionGallery() {
   fisheyeSessionFrames = [];
   fisheyeSessionFrameCounter = 0;
@@ -7199,6 +7618,7 @@ function clearFisheyeSessionGallery() {
   pushApiLog('fisheye', 'info', 'Cleared session image gallery.');
 }
 
+// Enables or disables the session-image scroll arrows.
 function updateFisheyeSessionScrollButtons() {
   var list = document.getElementById('fisheye-session-list');
   var leftBtn = document.getElementById('fisheye-session-left-btn');
@@ -7210,6 +7630,7 @@ function updateFisheyeSessionScrollButtons() {
   rightBtn.disabled = scrollLeft >= (maxScroll - 2);
 }
 
+// Scrolls the session-image gallery left or right.
 function scrollFisheyeSessionGallery(direction) {
   var list = document.getElementById('fisheye-session-list');
   if (!list) return;
@@ -7221,6 +7642,7 @@ function scrollFisheyeSessionGallery(direction) {
   setTimeout(updateFisheyeSessionScrollButtons, 220);
 }
 
+// Matches the active session-image entry to current fisheye state.
 function syncActiveFisheyeSessionFrame() {
   var matchedId = null;
   for (var i = fisheyeSessionFrames.length - 1; i >= 0; i--) {
@@ -7236,6 +7658,7 @@ function syncActiveFisheyeSessionFrame() {
   activeFisheyeSessionFrameId = matchedId;
 }
 
+// Renders the current session-image gallery strip.
 function renderFisheyeSessionGallery() {
   var list = document.getElementById('fisheye-session-list');
   var empty = document.getElementById('fisheye-session-empty');
@@ -7256,6 +7679,10 @@ function renderFisheyeSessionGallery() {
     btn.type = 'button';
     btn.className = 'fisheye-session-thumb' + (frame.id === activeFisheyeSessionFrameId ? ' active' : '');
     btn.title = 'Load session image ' + (index + 1);
+    var handledByTouch = false;
+    var touchStartX = 0;
+    var touchStartY = 0;
+    var touchMoved = false;
 
     var media = document.createElement('div');
     media.className = 'fisheye-session-thumb-media';
@@ -7295,7 +7722,41 @@ function renderFisheyeSessionGallery() {
         loadFisheyeSessionFrame(frame, 'focus');
       });
     }
-    btn.addEventListener('click', function() {
+    btn.addEventListener('touchstart', function(e) {
+      if (isDesktopHoverSessionGalleryMode()) return;
+      markTouchUiActivity();
+      var touch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
+      touchStartX = touch ? touch.clientX : 0;
+      touchStartY = touch ? touch.clientY : 0;
+      touchMoved = false;
+      handledByTouch = false;
+    }, { passive: true });
+    btn.addEventListener('touchmove', function(e) {
+      if (isDesktopHoverSessionGalleryMode()) return;
+      var touch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]);
+      if (!touch) return;
+      if (Math.abs(touch.clientX - touchStartX) > 12 || Math.abs(touch.clientY - touchStartY) > 12) {
+        touchMoved = true;
+      }
+    }, { passive: true });
+    btn.addEventListener('touchend', function(e) {
+      if (isDesktopHoverSessionGalleryMode()) return;
+      markTouchUiActivity();
+      if (touchMoved) return;
+      handledByTouch = true;
+      if (e.cancelable) e.preventDefault();
+      loadFisheyeSessionFrame(frame, 'touch');
+    });
+    btn.addEventListener('touchcancel', function() {
+      handledByTouch = false;
+      touchMoved = false;
+    }, { passive: true });
+    btn.addEventListener('click', function(e) {
+      if (handledByTouch) {
+        handledByTouch = false;
+        e.preventDefault();
+        return;
+      }
       if (isDesktopHoverSessionGalleryMode()) return;
       loadFisheyeSessionFrame(frame, 'click');
     });
@@ -7305,6 +7766,7 @@ function renderFisheyeSessionGallery() {
   updateFisheyeSessionScrollButtons();
 }
 
+// Adds a successful fisheye render to the session-image gallery.
 function addFisheyeSessionFrame(imageRef, imageUrl, outputText) {
   if (!imageUrl) return;
   var state = captureFisheyeSessionState();
@@ -7331,6 +7793,7 @@ function addFisheyeSessionFrame(imageRef, imageUrl, outputText) {
   renderFisheyeSessionGallery();
 }
 
+// Converts a snapshot timestamp into a YYYY-MM-DD day value.
 function getSnapshotDayValue(createdAt) {
   var ts = Number(createdAt || 0);
   if (!isFinite(ts) || ts <= 0) return '';
@@ -7341,6 +7804,7 @@ function getSnapshotDayValue(createdAt) {
   return y + '-' + m + '-' + day;
 }
 
+// Extracts a fisheye image ref from a local fisheye image URL.
 function _coerceFisheyeRefFromUrl(imageUrl) {
   var raw = String(imageUrl || '').trim();
   if (!raw) return null;
@@ -7355,6 +7819,7 @@ function _coerceFisheyeRefFromUrl(imageUrl) {
   return ref || null;
 }
 
+// Formats a snapshot day value into a human-readable label.
 function formatSnapshotDayLabel(dayValue) {
   if (!dayValue || !/^\d{4}-\d{2}-\d{2}$/.test(dayValue)) return dayValue || 'Unknown day';
   var parts = dayValue.split('-');
@@ -7366,6 +7831,7 @@ function formatSnapshotDayLabel(dayValue) {
   });
 }
 
+// Refreshes the snapshot day and snapshot selector options.
 function refreshSnapshotSelectors(selectIdToUse) {
   var daySelect = document.getElementById('snapshot-day-select');
   var snapshotSelect = document.getElementById('snapshot-select');
@@ -7415,6 +7881,7 @@ function refreshSnapshotSelectors(selectIdToUse) {
   }
 }
 
+// Builds a usable word pool for snapshot-title generation.
 function snapshotWordPool(text) {
   return String(text || '')
     .toLowerCase()
@@ -7426,11 +7893,13 @@ function snapshotWordPool(text) {
     });
 }
 
+// Picks one word for snapshot-title generation.
 function pickSnapshotWord(words, fallback) {
   if (!Array.isArray(words) || !words.length) return fallback;
   return words[Math.floor(Math.random() * words.length)] || fallback;
 }
 
+// Builds a descriptive auto-title for a new snapshot.
 function buildSnapshotTitle(state) {
   var thoughtWords = snapshotWordPool(state && state.mission);
   var outputWords = snapshotWordPool(state && state.current_output);
@@ -7452,6 +7921,7 @@ function buildSnapshotTitle(state) {
   return title;
 }
 
+// Ensures a snapshot image reference points to a saved image.
 async function ensureSnapshotImageRef(imageRef, imageUrl) {
   if (!imageRef && !imageUrl) return { image_ref: null, image_url: '' };
   if (!imageRef && /^\/api\/snapshots\/[^/]+\/images\//.test(String(imageUrl || ''))) {
@@ -7465,6 +7935,7 @@ async function ensureSnapshotImageRef(imageRef, imageUrl) {
   };
 }
 
+// Chooses the best visible fisheye image candidate for snapshot save.
 function getVisibleSnapshotImageCandidate() {
   var displayedUrl = getDisplayedFisheyeSrc();
   if (displayedUrl) {
@@ -7485,6 +7956,7 @@ function getVisibleSnapshotImageCandidate() {
   };
 }
 
+// Captures the full current UI state for snapshot saving.
 async function captureSnapshotState() {
   var currentImageCandidate = getVisibleSnapshotImageCandidate();
   var currentImage = await ensureSnapshotImageRef(currentImageCandidate.image_ref, currentImageCandidate.image_url);
@@ -7546,6 +8018,7 @@ async function captureSnapshotState() {
   };
 }
 
+// Restores a saved snapshot state into the current UI.
 function applySnapshotState(state, options) {
   if (!state || typeof state !== 'object') return;
   options = options || {};
@@ -7682,6 +8155,7 @@ function applySnapshotState(state, options) {
   }
 }
 
+// Loads the snapshot list from the backend and refreshes selectors.
 async function refreshSnapshotList(selectIdToUse) {
   try {
     var res = await fetch('/api/snapshots');
@@ -7703,6 +8177,7 @@ async function refreshSnapshotList(selectIdToUse) {
   }
 }
 
+// Saves the current UI state as a new snapshot.
 async function saveSnapshot() {
   setSnapshotButtonSaving(true);
   setSnapshotStatus('Saving snapshot...');
@@ -7730,6 +8205,7 @@ async function saveSnapshot() {
   }
 }
 
+// Loads a snapshot by id and restores its saved state.
 async function loadSnapshotById(snapshotId, options) {
   options = options || {};
   var resolvedId = String(snapshotId || '').trim();
@@ -7772,12 +8248,14 @@ async function loadSnapshotById(snapshotId, options) {
   }
 }
 
+// Loads the snapshot currently selected in the UI.
 async function loadSelectedSnapshot() {
   var select = document.getElementById('snapshot-select');
   if (!select || !select.value) return;
   await loadSnapshotById(select.value, { updateUrl: true, replaceUrl: false, syncSelectors: true });
 }
 
+// Requests a zip download of snapshot current-output images.
 function downloadSnapshotCurrentOutputsZip() {
   var zipDaySelect = document.getElementById('snapshot-zip-day-select');
   var day = zipDaySelect ? String(zipDaySelect.value || 'all') : 'all';
@@ -7790,12 +8268,14 @@ function downloadSnapshotCurrentOutputsZip() {
   }, 180);
 }
 
+// Updates snapshot selection when the chosen day changes.
 function onSnapshotDayChange() {
   var snapshotSelect = document.getElementById('snapshot-select');
   refreshSnapshotSelectors('');
   if (snapshotSelect) snapshotSelect.value = '';
 }
 
+// Runs a one-off text-model call for helper features like Trawl.
 async function callModelPrompt(prompt, model) {
   var response = await fetch('/api/generate', {
     method: 'POST',
@@ -7829,6 +8309,7 @@ async function callModelPrompt(prompt, model) {
   return assembled.trim();
 }
 
+// Normalizes a Trawl-generated thought sentence.
 function normaliseTrawlSentence(text) {
   var s = (text || '').replace(/\s+/g, ' ').trim();
   if (!s) return '';
@@ -7837,6 +8318,7 @@ function normaliseTrawlSentence(text) {
   return s;
 }
 
+// Parses Trawl-generated fish concepts into normalized tokens.
 function parseTrawlConcepts(text) {
   var raw = (text || '').trim();
   if (!raw) return [];
@@ -7856,6 +8338,7 @@ function parseTrawlConcepts(text) {
   return normaliseConceptTokens(tokens).slice(0, 5);
 }
 
+// Runs the Trawl helper to generate a thought and fish concepts.
 async function haulTrawl() {
   if (trawlInFlight) return;
   var thoughtEl = document.getElementById('trawl-thought');
@@ -7902,11 +8385,13 @@ async function haulTrawl() {
 /* ═══════════════════════════════
    RESIZE
 ═══════════════════════════════ */
+// Clamps mixer height to the allowed screen-aware range.
 function clampMixerHeight(px) {
   var viewportCap = Math.max(760, window.innerHeight - 160);
   return Math.max(220, Math.min(viewportCap, Math.round(px)));
 }
 
+// Applies a mixer height to the live layout.
 function applyMixerHeight(px) {
   var mixer = document.getElementById('mixer');
   if (!mixer) return;
@@ -7915,6 +8400,7 @@ function applyMixerHeight(px) {
   renderChips();
 }
 
+// Clamps fisheye pane width to the allowed range.
 function clampFisheyePaneWidth(px) {
   var row = document.getElementById('mixer-top-row');
   if (!row) return Math.max(220, Math.min(640, Math.round(px || 280)));
@@ -7924,12 +8410,14 @@ function clampFisheyePaneWidth(px) {
   return Math.max(minW, Math.min(maxW, Math.round(px)));
 }
 
+// Applies a fisheye pane width to the live layout.
 function applyFisheyePaneWidth(px) {
   fisheyePaneManualWidth = clampFisheyePaneWidth(px);
   updateMixerFisheyeLayout();
   renderChips();
 }
 
+// Sets up the vertical mixer resize handle.
 function setupMixerResizer() {
   var handle = document.getElementById('mixer-resize-handle');
   var mixer = document.getElementById('mixer');
@@ -7960,6 +8448,7 @@ function setupMixerResizer() {
   });
 }
 
+// Sets up the horizontal fisheye pane resize handle.
 function setupFisheyeResizer() {
   var handle = document.getElementById('fisheye-resize-handle');
   var panel = document.getElementById('visualise-output');
@@ -8006,10 +8495,12 @@ window.addEventListener('resize', function() {
 ═══════════════════════════════ */
 var tagTokens = []; // array of strings
 
+// Synchronizes the hidden concepts textarea from visible fish tokens.
 function tagSyncTextarea() {
   document.getElementById('sentence-input').value = tagTokens.join(', ');
 }
 
+// Renders the visible fish token list and delete controls.
 function tagRender() {
   var wrap  = document.getElementById('tag-input-wrap');
   var field = document.getElementById('tag-input-field');
@@ -8036,10 +8527,12 @@ function tagRender() {
   });
 }
 
+// Escapes HTML special characters for safe inline rendering.
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// Commits a typed fish concept into the visible token list.
 function tagCommit(raw) {
   var val = raw.trim().replace(/,+$/, '').trim();
   if (val.length === 0) return;
@@ -8131,6 +8624,7 @@ captureHardcodedPromptDefaults();
 loadSavedPromptTemplates();
 initUiTheme();
 setupTouchToggleLabels();
+setupDragImageUpload();
 bindControlButton('feedback-btn', applyFeedback);
 bindControlButton('infinite-feedback-btn', toggleInfiniteFeedback);
 bindControlButton('theme-toggle-btn', toggleUiTheme);
@@ -8155,6 +8649,8 @@ bindControlButton('fisheye-session-right-btn', function() { scrollFisheyeSession
   'history-toggle-btn',
   'fishtails-toggle-btn',
   'configuration-toggle-btn',
+  'upload-toggle-btn',
+  'upload-image-btn',
   'cfg-save-config-btn',
   'cfg-reset-config-btn',
   'cfg-save-preamble-btn',
@@ -8201,6 +8697,13 @@ if (downloadSnapshotCurrentOutputsBtnEl) downloadSnapshotCurrentOutputsBtnEl.add
 var refreshSnapshotBtnEl = document.getElementById('refresh-snapshot-btn');
 if (refreshSnapshotBtnEl) refreshSnapshotBtnEl.addEventListener('click', function() {
   refreshSnapshotList();
+});
+var uploadImageBtnEl = document.getElementById('upload-image-btn');
+if (uploadImageBtnEl) uploadImageBtnEl.addEventListener('click', uploadEmbeddedImage);
+var uploadImageFileEl = document.getElementById('upload-image-file');
+if (uploadImageFileEl) uploadImageFileEl.addEventListener('change', function() {
+  var hasFile = !!(uploadImageFileEl.files && uploadImageFileEl.files.length);
+  setUploadImageStatus(hasFile ? ('Selected ' + (uploadImageFileEl.files[0].name || 'image')) : '', '');
 });
 var fisheyeSessionListEl = document.getElementById('fisheye-session-list');
 if (fisheyeSessionListEl) fisheyeSessionListEl.addEventListener('scroll', updateFisheyeSessionScrollButtons, { passive: true });
@@ -8315,7 +8818,6 @@ loadAppConfig().finally(function() {
   refreshInactivityWatchState();
   syncOutputWindowHeightToThought();
   scheduleUpdate(0);
-});
-</script>
+});</script>
 </body>
 </html>

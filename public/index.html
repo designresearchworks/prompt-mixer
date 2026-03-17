@@ -155,6 +155,7 @@ function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", safeTheme);
 }
 
+// Loads the preferred theme from local storage first, then falls back to app config.
 async function loadTheme() {
   try {
     const stored = localStorage.getItem("prompt_mixer_theme");
